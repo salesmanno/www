@@ -19,7 +19,7 @@ try {
     $email = trim($input['email']);
     $phone = isset($input['phone']) ? trim($input['phone']) : null;
     
-    // Validate
+    // Validate required fields
     if (empty($name)) {
         echo json_encode(['success' => false, 'message' => 'Navn er påkrevd']);
         exit;
@@ -27,6 +27,11 @@ try {
     
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         echo json_encode(['success' => false, 'message' => 'Gyldig e-postadresse er påkrevd']);
+        exit;
+    }
+    
+    if (empty($phone)) {
+        echo json_encode(['success' => false, 'message' => 'Telefonnummer er påkrevd']);
         exit;
     }
     

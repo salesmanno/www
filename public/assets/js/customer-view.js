@@ -60,7 +60,57 @@ function updatePageContent(data) {
     if (data.aboutUs) {
         const aboutContent = document.getElementById('aboutContent');
         if (aboutContent) {
-            aboutContent.innerHTML = data.aboutUs;
+            let content = data.aboutUs;
+            
+            // Add contact info section if available
+            const settings = data.settings || {};
+            const hasContact = settings.contact_address || settings.contact_phone || settings.contact_email;
+            
+            if (hasContact) {
+                content += '<div class="contact-info-section">';
+                content += '<h3>Kontaktinformasjon</h3>';
+                
+                if (settings.contact_address) {
+                    content += `<div class="contact-item">
+                        <span class="contact-icon">📍</span>
+                        <span>${escapeHtml(settings.contact_address)}</span>
+                    </div>`;
+                }
+                
+                if (settings.contact_phone) {
+                    content += `<div class="contact-item">
+                        <span class="contact-icon">📞</span>
+                        <a href="tel:${escapeHtml(settings.contact_phone)}">${escapeHtml(settings.contact_phone)}</a>
+                    </div>`;
+                }
+                
+                if (settings.contact_email) {
+                    content += `<div class="contact-item">
+                        <span class="contact-icon">✉️</span>
+                        <a href="mailto:${escapeHtml(settings.contact_email)}">${escapeHtml(settings.contact_email)}</a>
+                    </div>`;
+                }
+                
+                // Add map if address is available
+                if (settings.contact_address) {
+                    const mapQuery = encodeURIComponent(settings.contact_address);
+                    content += `<div class="map-container">
+                        <div style="margin-top: 0.5rem; text-align: center; margin-bottom: 1rem;">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="map-link-btn"
+                               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                                📍 Vis på kart (Google Maps)
+                            </a>
+                        </div>
+                    </div>`;
+                }
+                
+                content += '</div>';
+            }
+            
+            aboutContent.innerHTML = content;
         }
     } else {
         const aboutContent = document.getElementById('aboutContent');

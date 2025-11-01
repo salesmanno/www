@@ -293,6 +293,67 @@ body {
     }
 }
 
+/* Contact Info Section */
+.contact-info-section {
+    margin-top: 2.5rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    border: 1px solid #dee2e6;
+}
+
+.contact-info-section h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.contact-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.contact-icon {
+    font-size: 1.3rem;
+    min-width: 30px;
+    text-align: center;
+}
+
+.contact-item a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.contact-item a:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
+.map-container {
+    margin-top: 1.5rem;
+}
+
+.map-container iframe {
+    display: block;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .hero-title {
