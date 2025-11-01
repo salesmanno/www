@@ -109,6 +109,11 @@ body {
     border-radius: 3px;
 }
 
+.nav-tab-link {
+    text-decoration: none;
+    display: inline-block;
+}
+
 .pages-container {
     display: flex;
     width: 300vw;

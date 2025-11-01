@@ -68,9 +68,9 @@ function displayEvents(events) {
                     
                     <div class="event-price">${formatPrice(event.ticket_price)} kr</div>
                     
-                    ${spotsLeft !== null ? `
-                        <div class="event-capacity ${isFull ? 'full' : isLowCapacity ? 'warning' : ''}">
-                            ${isFull ? '❌ Fullt booket' : isLowCapacity ? `⚠️ Kun ${spotsLeft} plasser igjen!` : `✓ ${spotsLeft} plasser tilgjengelig`}
+                    ${isFull ? `
+                        <div class="event-capacity full">
+                            ❌ Fullt booket
                         </div>
                     ` : ''}
                     

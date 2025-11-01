@@ -99,7 +99,7 @@ function updatePageContent(data) {
                             <div class="event-details">
                                 ${service.start_date ? `<div class="event-date">📅 ${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
                                 ${service.venue_name ? `<div class="event-venue">📍 ${escapeHtml(service.venue_name)}</div>` : ''}
-                                ${spotsLeft !== null ? `<div class="event-spots ${isFull ? 'full' : ''}">${isFull ? '❌ Fullt' : `✓ ${spotsLeft} plasser igjen`}</div>` : ''}
+                                ${isFull ? `<div class="event-spots full">❌ Fullt</div>` : ''}
                             </div>
                             ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
                             ${!isFull ? `<button class="register-btn" onclick="openEventRegistration('${service.product_id}', '${escapeHtml(service.name)}')">Meld deg på</button>` : '<div class="full-badge">Fullt booket</div>'}
