@@ -88,21 +88,54 @@ function updatePageContent(data) {
         if (servicesGrid) {
             servicesGrid.innerHTML = data.services.map(service => {
                 if (service.product_type === 'event') {
-                    // Event card - link to reservations page
+                    // Event card with expandable registration
                     const spotsLeft = service.max_attendees ? service.max_attendees - (service.registered_count || 0) : null;
                     const isFull = spotsLeft !== null && spotsLeft <= 0;
+                    const eventId = service.product_id;
                     
                     return `
-                        <div class="service-card event-card">
-                            <h3>${escapeHtml(service.name)}</h3>
-                            ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
-                            <div class="event-details">
-                                ${service.start_date ? `<div class="event-date">📅 ${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
-                                ${service.venue_name ? `<div class="event-venue">📍 ${escapeHtml(service.venue_name)}</div>` : ''}
-                                ${isFull ? `<div class="event-spots full">❌ Fullt</div>` : ''}
+                        <div class="service-card event-card" id="event-${eventId}">
+                            ${service.image_url ? `<img src="${escapeHtml(service.image_url)}" alt="${escapeHtml(service.name)}" class="event-image">` : ''}
+                            
+                            <div class="event-card-content">
+                                <h3>${escapeHtml(service.name)}</h3>
+                                ${service.description ? `<p class="event-description">${escapeHtml(service.description)}</p>` : ''}
+                                
+                                <div class="event-details">
+                                    ${service.start_date ? `<div class="event-date">📅 ${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
+                                    ${service.venue_name ? `<div class="event-venue">📍 ${escapeHtml(service.venue_name)}</div>` : ''}
+                                    ${isFull ? `<div class="event-spots full">❌ Fullt</div>` : ''}
+                                </div>
+                                
+                                ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
+                                
+                                ${!isFull ? `
+                                    <button class="register-btn" onclick="toggleEventRegistration('${eventId}')">
+                                        <span class="btn-text">Reserver billett</span>
+                                        <span class="btn-arrow">↓</span>
+                                    </button>
+                                ` : '<div class="full-badge">Fullt booket</div>'}
+                                
+                                <div class="event-registration-form" id="form-${eventId}" style="display: none;">
+                                    <h4>Meld deg på arrangementet</h4>
+                                    <form onsubmit="submitEventRegistration(event, '${eventId}', '${escapeHtml(service.name)}')">
+                                        <div class="form-group">
+                                            <label>Fullt navn *</label>
+                                            <input type="text" name="name" required minlength="2" placeholder="Ola Nordmann">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>E-post *</label>
+                                            <input type="email" name="email" required placeholder="ola@example.com">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Telefon *</label>
+                                            <input type="tel" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
+                                        </div>
+                                        <div class="form-message-${eventId}" style="display: none;"></div>
+                                        <button type="submit" class="submit-btn">Send påmelding</button>
+                                    </form>
+                                </div>
                             </div>
-                            ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
-                            ${!isFull ? `<a href="/public/bergsoy/reservasjoner.php" class="register-btn" style="display: block; text-decoration: none; text-align: center;">Se detaljer og meld deg på</a>` : '<div class="full-badge">Fullt booket</div>'}
                         </div>
                     `;
                 } else {
@@ -265,6 +298,88 @@ function formatEventDate(dateStr, timeStr) {
     }
     
     return dateFormatted;
+}
+
+// Toggle event registration form
+function toggleEventRegistration(eventId) {
+    const form = document.getElementById(`form-${eventId}`);
+    const card = document.getElementById(`event-${eventId}`);
+    const button = card.querySelector('.register-btn');
+    const arrow = button.querySelector('.btn-arrow');
+    
+    if (form.style.display === 'none') {
+        // Show form with smooth animation
+        form.style.display = 'block';
+        setTimeout(() => {
+            form.classList.add('show');
+            card.classList.add('expanded');
+            arrow.textContent = '↑';
+            button.querySelector('.btn-text').textContent = 'Skjul skjema';
+        }, 10);
+    } else {
+        // Hide form
+        form.classList.remove('show');
+        card.classList.remove('expanded');
+        arrow.textContent = '↓';
+        button.querySelector('.btn-text').textContent = 'Reserver billett';
+        setTimeout(() => {
+            form.style.display = 'none';
+        }, 300);
+    }
+}
+
+// Submit event registration
+async function submitEventRegistration(e, eventId, eventName) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const messageContainer = document.querySelector(`.form-message-${eventId}`);
+    
+    const formData = {
+        event_id: eventId,
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        phone: form.phone.value.trim()
+    };
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sender...';
+    messageContainer.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/register_event_public.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            messageContainer.className = `form-message-${eventId} success`;
+            messageContainer.textContent = '✓ ' + result.message;
+            messageContainer.style.display = 'block';
+            form.reset();
+            
+            setTimeout(() => {
+                toggleEventRegistration(eventId);
+                loadData(); // Reload to update capacity
+            }, 2000);
+        } else {
+            messageContainer.className = `form-message-${eventId} error`;
+            messageContainer.textContent = result.message;
+            messageContainer.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send påmelding';
+        }
+    } catch (error) {
+        messageContainer.className = `form-message-${eventId} error`;
+        messageContainer.textContent = 'Noe gikk galt. Vennligst prøv igjen.';
+        messageContainer.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send påmelding';
+    }
 }
 
 // Keyboard navigation (optional)

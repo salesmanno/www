@@ -20,7 +20,6 @@
             <span class="nav-tab" data-page="about" onclick="swipeTo('about')">Om Oss</span>
             <span class="nav-tab active" data-page="home" onclick="swipeTo('home')">Hjem</span>
             <span class="nav-tab" data-page="services" onclick="swipeTo('services')">Tjenester</span>
-            <a href="/public/bergsoy/reservasjoner.php" class="nav-tab nav-tab-link">Arrangementer</a>
         </div>
 
         <!-- Pages Container -->
