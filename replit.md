@@ -71,6 +71,22 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * No authentication required for customers
     * No capacity details shown to public (privacy)
     * Success message auto-closes overlay after 2 seconds
+  - **Service booking**: Full-screen overlay booking page with interactive calendar and time selection
+    * Service cards display "📅 Book time" button for regular services (non-events)
+    * Click button opens full-screen booking overlay with slide-up animation
+    * **Date selector**: Horizontal scrollable date picker showing next 14 weekdays
+    * **Staff calendar**: Grid-based availability calendar showing time slots (30-min intervals, 08:00-18:00)
+    * **Privacy-first design**: Staff shown as numbered columns (Ansatt 1, 2, 3...) - no names disclosed
+    * **Visual indicators**: ✓ (green) for available, ✗ (red) for booked, selected slots highlighted in purple gradient
+    * **Interactive booking**: Click any available slot to select date/time/staff
+    * **Booking summary**: Shows selected date, time, and staff number before confirmation
+    * **Customer form**: Name, email, phone (all required with validation)
+    * **Smart allocation**: Automatically assigns available staff member for selected time slot
+    * **Duplicate prevention**: Prevents same customer from booking same service multiple times
+    * **Member pricing notice**: "ℹ️ Medlemspriser tildeles automatisk" displayed on booking page
+    * Stores bookings in `service_bookings` table
+    * No authentication required for public booking
+    * Success message auto-closes overlay after 2.5 seconds
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`
     * Shows event details: title, description, date/time, venue, capacity
@@ -81,6 +97,8 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * `get_public_website_data.php` - Fetches all public data for main website
     * `get_public_events.php` - Fetches all upcoming events for reservations page
     * `register_event_public.php` - Public event registration (no auth required)
+    * `get_public_service_availability.php` - Fetches available time slots for service booking (14 days, weekdays only, 30-min intervals)
+    * `book_service_public.php` - Creates service booking with automatic staff assignment (no auth required)
 
 ## External Dependencies
 - **Database**: Dual database support with PDO:

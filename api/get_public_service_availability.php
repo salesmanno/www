@@ -20,11 +20,11 @@ try {
     
     // Get service details and find company
     $stmt = $db->prepare("
-        SELECT op.*, rs.duration_minutes, rs.id as service_internal_id
+        SELECT op.*, rs.duration_minutes, rs.capacity, rs.id as service_internal_id
         FROM output_products op
-        LEFT JOIN reservation_services rs ON rs.id = op.source_id
+        LEFT JOIN reservation_services rs ON rs.id = op.product_id
         WHERE op.id = ?
-        AND op.is_active = true
+        AND op.is_visible = true
     ");
     $stmt->execute([$serviceId]);
     $service = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -36,6 +36,7 @@ try {
     
     $companyId = $service['company_id'];
     $duration = $service['duration_minutes'] ?? 60; // Default 60 minutes
+    $serviceCapacity = $service['capacity'] ?? null;
     
     // Get all active staff for this company
     $stmt = $db->prepare("
@@ -133,22 +134,51 @@ try {
             $availableStaffCount = 0;
             $staffAvailability = [];
             
+            // Calculate end time for this slot
+            $slotStart = new DateTime($dateStr . ' ' . $time);
+            $slotEnd = clone $slotStart;
+            $slotEnd->add(new DateInterval('PT' . $duration . 'M'));
+            
+            // Check if slot end time is beyond operating hours
+            $opHoursEnd = new DateTime($dateStr . ' ' . sprintf('%02d:00:00', $endHour));
+            $slotExceedsHours = $slotEnd > $opHoursEnd;
+            
+            // If service has capacity limits, check total overlapping bookings for this slot
+            $capacityReached = false;
+            if ($serviceCapacity && $serviceCapacity > 0) {
+                $slotEndTime = $slotEnd->format('H:i:s');
+                $stmt = $db->prepare("
+                    SELECT COUNT(*) as booking_count
+                    FROM service_bookings
+                    WHERE company_id = ?
+                    AND service_id = ?
+                    AND date_from = ?
+                    AND status NOT IN ('cancelled', 'completed')
+                    AND (
+                        (time_from < ? AND time_to > ?)
+                        OR (time_from >= ? AND time_from < ?)
+                    )
+                ");
+                $stmt->execute([
+                    $companyId, 
+                    $service['service_internal_id'], 
+                    $dateStr,
+                    $slotEndTime,  // bookings that start before our slot ends
+                    $time,         // and end after our slot starts
+                    $time,         // OR bookings that start at/after our slot start
+                    $slotEndTime   // and start before our slot ends
+                ]);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $capacityReached = $result['booking_count'] >= $serviceCapacity;
+            }
+            
             foreach ($staffIds as $index => $staffId) {
                 $isAvailable = true;
                 
-                // Calculate end time for this slot
-                $slotStart = new DateTime($dateStr . ' ' . $time);
-                $slotEnd = clone $slotStart;
-                $slotEnd->add(new DateInterval('PT' . $duration . 'M'));
-                
-                // Check if slot end time is beyond operating hours
-                $opHoursEnd = new DateTime($dateStr . ' ' . sprintf('%02d:00:00', $endHour));
-                if ($slotEnd > $opHoursEnd) {
+                if ($slotExceedsHours || $capacityReached) {
                     $isAvailable = false;
-                }
-                
-                // Check against all bookings for this staff on this date
-                if ($isAvailable) {
+                } else {
+                    // Check against all bookings for this staff on this date
                     foreach ($bookings as $booking) {
                         if ($booking['date_from'] === $dateStr && $booking['assigned_staff_id'] == $staffId) {
                             $bookingStart = new DateTime($dateStr . ' ' . $booking['time_from']);

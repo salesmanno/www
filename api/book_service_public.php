@@ -37,11 +37,11 @@ try {
     
     // Get service details
     $stmt = $db->prepare("
-        SELECT op.*, rs.duration_minutes, rs.id as service_internal_id
+        SELECT op.*, rs.duration_minutes, rs.capacity, rs.id as service_internal_id
         FROM output_products op
-        LEFT JOIN reservation_services rs ON rs.id = op.source_id
+        LEFT JOIN reservation_services rs ON rs.id = op.product_id
         WHERE op.id = ?
-        AND op.is_active = true
+        AND op.is_visible = true
     ");
     $stmt->execute([$serviceId]);
     $service = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,11 +55,50 @@ try {
     $companyId = $service['company_id'];
     $duration = $service['duration_minutes'] ?? 60;
     
-    // Calculate end time
+    // Calculate end time first
     $startDateTime = new DateTime($bookingDate . ' ' . $bookingTime);
     $endDateTime = clone $startDateTime;
     $endDateTime->add(new DateInterval('PT' . $duration . 'M'));
     $endTime = $endDateTime->format('H:i:s');
+    
+    // Server-side validation: Check operating hours and weekdays
+    $dayOfWeek = (int)$startDateTime->format('w');
+    $startHour = (int)$startDateTime->format('H');
+    
+    // Define operating hours boundaries
+    $openingTime = new DateTime($bookingDate . ' 08:00:00');
+    $closingTime = new DateTime($bookingDate . ' 18:00:00');
+    
+    // Reject weekends
+    if ($dayOfWeek === 0 || $dayOfWeek === 6) {
+        $db->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Bookinger er kun tillatt på hverdager (mandag-fredag)']);
+        exit;
+    }
+    
+    // Reject bookings outside operating hours (08:00-18:00)
+    // Start time must be >= 08:00 and < 18:00
+    if ($startDateTime < $openingTime || $startDateTime >= $closingTime) {
+        $db->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Bookinger må starte mellom 08:00 og 18:00']);
+        exit;
+    }
+    
+    // End time must be <= 18:00 on the same day (no bookings extending past closing or into next day)
+    if ($endDateTime > $closingTime || $endDateTime->format('Y-m-d') !== $bookingDate) {
+        $db->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Bookingen kan ikke vare forbi stengetid kl. 18:00']);
+        exit;
+    }
+    
+    // Reject past dates
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    if ($startDateTime < $today) {
+        $db->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Kan ikke booke i fortiden']);
+        exit;
+    }
     
     // Find available staff for this slot
     $stmt = $db->prepare("
@@ -98,22 +137,53 @@ try {
     
     $assignedStaffId = $availableStaff['id'];
     
-    // Check for duplicate booking (same email, date, service within last 5 minutes)
+    // Check for duplicate booking (same email, date, service - ANY active booking)
     $stmt = $db->prepare("
         SELECT id FROM service_bookings
         WHERE company_id = ?
         AND customer_email = ?
         AND date_from = ?
         AND service_id = ?
-        AND status NOT IN ('cancelled')
-        AND created_at > NOW() - INTERVAL '5 minutes'
+        AND status NOT IN ('cancelled', 'completed')
     ");
     $stmt->execute([$companyId, $customerEmail, $bookingDate, $service['service_internal_id']]);
     
     if ($stmt->fetch()) {
         $db->rollBack();
-        echo json_encode(['success' => false, 'message' => 'Du har allerede en aktiv booking for denne tjenesten. Hvis du ønsker å endre tiden, vennligst kontakt oss.']);
+        echo json_encode(['success' => false, 'message' => 'Du har allerede en aktiv booking for denne tjenesten på denne datoen. Hvis du ønsker å endre tiden, vennligst kontakt oss.']);
         exit;
+    }
+    
+    // Check service capacity if configured (check for overlapping bookings)
+    if (isset($service['capacity']) && $service['capacity'] > 0) {
+        $stmt = $db->prepare("
+            SELECT COUNT(*) as booking_count
+            FROM service_bookings
+            WHERE company_id = ?
+            AND service_id = ?
+            AND date_from = ?
+            AND status NOT IN ('cancelled', 'completed')
+            AND (
+                (time_from < ? AND time_to > ?)
+                OR (time_from >= ? AND time_from < ?)
+            )
+        ");
+        $stmt->execute([
+            $companyId, 
+            $service['service_internal_id'], 
+            $bookingDate,
+            $endTime,      // bookings that start before our end time
+            $bookingTime,  // and end after our start time
+            $bookingTime,  // OR bookings that start at/after our start
+            $endTime       // and start before our end time
+        ]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result['booking_count'] >= $service['capacity']) {
+            $db->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Beklager, dette tidspunktet er fullt booket. Vennligst velg et annet tidspunkt.']);
+            exit;
+        }
     }
     
     // Create booking
