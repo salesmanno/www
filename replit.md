@@ -101,15 +101,13 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Stores registrations in `tenant_members` table with status='pending'
     * No authentication required for public registration
     * Success message auto-closes overlay after 2.5 seconds
-  - **Contact information in Om oss**: Displays company contact details with interactive map
-    * **Contact info section**: Shows address (📍), phone (📞), and email (✉️) with icons
+  - **Simplified contact section in Om oss**: Clean, minimalist contact display with embedded map
+    * **Embedded Google Map**: Full interactive map displayed by default (300px height) with rounded corners and shadow
     * **Address from tenant_companies**: Dynamically builds address from separate columns (address_street, address_city, address_zip, address_state, address_country)
     * **Contact priority**: Prefers company contact info (`tenant_companies.contact_email`, `tenant_companies.contact_phone`) over settings fallback
-    * **Dynamic data**: Contact information fetched from `tenant_website_general` table
-    * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links
-    * **Map integration**: Google Maps button dynamically generated from tenant's contact_address
-    * **Tenant-specific**: Each company's map link opens their specific address location
-    * **Styling**: Gradient background, hover effects, responsive design
+    * **Simplified contact line**: Single centered line below map with phone (📞) and email (✉️) separated by bullet point
+    * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links in purple color (#667eea)
+    * **No complex boxes**: Removed structured contact info section for cleaner, more accessible design
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`
     * Shows event details: title, description, date/time, venue, capacity

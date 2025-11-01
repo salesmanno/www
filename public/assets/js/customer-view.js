@@ -65,7 +65,7 @@ function updatePageContent(data) {
         if (aboutContent) {
             let content = data.aboutUs;
             
-            // Add contact info section if available
+            // Add simplified contact info
             const company = data.company || {};
             const settings = data.settings || {};
             
@@ -90,51 +90,43 @@ function updatePageContent(data) {
             const contactPhone = company.contact_phone || settings.contact_phone;
             const contactEmail = company.contact_email || settings.contact_email;
             const contactAddress = fullAddress || settings.contact_address;
+            const companyName = company.name || 'Oss';
             
-            const hasContact = contactAddress || contactPhone || contactEmail;
-            
-            if (hasContact) {
-                content += '<div class="contact-info-section">';
-                content += '<h3>Kontaktinformasjon</h3>';
-                
-                if (contactAddress) {
-                    content += `<div class="contact-item">
-                        <span class="contact-icon">📍</span>
-                        <span>${escapeHtml(contactAddress)}</span>
+            // Add embedded Google Map first
+            if (contactAddress) {
+                const mapQuery = encodeURIComponent(contactAddress);
+                content += `
+                    <div class="simple-map-container">
+                        <iframe 
+                            src="https://maps.google.com/maps?q=${mapQuery}&t=&z=13&ie=UTF8&iwloc=&output=embed"
+                            width="100%" 
+                            height="300" 
+                            style="border:0; border-radius: 12px; margin-top: 2rem;" 
+                            allowfullscreen="" 
+                            loading="lazy" 
+                            referrerpolicy="no-referrer-when-downgrade">
+                        </iframe>
                     </div>`;
-                }
+            }
+            
+            // Add simple contact info below map
+            if (contactPhone || contactEmail) {
+                content += '<div class="simple-contact">';
+                content += `<p style="margin-top: 1.5rem; font-size: 1rem; color: #1a1a1a; line-height: 1.8;">`;
                 
                 if (contactPhone) {
-                    content += `<div class="contact-item">
-                        <span class="contact-icon">📞</span>
-                        <a href="tel:${escapeHtml(contactPhone)}">${escapeHtml(contactPhone)}</a>
-                    </div>`;
+                    content += `📞 <a href="tel:${escapeHtml(contactPhone)}" style="color: #667eea; text-decoration: none; font-weight: 500;">${escapeHtml(contactPhone)}</a>`;
+                }
+                
+                if (contactPhone && contactEmail) {
+                    content += ` • `;
                 }
                 
                 if (contactEmail) {
-                    content += `<div class="contact-item">
-                        <span class="contact-icon">✉️</span>
-                        <a href="mailto:${escapeHtml(contactEmail)}">${escapeHtml(contactEmail)}</a>
-                    </div>`;
+                    content += `✉️ <a href="mailto:${escapeHtml(contactEmail)}" style="color: #667eea; text-decoration: none; font-weight: 500;">${escapeHtml(contactEmail)}</a>`;
                 }
                 
-                // Add map if address is available
-                if (contactAddress) {
-                    const mapQuery = encodeURIComponent(contactAddress);
-                    content += `<div class="map-container">
-                        <div style="margin-top: 0.5rem; text-align: center; margin-bottom: 1rem;">
-                            <a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               class="map-link-btn"
-                               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: transform 0.2s ease, box-shadow 0.2s ease;">
-                                📍 Vis på kart (Google Maps)
-                            </a>
-                        </div>
-                    </div>`;
-                }
-                
-                content += '</div>';
+                content += '</p></div>';
             }
             
             aboutContent.innerHTML = content;
