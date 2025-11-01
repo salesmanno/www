@@ -473,7 +473,7 @@ body {
 /* Event Registration Overlay */
 .event-registration-overlay {
     position: fixed;
-    top: 0;
+    top: 144px; /* Below logo (80px) + nav header (64px) */
     left: 0;
     right: 0;
     bottom: 0;
@@ -494,7 +494,7 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 100%;
+    height: calc(100vh - 144px); /* Full height minus header space */
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 24px 24px 0 0;
     transform: translateY(100%);

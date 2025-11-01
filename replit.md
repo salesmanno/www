@@ -59,9 +59,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
     * Events: `events_eventdata` (joined with output_products for event details)
-  - **Event registration**: Full-screen overlay registration page with slide-up animation and **customizable registration fields**
+  - **Event registration**: Registration modal that respects header/nav bar with slide-up animation and **customizable registration fields**
     * Event cards show on "Tjenester" page with event image (280px height), description, date/time, venue, and price
-    * Click "Reserver billett" opens full-screen registration overlay
+    * Click "Reserver billett" opens registration modal (starts below nav bar at 144px from top)
     * Smooth slide-up animation from bottom (similar to fane/tab swipe transitions)
     * Registration page displays: event image (350px height), event name, event info box, and registration form
     * Event info box includes: description, date/time, venue, price, and "ℹ️ Medlemspriser tildeles automatisk" notice
@@ -82,9 +82,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * No authentication required for customers
     * No capacity details shown to public (privacy)
     * Success message auto-closes overlay after 2 seconds
-  - **Service booking**: Full-screen overlay booking page with simplified time slot selection
+  - **Service booking**: Booking modal that respects header/nav bar with simplified time slot selection
     * Service cards display "📅 Book time" button for regular services (non-events)
-    * Click button opens full-screen booking overlay with slide-up animation
+    * Click button opens booking modal (starts below nav bar at 144px from top) with slide-up animation
     * **Date selector**: Horizontal scrollable date picker showing next 14 weekdays
     * **Simplified time slots**: Shows simple LEDIG (available) or OPPTATT (booked) status for each time slot (30-min intervals, 08:00-18:00)
     * **No staff visibility**: Removed staff-grid columns for privacy and simplicity
@@ -95,9 +95,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Stores bookings in `service_bookings` table
     * No authentication required for public booking
     * Success message auto-closes overlay after 2.5 seconds
-  - **Membership registration**: Full-screen overlay registration for membership sign-ups
+  - **Membership registration**: Registration modal that respects header/nav bar for membership sign-ups
     * Membership cards display "👤 Bli medlem" button
-    * Click button opens full-screen registration overlay with slide-up animation
+    * Click button opens registration modal (starts below nav bar at 144px from top) with slide-up animation
     * **Minimal required fields**: Name, email, phone (all validated on frontend and backend)
     * **Duplicate prevention**: Prevents same email from registering multiple times as active member
     * **Server-side validation**: API enforces all three required fields (name, email, phone)
