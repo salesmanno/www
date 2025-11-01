@@ -67,17 +67,18 @@ body {
 }
 
 .header-tagline {
-    font-size: 0.75rem;
-    color: #666;
+    font-size: 0.55rem;
+    color: #999;
     text-align: right;
     white-space: nowrap;
     position: absolute;
     right: 20px;
+    bottom: 8px;
 }
 
 .header-tagline span {
-    font-weight: 600;
-    color: #1a1a1a;
+    font-weight: 500;
+    color: #666;
 }
 
 .nav-header {
