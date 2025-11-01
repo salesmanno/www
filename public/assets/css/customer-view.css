@@ -40,6 +40,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 15px;
     padding: 15px 20px;
     z-index: 1001;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -49,6 +50,13 @@ body {
     height: 50px;
     width: auto;
     object-fit: contain;
+}
+
+.header-company-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
 }
 
 .nav-header {
@@ -194,20 +202,11 @@ body {
     margin-bottom: 50px;
 }
 
-
-.hero-title {
-    font-size: 3.5rem;
-    font-weight: 700;
-    margin-bottom: 15px;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    animation: fadeInUp 0.8s ease 0.2s both;
-}
-
 .hero-subtitle {
-    font-size: 1.5rem;
-    font-weight: 300;
+    font-size: 1.8rem;
+    font-weight: 400;
     opacity: 0.95;
-    animation: fadeInUp 0.8s ease 0.4s both;
+    animation: fadeInUp 0.8s ease 0.2s both;
 }
 
 /* Page Title */

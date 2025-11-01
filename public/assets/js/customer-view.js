@@ -36,10 +36,10 @@ async function loadData() {
 
 // Update page content with API data
 function updatePageContent(data) {
-    // Update company info
+    // Update company info in header
     if (data.company) {
-        const titleEl = document.getElementById('heroTitle');
-        if (titleEl) titleEl.textContent = data.company.name;
+        const headerNameEl = document.getElementById('headerCompanyName');
+        if (headerNameEl) headerNameEl.textContent = data.company.name;
     }
     
     // Update hero section with settings

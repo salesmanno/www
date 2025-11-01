@@ -12,6 +12,7 @@
         <!-- Logo Section -->
         <div class="logo-section">
             <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="header-logo" id="headerLogo">
+            <h1 class="header-company-name" id="headerCompanyName">Bergsøy</h1>
         </div>
         
         <!-- Navigation Header -->
@@ -55,7 +56,6 @@
                     </button>
                     <div class="content-wrapper">
                         <div class="hero-section">
-                            <h1 class="hero-title" id="heroTitle">Bergsøy</h1>
                             <p class="hero-subtitle" id="heroSubtitle">Velkommen</p>
                         </div>
                         
