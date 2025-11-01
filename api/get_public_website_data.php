@@ -140,7 +140,7 @@ try {
         $stmt->execute([$companyId]);
         $aboutData = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Get services (from output_products) with event details
+        // Get services (from output_products) with event details - OPTIMIZED
         $stmt = $db->prepare("
             SELECT 
                 op.id, 
@@ -158,9 +158,14 @@ try {
                 ed.venue_name,
                 ed.max_attendees,
                 COALESCE(ed.ticket_price, op.price) as ticket_price,
-                (SELECT COUNT(*) FROM events_checkin WHERE event_id = ed.id) as registered_count
+                COALESCE(ec.count, 0) as registered_count
             FROM output_products op
             LEFT JOIN events_eventdata ed ON op.product_type = 'event' AND op.product_id = ed.id
+            LEFT JOIN (
+                SELECT event_id, COUNT(*) as count 
+                FROM events_checkin 
+                GROUP BY event_id
+            ) ec ON ed.id = ec.event_id
             WHERE op.company_id = ? AND op.is_visible = " . dbBool(true) . "
             ORDER BY 
                 CASE WHEN op.product_type = 'event' THEN 0 ELSE 1 END,

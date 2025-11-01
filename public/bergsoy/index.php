@@ -111,6 +111,6 @@
         </div>
     </div>
 
-    <script src="../assets/js/customer-view.js"></script>
+    <script src="../assets/js/customer-view.js" defer></script>
 </body>
 </html>
