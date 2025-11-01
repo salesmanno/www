@@ -48,6 +48,12 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - Bergsøy example implementation in `/public/bergsoy/`
   - Gradient-based design with smooth animations
   - Mobile-first responsive design with touch gestures
+  - Data sources:
+    * Company info: `tenant_companies` (Ditt Firma)
+    * Website config: `tenant_website_config` (Ditt Nettsted)
+    * Website settings: `tenant_website_general` (Ditt Nettsted)
+    * News/announcements: `tenant_announcements` (displayed on homepage)
+    * Services: `output_products` (displayed on services page)
 
 ## External Dependencies
 - **Database**: Dual database support with PDO:

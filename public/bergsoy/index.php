@@ -54,6 +54,14 @@
                             <h1 class="hero-title" id="heroTitle">Bergsøy</h1>
                             <p class="hero-subtitle" id="heroSubtitle">Velkommen</p>
                         </div>
+                        
+                        <!-- News/Announcements Section -->
+                        <div class="news-section" id="newsSection">
+                            <h2 class="section-title">Nyheter</h2>
+                            <div class="news-container" id="newsContainer">
+                                <p>Laster nyheter...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

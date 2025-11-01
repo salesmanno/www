@@ -146,6 +146,7 @@ body {
 .hero-section {
     text-align: center;
     animation: fadeInUp 0.8s ease;
+    margin-bottom: 50px;
 }
 
 .company-logo {
@@ -291,6 +292,74 @@ body {
     .nav-arrow-right {
         right: 10px;
     }
+}
+
+/* News Section */
+.news-section {
+    margin-top: 40px;
+    animation: fadeInUp 0.8s ease 0.6s both;
+}
+
+.section-title {
+    font-size: 2rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.news-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.news-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.news-card.pinned {
+    border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.news-card.pinned::before {
+    content: '📌';
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 1.2rem;
+}
+
+.news-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.news-card h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    padding-right: 30px;
+}
+
+.news-card p {
+    font-size: 1rem;
+    opacity: 0.95;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.news-date {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    font-style: italic;
 }
 
 /* Scrollbar Styling */

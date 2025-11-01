@@ -63,6 +63,25 @@ function updatePageContent(data) {
         }
     }
     
+    // Update News/Announcements
+    if (data.announcements && data.announcements.length > 0) {
+        const newsContainer = document.getElementById('newsContainer');
+        if (newsContainer) {
+            newsContainer.innerHTML = data.announcements.map(news => `
+                <div class="news-card ${news.is_pinned ? 'pinned' : ''}">
+                    <h3>${escapeHtml(news.title)}</h3>
+                    <p>${escapeHtml(news.content)}</p>
+                    <div class="news-date">${formatDate(news.publish_at || news.created_at)}</div>
+                </div>
+            `).join('');
+        }
+    } else {
+        const newsContainer = document.getElementById('newsContainer');
+        if (newsContainer) {
+            newsContainer.innerHTML = '<p>Ingen nyheter for øyeblikket.</p>';
+        }
+    }
+    
     // Update Services
     if (data.services && data.services.length > 0) {
         const servicesGrid = document.getElementById('servicesGrid');
@@ -183,6 +202,29 @@ function formatPrice(price) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+        return 'I dag';
+    } else if (diffDays === 1) {
+        return 'I går';
+    } else if (diffDays < 7) {
+        return `${diffDays} dager siden`;
+    } else {
+        return date.toLocaleDateString('no-NO', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    }
 }
 
 // Keyboard navigation (optional)
