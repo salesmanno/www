@@ -71,10 +71,10 @@ try {
     $endDateObj->add(new DateInterval('P' . ($days - 1) . 'D'));
     $endDate = $endDateObj->format('Y-m-d');
     
-    // Get all existing bookings for the period
+    // Get all existing bookings for the period (for active staff only)
     $placeholders = str_repeat('?,', count($staffIds) - 1) . '?';
     $stmt = $db->prepare("
-        SELECT date_from, time_from, time_to, assigned_staff_id
+        SELECT date_from, time_from, time_to, assigned_staff_id, service_id
         FROM service_bookings
         WHERE company_id = ?
         AND assigned_staff_id IN ($placeholders)
@@ -87,6 +87,34 @@ try {
     $params = array_merge([$companyId], $staffIds, [$startDate, $endDate]);
     $stmt->execute($params);
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get ALL bookings for capacity checking (including inactive staff)
+    $serviceInternalId = $service['service_internal_id'];
+    $allServiceBookings = [];
+    if ($serviceInternalId) {
+        $stmt = $db->prepare("
+            SELECT date_from, time_from, time_to
+            FROM service_bookings
+            WHERE company_id = ?
+            AND service_id = ?
+            AND date_from >= ?
+            AND date_from <= ?
+            AND status NOT IN ('cancelled', 'completed')
+            ORDER BY date_from, time_from
+        ");
+        $stmt->execute([$companyId, $serviceInternalId, $startDate, $endDate]);
+        $allServiceBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    // Pre-calculate bookings per date for capacity checking
+    $serviceBookingsByDate = [];
+    foreach ($allServiceBookings as $booking) {
+        $date = $booking['date_from'];
+        if (!isset($serviceBookingsByDate[$date])) {
+            $serviceBookingsByDate[$date] = [];
+        }
+        $serviceBookingsByDate[$date][] = $booking;
+    }
     
     // Operating hours (can be customized later)
     $startHour = 8;  // 08:00
@@ -145,31 +173,18 @@ try {
             
             // If service has capacity limits, check total overlapping bookings for this slot
             $capacityReached = false;
-            if ($serviceCapacity && $serviceCapacity > 0) {
-                $slotEndTime = $slotEnd->format('H:i:s');
-                $stmt = $db->prepare("
-                    SELECT COUNT(*) as booking_count
-                    FROM service_bookings
-                    WHERE company_id = ?
-                    AND service_id = ?
-                    AND date_from = ?
-                    AND status NOT IN ('cancelled', 'completed')
-                    AND (
-                        (time_from < ? AND time_to > ?)
-                        OR (time_from >= ? AND time_from < ?)
-                    )
-                ");
-                $stmt->execute([
-                    $companyId, 
-                    $service['service_internal_id'], 
-                    $dateStr,
-                    $slotEndTime,  // bookings that start before our slot ends
-                    $time,         // and end after our slot starts
-                    $time,         // OR bookings that start at/after our slot start
-                    $slotEndTime   // and start before our slot ends
-                ]);
-                $result = $stmt->fetch(PDO::FETCH_ASSOC);
-                $capacityReached = $result['booking_count'] >= $serviceCapacity;
+            if ($serviceCapacity && $serviceCapacity > 0 && isset($serviceBookingsByDate[$dateStr])) {
+                $overlappingCount = 0;
+                foreach ($serviceBookingsByDate[$dateStr] as $booking) {
+                    $bookingStart = new DateTime($dateStr . ' ' . $booking['time_from']);
+                    $bookingEnd = new DateTime($dateStr . ' ' . $booking['time_to']);
+                    
+                    // Check for overlap
+                    if ($slotStart < $bookingEnd && $slotEnd > $bookingStart) {
+                        $overlappingCount++;
+                    }
+                }
+                $capacityReached = $overlappingCount >= $serviceCapacity;
             }
             
             foreach ($staffIds as $index => $staffId) {
