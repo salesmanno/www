@@ -118,19 +118,23 @@ function updatePageContent(data) {
                         </div>
                     `;
                 } else {
-                    // Regular service card - use 'id' as service_id for booking
+                    // Regular service/product card
+                    const isService = service.product_type === 'service';
                     const bookingData = {
                         ...service,
                         service_id: service.id  // Use output_products.id for booking API
                     };
+                    
                     return `
                         <div class="service-card">
                             <h3>${escapeHtml(service.name)}</h3>
                             ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
                             ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
-                            <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(bookingData).replace(/'/g, "&apos;")})'>
-                                📅 Book time
-                            </button>
+                            ${isService ? `
+                                <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(bookingData).replace(/'/g, "&apos;")})'>
+                                    📅 Book time
+                                </button>
+                            ` : ''}
                         </div>
                     `;
                 }
