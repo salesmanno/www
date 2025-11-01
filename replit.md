@@ -39,21 +39,20 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
 - **Clean Database Architecture**: Modular database design eliminating duplicates and redundancy, standardizing tables, adding cost price tracking, and introducing `service_bookings` and `unified_ledger` tables.
 
 ## Recent Changes
-- **November 1, 2025**: Created customer-facing public website view
-  - New folder structure: `public/` for customer views
-  - Implemented modern, responsive website with swipe/touch navigation
-  - Three-page layout: Om Oss (left), Hjem (center), Tjenester (right)
-  - Multi-tenant support based on subdomain/folder structure
-  - API endpoint `get_public_website_data.php` with mock data fallback
-  - Bergsøy example implementation in `/public/bergsoy/`
-  - Gradient-based design with smooth animations
-  - Mobile-first responsive design with touch gestures
-  - Data sources:
+- **November 1, 2025**: Customer website now active as main view
+  - **Main landing page**: Root URL (`/`) now redirects to customer view (`/public/bergsoy/`)
+  - **Admin login relocated**: Moved to `/admin.php` (previously at `/`)
+  - **News/announcements on homepage**: Public website displays news from `tenant_announcements` table
+  - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
+  - **Three-page layout**: Om Oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
+  - **Modern gradient design**: Smooth animations and mobile-first responsive design
+  - **Data sources**:
     * Company info: `tenant_companies` (Ditt Firma)
     * Website config: `tenant_website_config` (Ditt Nettsted)
     * Website settings: `tenant_website_general` (Ditt Nettsted)
-    * News/announcements: `tenant_announcements` (displayed on homepage)
+    * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
+  - **API endpoint**: `get_public_website_data.php` with mock data fallback for development
 
 ## External Dependencies
 - **Database**: Dual database support with PDO:

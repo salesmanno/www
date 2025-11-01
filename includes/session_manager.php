@@ -14,7 +14,7 @@ if (isset($_SESSION['session_id']) && isset($_SESSION['tenant_admin_id'])) {
     // If database type changed, force logout
     if ($currentDbType !== $sessionDbType) {
         session_destroy();
-        header('Location: /index.php?msg=database_changed');
+        header('Location: /admin.php?msg=database_changed');
         exit;
     }
     

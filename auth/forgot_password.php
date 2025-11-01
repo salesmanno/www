@@ -5,7 +5,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php?error=invalid_request');
+    header('Location: ../admin.php?error=invalid_request');
     exit;
 }
 
@@ -17,7 +17,7 @@ $generic_message = 'reset_request_sent';
 
 if (empty($email) || empty($secret)) {
     // Don't reveal that fields are missing
-    header('Location: ../index.php?message=' . $generic_message);
+    header('Location: ../admin.php?message=' . $generic_message);
     exit;
 }
 
@@ -26,7 +26,7 @@ try {
     
     if ($db === null) {
         error_log("Forgot password: Database connection failed");
-        header('Location: ../index.php?message=' . $generic_message);
+        header('Location: ../admin.php?message=' . $generic_message);
         exit;
     }
     
@@ -58,12 +58,12 @@ try {
     }
     
     // Always return the same generic message regardless of success/failure
-    header('Location: ../index.php?message=' . $generic_message);
+    header('Location: ../admin.php?message=' . $generic_message);
     exit;
     
 } catch (Exception $e) {
     error_log("Forgot password error: " . $e->getMessage());
     // Still return generic message even on error
-    header('Location: ../index.php?message=' . $generic_message);
+    header('Location: ../admin.php?message=' . $generic_message);
     exit;
 }

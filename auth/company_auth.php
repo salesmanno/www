@@ -5,7 +5,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php?error=invalid_request');
+    header('Location: ../admin.php?error=invalid_request');
     exit;
 }
 
@@ -13,36 +13,36 @@ $username = $_POST['username'] ?? '';
 $password = $_POST['password'] ?? '';
 
 if (empty($username) || empty($password)) {
-    header('Location: ../index.php?error=invalid_credentials');
+    header('Location: ../admin.php?error=invalid_credentials');
     exit;
 }
 
 try {
     $db = getDBConnection();
     if (!$db) {
-        header('Location: ../index.php?error=database_unavailable');
+        header('Location: ../admin.php?error=database_unavailable');
         exit;
     }
     
     $admin = getTenantAdminByUsername($username);
     
     if (!$admin) {
-        header('Location: ../index.php?error=invalid_credentials');
+        header('Location: ../admin.php?error=invalid_credentials');
         exit;
     }
     
     if (!verifyPassword($password, $admin['password_hash'])) {
-        header('Location: ../index.php?error=invalid_credentials');
+        header('Location: ../admin.php?error=invalid_credentials');
         exit;
     }
     
     if (!$admin['is_active']) {
-        header('Location: ../index.php?error=account_inactive');
+        header('Location: ../admin.php?error=account_inactive');
         exit;
     }
     
     if (!$admin['company_active']) {
-        header('Location: ../index.php?error=company_inactive');
+        header('Location: ../admin.php?error=company_inactive');
         exit;
     }
     
@@ -70,7 +70,7 @@ try {
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($result['active_sessions'] > 0) {
-        header('Location: ../index.php?error=already_logged_in');
+        header('Location: ../admin.php?error=already_logged_in');
         exit;
     }
     
@@ -97,6 +97,6 @@ try {
     
 } catch (Exception $e) {
     error_log("Login error: " . $e->getMessage());
-    header('Location: ../index.php?error=system_error');
+    header('Location: ../admin.php?error=system_error');
     exit;
 }
