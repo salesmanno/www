@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (!$input || !isset($input['event_id']) || !isset($input['name']) || !isset($input['email'])) {
+if (!$input || !isset($input['event_id'])) {
     echo json_encode(['success' => false, 'message' => 'Manglende påkrevde felt']);
     exit;
 }
@@ -23,9 +23,69 @@ try {
     $db = getDBConnection();
     
     $event_id = $input['event_id'];
-    $name = trim($input['name']);
-    $email = trim($input['email']);
+    
+    // Fetch registration fields for this event to validate required fields
+    $stmt = $db->prepare("
+        SELECT field_name, field_label, is_required 
+        FROM event_registration_fields 
+        WHERE event_id = ? AND is_visible = 1
+    ");
+    $stmt->execute([$event_id]);
+    $registrationFields = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Validate required fields
+    $missingFields = [];
+    foreach ($registrationFields as $field) {
+        if ($field['is_required'] && (!isset($input[$field['field_name']]) || trim($input[$field['field_name']]) === '')) {
+            $missingFields[] = $field['field_label'];
+        }
+    }
+    
+    if (!empty($missingFields)) {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Manglende påkrevde felt: ' . implode(', ', $missingFields)
+        ]);
+        exit;
+    }
+    
+    // Extract standard fields
+    $first_name = isset($input['first_name']) ? trim($input['first_name']) : '';
+    $last_name = isset($input['last_name']) ? trim($input['last_name']) : '';
+    
+    // Support legacy 'name' field for backward compatibility
+    if (empty($first_name) && empty($last_name) && isset($input['name'])) {
+        $name = trim($input['name']);
+    } else {
+        $name = trim($first_name . ' ' . $last_name);
+    }
+    
+    $email = isset($input['email']) ? trim($input['email']) : null;
     $phone = isset($input['phone']) ? trim($input['phone']) : null;
+    $street = isset($input['street']) ? trim($input['street']) : null;
+    $zip = isset($input['zip']) ? trim($input['zip']) : null;
+    $city = isset($input['city']) ? trim($input['city']) : null;
+    $postal = isset($input['postal']) ? trim($input['postal']) : null;
+    
+    // Enforce minimum required fields regardless of configuration
+    if (empty($name)) {
+        echo json_encode(['success' => false, 'message' => 'Navn er påkrevd']);
+        exit;
+    }
+    
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['success' => false, 'message' => 'Gyldig e-postadresse er påkrevd']);
+        exit;
+    }
+    
+    // Extract custom fields (not in standard columns)
+    $standardFieldNames = ['first_name', 'last_name', 'name', 'email', 'phone', 'street', 'zip', 'city', 'postal', 'event_id'];
+    $customFields = [];
+    foreach ($input as $key => $value) {
+        if (!in_array($key, $standardFieldNames) && $value !== null && trim($value) !== '') {
+            $customFields[$key] = trim($value);
+        }
+    }
     
     // Verify event exists and is active
     $stmt = $db->prepare("
@@ -81,13 +141,16 @@ try {
         );
     }
     
-    // Insert registration into events_checkin
+    // Insert registration into events_checkin with all fields
     $stmt = $db->prepare("
         INSERT INTO events_checkin 
         (id, event_id, attendee_name, attendee_email, attendee_phone, 
-         ticket_type, ticket_price, payment_status, checked_in, created_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, 'online', ?, 'pending', " . dbBool(false) . ", NOW(), NOW())
+         attendee_street, attendee_zip, attendee_city, attendee_postal,
+         custom_fields, ticket_type, ticket_price, payment_status, checked_in, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, 'pending', " . dbBool(false) . ", NOW(), NOW())
     ");
+    
+    $customFieldsJson = !empty($customFields) ? json_encode($customFields) : null;
     
     $stmt->execute([
         $checkin_id,
@@ -95,6 +158,11 @@ try {
         $name,
         $email,
         $phone,
+        $street,
+        $zip,
+        $city,
+        $postal,
+        $customFieldsJson,
         $event['ticket_price'] ?? 0
     ]);
     

@@ -171,6 +171,53 @@ try {
         $stmt->execute([$companyId]);
         $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Get registration fields for each event
+        $eventIds = array_filter(array_map(function($service) {
+            return $service['product_type'] === 'event' ? $service['product_id'] : null;
+        }, $services));
+        
+        $registrationFields = [];
+        if (!empty($eventIds)) {
+            $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
+            $stmt = $db->prepare("
+                SELECT 
+                    event_id,
+                    field_name,
+                    field_label,
+                    field_type,
+                    is_required,
+                    is_visible,
+                    display_order
+                FROM event_registration_fields
+                WHERE event_id IN ($placeholders) AND is_visible = 1
+                ORDER BY event_id, display_order ASC
+            ");
+            $stmt->execute(array_values($eventIds));
+            $fields = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Group fields by event_id
+            foreach ($fields as $field) {
+                if (!isset($registrationFields[$field['event_id']])) {
+                    $registrationFields[$field['event_id']] = [];
+                }
+                $registrationFields[$field['event_id']][] = [
+                    'field_name' => $field['field_name'],
+                    'field_label' => $field['field_label'],
+                    'field_type' => $field['field_type'],
+                    'is_required' => (bool)$field['is_required']
+                ];
+            }
+        }
+        
+        // Add registration fields to each event service
+        foreach ($services as &$service) {
+            if ($service['product_type'] === 'event' && isset($registrationFields[$service['product_id']])) {
+                $service['registration_fields'] = $registrationFields[$service['product_id']];
+            } else {
+                $service['registration_fields'] = [];
+            }
+        }
+        
         // Get published announcements/news for public view
         $dbType = getDBType();
         $tableName = $dbType === 'mysql' ? 'tenant_announcements' : 'x_tenant_announcements';

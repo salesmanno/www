@@ -295,6 +295,57 @@ function openEventRegistration(eventData) {
     const overlay = document.getElementById('eventRegistrationOverlay');
     const content = document.getElementById('registrationContent');
     
+    // Generate form fields based on registration_fields configuration
+    let fields = eventData.registration_fields || [];
+    
+    // If no fields configured, use sensible defaults (name and email required)
+    if (fields.length === 0) {
+        fields = [
+            {field_name: 'first_name', field_label: 'Fornavn', field_type: 'text', is_required: true},
+            {field_name: 'last_name', field_label: 'Etternavn', field_type: 'text', is_required: true},
+            {field_name: 'email', field_label: 'E-postadresse', field_type: 'email', is_required: true},
+            {field_name: 'phone', field_label: 'Telefonnummer', field_type: 'tel', is_required: false}
+        ];
+    }
+    
+    // Generate HTML for form fields
+    const formFieldsHtml = fields.map(field => {
+        const fieldId = `reg_${field.field_name}`;
+        const isRequired = field.is_required;
+        const requiredAttr = isRequired ? 'required' : '';
+        const requiredLabel = isRequired ? ' *' : '';
+        
+        // Determine input attributes based on field type
+        let inputAttrs = '';
+        let placeholder = '';
+        
+        switch (field.field_type) {
+            case 'email':
+                placeholder = 'ola@example.com';
+                break;
+            case 'tel':
+                inputAttrs = 'pattern="[0-9]{8,15}"';
+                placeholder = '912 34 567';
+                break;
+            case 'number':
+                inputAttrs = 'min="0" max="150"';
+                placeholder = '25';
+                break;
+            case 'text':
+            default:
+                inputAttrs = 'minlength="2"';
+                placeholder = '';
+                break;
+        }
+        
+        return `
+            <div class="form-field">
+                <label for="${fieldId}">${escapeHtml(field.field_label)}${requiredLabel}</label>
+                <input type="${field.field_type}" id="${fieldId}" name="${field.field_name}" ${requiredAttr} ${inputAttrs} placeholder="${placeholder}">
+            </div>
+        `;
+    }).join('');
+    
     // Build registration page content
     content.innerHTML = `
         ${eventData.image_url ? `<img src="${escapeHtml(eventData.image_url)}" alt="${escapeHtml(eventData.name)}" class="registration-event-image">` : ''}
@@ -312,20 +363,7 @@ function openEventRegistration(eventData) {
         <form id="eventRegistrationForm" class="registration-form" onsubmit="submitEventRegistration(event, '${eventData.product_id}')">
             <h3 class="form-title">Påmeldingsinformasjon</h3>
             
-            <div class="form-field">
-                <label for="reg_name">Fullt navn *</label>
-                <input type="text" id="reg_name" name="name" required minlength="2" placeholder="Ola Nordmann">
-            </div>
-            
-            <div class="form-field">
-                <label for="reg_email">E-postadresse *</label>
-                <input type="email" id="reg_email" name="email" required placeholder="ola@example.com">
-            </div>
-            
-            <div class="form-field">
-                <label for="reg_phone">Telefonnummer *</label>
-                <input type="tel" id="reg_phone" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
-            </div>
+            ${formFieldsHtml}
             
             <div id="registrationMessage" class="registration-message" style="display: none;"></div>
             
