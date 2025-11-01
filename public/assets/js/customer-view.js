@@ -118,13 +118,17 @@ function updatePageContent(data) {
                         </div>
                     `;
                 } else {
-                    // Regular service card
+                    // Regular service card - use 'id' as service_id for booking
+                    const bookingData = {
+                        ...service,
+                        service_id: service.id  // Use output_products.id for booking API
+                    };
                     return `
                         <div class="service-card">
                             <h3>${escapeHtml(service.name)}</h3>
                             ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
                             ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
-                            <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(service).replace(/'/g, "&apos;")})'>
+                            <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(bookingData).replace(/'/g, "&apos;")})'>
                                 📅 Book time
                             </button>
                         </div>
@@ -347,6 +351,9 @@ async function openServiceBooking(serviceData) {
     const overlay = document.getElementById('serviceBookingOverlay');
     const content = document.getElementById('serviceBookingContent');
     
+    // Use service_id if available, otherwise fall back to id
+    const serviceId = serviceData.service_id || serviceData.id;
+    
     // Show loading state
     content.innerHTML = `
         <h2 class="registration-event-title">Book ${escapeHtml(serviceData.name)}</h2>
@@ -359,7 +366,7 @@ async function openServiceBooking(serviceData) {
     
     // Fetch availability
     try {
-        const response = await fetch(`/api/get_public_service_availability.php?service_id=${serviceData.product_id}&days=14`);
+        const response = await fetch(`/api/get_public_service_availability.php?service_id=${serviceId}&days=14`);
         const result = await response.json();
         
         if (result.success) {
@@ -545,8 +552,11 @@ async function submitServiceBooking(e) {
     const submitBtn = form.querySelector('button[type="submit"]');
     const messageEl = document.getElementById('bookingMessage');
     
+    // Use service_id if available, otherwise fall back to id
+    const serviceId = currentServiceData.service_id || currentServiceData.id;
+    
     const formData = {
-        service_id: currentServiceData.product_id,
+        service_id: serviceId,
         date: selectedDate,
         time: selectedTime,
         preferred_staff: selectedStaff,
