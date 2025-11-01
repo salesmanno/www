@@ -66,37 +66,61 @@ function updatePageContent(data) {
             let content = data.aboutUs;
             
             // Add contact info section if available
+            const company = data.company || {};
             const settings = data.settings || {};
-            const hasContact = settings.contact_address || settings.contact_phone || settings.contact_email;
+            
+            // Build address from company fields
+            let fullAddress = '';
+            if (company.address_street || company.address_city) {
+                const addressParts = [];
+                if (company.address_street) addressParts.push(company.address_street);
+                
+                const cityLine = [];
+                if (company.address_zip) cityLine.push(company.address_zip);
+                if (company.address_city) cityLine.push(company.address_city);
+                if (cityLine.length > 0) addressParts.push(cityLine.join(' '));
+                
+                if (company.address_state) addressParts.push(company.address_state);
+                if (company.address_country) addressParts.push(company.address_country);
+                
+                fullAddress = addressParts.join(', ');
+            }
+            
+            // Prefer company contact info, fallback to settings
+            const contactPhone = company.contact_phone || settings.contact_phone;
+            const contactEmail = company.contact_email || settings.contact_email;
+            const contactAddress = fullAddress || settings.contact_address;
+            
+            const hasContact = contactAddress || contactPhone || contactEmail;
             
             if (hasContact) {
                 content += '<div class="contact-info-section">';
                 content += '<h3>Kontaktinformasjon</h3>';
                 
-                if (settings.contact_address) {
+                if (contactAddress) {
                     content += `<div class="contact-item">
                         <span class="contact-icon">📍</span>
-                        <span>${escapeHtml(settings.contact_address)}</span>
+                        <span>${escapeHtml(contactAddress)}</span>
                     </div>`;
                 }
                 
-                if (settings.contact_phone) {
+                if (contactPhone) {
                     content += `<div class="contact-item">
                         <span class="contact-icon">📞</span>
-                        <a href="tel:${escapeHtml(settings.contact_phone)}">${escapeHtml(settings.contact_phone)}</a>
+                        <a href="tel:${escapeHtml(contactPhone)}">${escapeHtml(contactPhone)}</a>
                     </div>`;
                 }
                 
-                if (settings.contact_email) {
+                if (contactEmail) {
                     content += `<div class="contact-item">
                         <span class="contact-icon">✉️</span>
-                        <a href="mailto:${escapeHtml(settings.contact_email)}">${escapeHtml(settings.contact_email)}</a>
+                        <a href="mailto:${escapeHtml(contactEmail)}">${escapeHtml(contactEmail)}</a>
                     </div>`;
                 }
                 
                 // Add map if address is available
-                if (settings.contact_address) {
-                    const mapQuery = encodeURIComponent(settings.contact_address);
+                if (contactAddress) {
+                    const mapQuery = encodeURIComponent(contactAddress);
                     content += `<div class="map-container">
                         <div style="margin-top: 0.5rem; text-align: center; margin-bottom: 1rem;">
                             <a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" 

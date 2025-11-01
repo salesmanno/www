@@ -102,7 +102,8 @@ try {
         // Get basic company information (flexible subdomain matching)
         // Try exact match first, then partial match (e.g., bergsoy matches bergsoy-danseklubb)
         $stmt = $db->prepare("
-            SELECT id, name, subdomain, contact_email, contact_phone, logo_url
+            SELECT id, name, subdomain, contact_email, contact_phone, logo_url,
+                   address_street, address_city, address_state, address_zip, address_country
             FROM tenant_companies 
             WHERE (subdomain = ? OR subdomain LIKE CONCAT(?, '%') OR subdomain LIKE CONCAT('%', ?)) 
             AND is_active = TRUE

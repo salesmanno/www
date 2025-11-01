@@ -44,7 +44,7 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Admin login relocated**: Moved to `/admin.php` (previously at `/`)
   - **News/announcements on homepage**: Public website displays news from `tenant_announcements` table
   - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
-  - **Three-page layout**: Om Oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
+  - **Three-page layout**: Om oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
   - **Modern gradient design**: Smooth animations and mobile-first responsive design
   - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top with tagline "en tjeneste til [company name] levert av Salesman.no" on right side
   - **Navigation header**: Clean, distinct header with clickable tabs and visual indicator for active page
@@ -57,10 +57,10 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Services: `output_products` (displayed on services page)
     * Events: `events_eventdata` (joined with output_products for event details)
   - **Event registration**: Full-screen overlay registration page with slide-up animation and **customizable registration fields**
-    * Event cards show on "Tjenester" page with event image, description, date/time, venue, and price
+    * Event cards show on "Tjenester" page with event image (280px height), description, date/time, venue, and price
     * Click "Reserver billett" opens full-screen registration overlay
     * Smooth slide-up animation from bottom (similar to fane/tab swipe transitions)
-    * Registration page displays: event image (300px), event name, event info box, and registration form
+    * Registration page displays: event image (350px height), event name, event info box, and registration form
     * Event info box includes: description, date/time, venue, price, and "ℹ️ Medlemspriser tildeles automatisk" notice
     * Registration form header: "Påmeldingsinformasjon"
     * **Dynamic registration fields**: Form fields are configurable per event from admin panel
@@ -101,8 +101,10 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Stores registrations in `tenant_members` table with status='pending'
     * No authentication required for public registration
     * Success message auto-closes overlay after 2.5 seconds
-  - **Contact information in Om Oss**: Displays company contact details with interactive map
+  - **Contact information in Om oss**: Displays company contact details with interactive map
     * **Contact info section**: Shows address (📍), phone (📞), and email (✉️) with icons
+    * **Address from tenant_companies**: Dynamically builds address from separate columns (address_street, address_city, address_zip, address_state, address_country)
+    * **Contact priority**: Prefers company contact info (`tenant_companies.contact_email`, `tenant_companies.contact_phone`) over settings fallback
     * **Dynamic data**: Contact information fetched from `tenant_website_general` table
     * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links
     * **Map integration**: Google Maps button dynamically generated from tenant's contact_address

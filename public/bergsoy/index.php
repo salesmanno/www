@@ -22,14 +22,14 @@
         
         <!-- Navigation Header -->
         <div class="nav-header">
-            <span class="nav-tab" data-page="about" onclick="swipeTo('about')">Om Oss</span>
+            <span class="nav-tab" data-page="about" onclick="swipeTo('about')">Om oss</span>
             <span class="nav-tab active" data-page="home" onclick="swipeTo('home')">Hjem</span>
             <span class="nav-tab" data-page="services" onclick="swipeTo('services')">Tjenester</span>
         </div>
 
         <!-- Pages Container -->
         <div class="pages-container" id="pagesContainer">
-            <!-- Om Oss Page -->
+            <!-- Om oss Page -->
             <div class="page" id="aboutPage">
                 <div class="page-content">
                     <button class="nav-arrow nav-arrow-right" onclick="swipeTo('home')">
@@ -38,7 +38,7 @@
                         </svg>
                     </button>
                     <div class="content-wrapper">
-                        <h1 class="page-title">Om Oss</h1>
+                        <h1 class="page-title">Om oss</h1>
                         <div class="about-content" id="aboutContent">
                             <p>Laster innhold...</p>
                         </div>
