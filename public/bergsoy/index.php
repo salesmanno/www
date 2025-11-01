@@ -9,11 +9,16 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Navigation Dots -->
-        <div class="nav-dots">
-            <span class="dot" data-page="about"></span>
-            <span class="dot active" data-page="home"></span>
-            <span class="dot" data-page="services"></span>
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="header-logo" id="headerLogo">
+        </div>
+        
+        <!-- Navigation Header -->
+        <div class="nav-header">
+            <span class="nav-tab" data-page="about" onclick="swipeTo('about')">Om Oss</span>
+            <span class="nav-tab active" data-page="home" onclick="swipeTo('home')">Hjem</span>
+            <span class="nav-tab" data-page="services" onclick="swipeTo('services')">Tjenester</span>
         </div>
 
         <!-- Pages Container -->
@@ -50,7 +55,6 @@
                     </button>
                     <div class="content-wrapper">
                         <div class="hero-section">
-                            <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="company-logo" id="companyLogo">
                             <h1 class="hero-title" id="heroTitle">Bergsøy</h1>
                             <p class="hero-subtitle" id="heroSubtitle">Velkommen</p>
                         </div>

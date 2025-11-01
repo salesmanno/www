@@ -46,6 +46,8 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
   - **Three-page layout**: Om Oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
   - **Modern gradient design**: Smooth animations and mobile-first responsive design
+  - **Navigation header**: Clean, distinct header with clickable tabs and visual indicator for active page
+  - **Dual navigation**: Users can navigate by clicking header tabs OR using arrow buttons/swipe gestures
   - **Data sources**:
     * Company info: `tenant_companies` (Ditt Firma)
     * Website config: `tenant_website_config` (Ditt Nettsted)

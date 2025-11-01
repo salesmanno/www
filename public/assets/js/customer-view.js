@@ -106,6 +106,14 @@ function updatePageContent(data) {
 function swipeTo(pageName) {
     if (isTransitioning) return;
     
+    // Update header tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-page') === pageName) {
+            tab.classList.add('active');
+        }
+    });
+    
     const pageIndex = pages.indexOf(pageName);
     if (pageIndex === -1) return;
     
@@ -119,7 +127,6 @@ function swipeTo(pageName) {
     container.classList.add('transitioning');
     
     updateActivePage();
-    updateDots();
     
     setTimeout(() => {
         isTransitioning = false;
@@ -139,15 +146,7 @@ function updateActivePage() {
     }
 }
 
-// Update navigation dots
-function updateDots() {
-    document.querySelectorAll('.dot').forEach(dot => {
-        dot.classList.remove('active');
-        if (dot.dataset.page === currentPage) {
-            dot.classList.add('active');
-        }
-    });
-}
+// Update navigation tabs (handled in swipeTo function)
 
 // Setup swipe listeners
 function setupSwipeListeners() {
