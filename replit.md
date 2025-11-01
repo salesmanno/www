@@ -56,12 +56,15 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
     * Events: `events_eventdata` (joined with output_products for event details)
-  - **Event registration**: Public customers can register for events directly from the website
-    * Registration form: Name, email, phone
-    * Automatic capacity checking (shows spots left)
+  - **Event registration**: Public customers can register for events on dedicated reservations page
+    * Main site shows event cards with "Se detaljer og meld deg på" link
+    * Links redirect to dedicated reservations page
+    * Registration form: Name, email, phone (all required fields)
+    * Automatic capacity checking (only shows "Fullt" when full)
     * Prevents duplicate registrations by email
     * Stores registrations in `events_checkin` table
     * No authentication required for customers
+    * No capacity details shown to public (privacy)
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`
     * Shows event details: title, description, date/time, venue, capacity
