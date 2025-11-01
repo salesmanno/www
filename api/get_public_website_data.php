@@ -99,13 +99,16 @@ try {
     try {
         $db = getDBConnection();
         
-        // Get basic company information
+        // Get basic company information (flexible subdomain matching)
+        // Try exact match first, then partial match (e.g., bergsoy matches bergsoy-danseklubb)
         $stmt = $db->prepare("
             SELECT id, name, subdomain, contact_email, contact_phone, logo_url
             FROM tenant_companies 
-            WHERE subdomain = ? AND is_active = TRUE
+            WHERE (subdomain = ? OR subdomain LIKE CONCAT(?, '%') OR subdomain LIKE CONCAT('%', ?)) 
+            AND is_active = TRUE
+            LIMIT 1
         ");
-        $stmt->execute([$subdomain]);
+        $stmt->execute([$subdomain, $subdomain, $subdomain]);
         $company = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$company) {
@@ -141,27 +144,28 @@ try {
         $stmt = $db->prepare("
             SELECT 
                 op.id, 
-                op.name, 
-                op.description, 
+                COALESCE(NULLIF(op.name, ''), ed.title, op.name) as name,
+                COALESCE(NULLIF(op.description, ''), ed.description, op.description) as description,
                 op.price, 
-                op.image_url,
+                ed.event_image_url as image_url,
                 op.product_type,
                 op.product_id,
+                ed.title as event_title,
                 ed.start_date,
                 ed.start_time,
                 ed.end_date,
                 ed.end_time,
                 ed.venue_name,
                 ed.max_attendees,
-                ed.ticket_price,
+                COALESCE(ed.ticket_price, op.price) as ticket_price,
                 (SELECT COUNT(*) FROM events_checkin WHERE event_id = ed.id) as registered_count
             FROM output_products op
             LEFT JOIN events_eventdata ed ON op.product_type = 'event' AND op.product_id = ed.id
-            WHERE op.company_id = ? AND op.is_visible = TRUE AND op.is_active = TRUE
+            WHERE op.company_id = ? AND op.is_visible = " . dbBool(true) . "
             ORDER BY 
                 CASE WHEN op.product_type = 'event' THEN 0 ELSE 1 END,
                 ed.start_date ASC,
-                op.name ASC
+                COALESCE(NULLIF(op.name, ''), ed.title, op.name) ASC
             LIMIT 20
         ");
         $stmt->execute([$companyId]);
@@ -199,12 +203,24 @@ try {
             $announcement['is_pinned'] = (bool)$announcement['is_pinned'];
         }
         
+        // Provide defaults for missing data
+        $defaultAboutUs = $aboutData && $aboutData['about_us'] 
+            ? $aboutData['about_us'] 
+            : "<p>Velkommen til {$company['name']}!</p><p>Vi er et ledende selskap som leverer kvalitetstjenester til våre kunder.</p><p>Kontakt oss for mer informasjon!</p>";
+        
+        $defaultSettings = $websiteGeneral ?: [
+            'hero_title' => $company['name'],
+            'hero_description' => "Velkommen til " . $company['name'],
+            'primary_color' => '#667eea',
+            'secondary_color' => '#764ba2'
+        ];
+        
         echo json_encode([
             'success' => true,
             'company' => $company,
             'config' => $websiteConfig,
-            'settings' => $websiteGeneral,
-            'aboutUs' => $aboutData ? $aboutData['about_us'] : null,
+            'settings' => $defaultSettings,
+            'aboutUs' => $defaultAboutUs,
             'services' => $services,
             'announcements' => $announcements
         ]);
