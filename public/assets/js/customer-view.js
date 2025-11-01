@@ -295,6 +295,7 @@ function openEventRegistration(eventData) {
             ${eventData.start_date ? `<div class="event-info-item">📅 ${formatEventDate(eventData.start_date, eventData.start_time)}</div>` : ''}
             ${eventData.venue_name ? `<div class="event-info-item">📍 ${escapeHtml(eventData.venue_name)}</div>` : ''}
             ${eventData.ticket_price ? `<div class="event-info-item">💰 ${formatPrice(eventData.ticket_price)} kr</div>` : ''}
+            <div class="event-info-notice">ℹ️ Medlemspriser tildeles automatisk</div>
         </div>
         
         <form id="eventRegistrationForm" class="registration-form" onsubmit="submitEventRegistration(event, '${eventData.product_id}')">

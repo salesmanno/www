@@ -61,7 +61,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Click "Reserver billett" opens full-screen registration overlay
     * Smooth slide-up animation from bottom (similar to fane/tab swipe transitions)
     * Registration page displays: event image (300px), event name, event info box, and registration form
-    * Registration form: Name, email, phone (all required fields with validation and placeholders)
+    * Event info box includes: description, date/time, venue, price, and "ℹ️ Medlemspriser tildeles automatisk" notice
+    * Registration form header: "Påmeldingsinformasjon"
+    * Registration form fields: Name, email, phone (all required fields with validation and placeholders)
     * Close button (×) with rotate animation on hover
     * Automatic capacity checking (only shows "Fullt" when full on cards)
     * Prevents duplicate registrations by email
