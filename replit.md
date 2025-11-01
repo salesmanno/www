@@ -38,10 +38,32 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
 - **Staff-First Architecture**: `tenant_staff` (employees) are created independently, with `tenant_admins` (login accounts) optionally linked.
 - **Clean Database Architecture**: Modular database design eliminating duplicates and redundancy, standardizing tables, adding cost price tracking, and introducing `service_bookings` and `unified_ledger` tables.
 
+## Recent Changes
+- **November 1, 2025**: Created customer-facing public website view
+  - New folder structure: `public/` for customer views
+  - Implemented modern, responsive website with swipe/touch navigation
+  - Three-page layout: Om Oss (left), Hjem (center), Tjenester (right)
+  - Multi-tenant support based on subdomain/folder structure
+  - API endpoint `get_public_website_data.php` with mock data fallback
+  - Bergsøy example implementation in `/public/bergsoy/`
+  - Gradient-based design with smooth animations
+  - Mobile-first responsive design with touch gestures
+
 ## External Dependencies
 - **Database**: Dual database support with PDO:
     - Production: MySQL (Domeneshop)
     - Development/Testing: PostgreSQL (auto-fallback when MySQL unavailable)
-- **UI Framework**: Bootstrap 5.
+- **UI Framework**: Bootstrap 5 (admin), Custom CSS (customer view).
 - **Email Protocols**: SMTP and IMAP for webmail.
 - **Storage**: Object storage for contract document uploads.
+
+## Project Structure
+- `/admin/` - Admin interface components
+- `/api/` - API endpoints for both admin and public views
+- `/pages/` - Admin pages
+- `/public/` - Customer-facing public websites
+  - `/public/bergsoy/` - Bergsøy customer website
+  - `/public/assets/` - Shared assets (CSS, JS, images)
+- `/includes/` - Shared PHP utilities
+- `/modules/` - Admin module content
+- `/config/` - Configuration files

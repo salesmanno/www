@@ -1,0 +1,47 @@
+# Vendor directories
+vendor/
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Log files
+*.log
+logs/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Session files
+sessions/
+
+# Uploaded files (excluding example assets)
+uploads/
+
+# Database exports
+*.sql
+!docs/*.sql
+
+# Composer
+composer.phar
+composer.lock
+
+# NPM
+package-lock.json
+
+# Cache
+cache/
