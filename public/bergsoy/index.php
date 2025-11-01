@@ -11,8 +11,13 @@
     <div class="app-container">
         <!-- Logo Section -->
         <div class="logo-section">
-            <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="header-logo" id="headerLogo">
-            <h1 class="header-company-name" id="headerCompanyName">Bergsøy</h1>
+            <div class="logo-center">
+                <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="header-logo" id="headerLogo">
+                <h1 class="header-company-name" id="headerCompanyName">Bergsøy</h1>
+            </div>
+            <div class="header-tagline">
+                en tjeneste til <span id="headerCompanyNameTagline">Bergsøy</span> levert av Salesman.no
+            </div>
         </div>
         
         <!-- Navigation Header -->

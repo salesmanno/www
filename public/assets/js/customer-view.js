@@ -46,6 +46,9 @@ function updatePageContent(data) {
     if (data.company) {
         const headerNameEl = document.getElementById('headerCompanyName');
         if (headerNameEl) headerNameEl.textContent = data.company.name;
+        
+        const headerTaglineEl = document.getElementById('headerCompanyNameTagline');
+        if (headerTaglineEl) headerTaglineEl.textContent = data.company.name;
     }
     
     // Update hero section with settings

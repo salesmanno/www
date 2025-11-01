@@ -32,9 +32,9 @@ function getMockData($subdomain) {
                 'hero_title' => 'Welcome to yourCompany',
                 'hero_description' => 'Your partner for quality and service',
                 'hero_button_text' => 'Contact us',
-                'contact_email' => 'contact@yourcompany.com',
-                'contact_phone' => '+47 123 45 678',
-                'contact_address' => 'Your City, Country',
+                'contact_email' => 'post@yourcompany.no',
+                'contact_phone' => '+47 70 12 34 56',
+                'contact_address' => 'Eksempelveien 42, 6000 Ålesund',
                 'is_active' => true,
                 'maintenance_mode' => false
             ],
@@ -264,7 +264,10 @@ try {
             'hero_title' => $company['name'],
             'hero_description' => "Velkommen til " . $company['name'],
             'primary_color' => '#667eea',
-            'secondary_color' => '#764ba2'
+            'secondary_color' => '#764ba2',
+            'contact_email' => 'post@yourcompany.no',
+            'contact_phone' => '+47 70 12 34 56',
+            'contact_address' => 'Eksempelveien 42, 6000 Ålesund'
         ];
         
         echo json_encode([
