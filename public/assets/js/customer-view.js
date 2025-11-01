@@ -110,12 +110,14 @@ function updatePageContent(data) {
             }
             
             // Add simple contact info below map
-            if (contactPhone || contactEmail) {
+            const orgNumber = company.org_number;
+            
+            if (contactPhone || contactEmail || orgNumber) {
                 content += '<div class="simple-contact">';
                 content += `<p style="margin-top: 1.5rem; font-size: 1rem; color: #1a1a1a; line-height: 1.8;">`;
                 
                 if (contactPhone) {
-                    content += `📞 <a href="tel:${escapeHtml(contactPhone)}" style="color: #667eea; text-decoration: none; font-weight: 500;">${escapeHtml(contactPhone)}</a>`;
+                    content += `📞 <a href="tel:${escapeHtml(contactPhone)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactPhone)}</a>`;
                 }
                 
                 if (contactPhone && contactEmail) {
@@ -123,7 +125,15 @@ function updatePageContent(data) {
                 }
                 
                 if (contactEmail) {
-                    content += `✉️ <a href="mailto:${escapeHtml(contactEmail)}" style="color: #667eea; text-decoration: none; font-weight: 500;">${escapeHtml(contactEmail)}</a>`;
+                    content += `✉️ <a href="mailto:${escapeHtml(contactEmail)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactEmail)}</a>`;
+                }
+                
+                if ((contactPhone || contactEmail) && orgNumber) {
+                    content += ` • `;
+                }
+                
+                if (orgNumber) {
+                    content += `Org.nr: ${escapeHtml(orgNumber)}`;
                 }
                 
                 content += '</p></div>';

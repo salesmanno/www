@@ -105,8 +105,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * **Embedded Google Map**: Full interactive map displayed by default (300px height) with rounded corners and shadow
     * **Address from tenant_companies**: Dynamically builds address from separate columns (address_street, address_city, address_zip, address_state, address_country)
     * **Contact priority**: Prefers company contact info (`tenant_companies.contact_email`, `tenant_companies.contact_phone`) over settings fallback
-    * **Simplified contact line**: Single centered line below map with phone (📞) and email (✉️) separated by bullet point
-    * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links in purple color (#667eea)
+    * **Simplified contact line**: Single centered line below map with phone (📞), email (✉️), and org_number separated by bullet points
+    * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links in dark color (#1a1a1a) with hover opacity effect
+    * **Organization number**: Displays org_number from `tenant_companies` table
     * **No complex boxes**: Removed structured contact info section for cleaner, more accessible design
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`

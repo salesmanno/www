@@ -301,8 +301,13 @@ body {
     text-align: center;
 }
 
+.simple-contact a {
+    color: #1a1a1a;
+}
+
 .simple-contact a:hover {
     text-decoration: underline;
+    opacity: 0.7;
 }
 
 /* Responsive Design */
