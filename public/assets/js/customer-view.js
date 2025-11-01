@@ -86,13 +86,36 @@ function updatePageContent(data) {
     if (data.services && data.services.length > 0) {
         const servicesGrid = document.getElementById('servicesGrid');
         if (servicesGrid) {
-            servicesGrid.innerHTML = data.services.map(service => `
-                <div class="service-card">
-                    <h3>${escapeHtml(service.name)}</h3>
-                    ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
-                    ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
-                </div>
-            `).join('');
+            servicesGrid.innerHTML = data.services.map(service => {
+                if (service.product_type === 'event') {
+                    // Event card with registration
+                    const spotsLeft = service.max_attendees ? service.max_attendees - (service.registered_count || 0) : null;
+                    const isFull = spotsLeft !== null && spotsLeft <= 0;
+                    
+                    return `
+                        <div class="service-card event-card">
+                            <h3>${escapeHtml(service.name)}</h3>
+                            ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
+                            <div class="event-details">
+                                ${service.start_date ? `<div class="event-date">📅 ${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
+                                ${service.venue_name ? `<div class="event-venue">📍 ${escapeHtml(service.venue_name)}</div>` : ''}
+                                ${spotsLeft !== null ? `<div class="event-spots ${isFull ? 'full' : ''}">${isFull ? '❌ Fullt' : `✓ ${spotsLeft} plasser igjen`}</div>` : ''}
+                            </div>
+                            ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
+                            ${!isFull ? `<button class="register-btn" onclick="openEventRegistration('${service.product_id}', '${escapeHtml(service.name)}')">Meld deg på</button>` : '<div class="full-badge">Fullt booket</div>'}
+                        </div>
+                    `;
+                } else {
+                    // Regular service card
+                    return `
+                        <div class="service-card">
+                            <h3>${escapeHtml(service.name)}</h3>
+                            ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
+                            ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
+                        </div>
+                    `;
+                }
+            }).join('');
         }
     } else {
         const servicesGrid = document.getElementById('servicesGrid');
@@ -223,6 +246,109 @@ function formatDate(dateString) {
             month: 'long',
             year: 'numeric'
         });
+    }
+}
+
+function formatEventDate(dateStr, timeStr) {
+    if (!dateStr) return '';
+    
+    const date = new Date(dateStr);
+    const dateFormatted = date.toLocaleDateString('no-NO', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+    
+    if (timeStr) {
+        return `${dateFormatted} kl. ${timeStr.substring(0, 5)}`;
+    }
+    
+    return dateFormatted;
+}
+
+// Open event registration modal
+function openEventRegistration(eventId, eventName) {
+    const modal = document.createElement('div');
+    modal.className = 'registration-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Meld deg på</h2>
+                <button class="close-btn" onclick="this.closest('.registration-modal').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <h3>${escapeHtml(eventName)}</h3>
+                <form id="registrationForm" onsubmit="submitEventRegistration(event, '${eventId}')">
+                    <div class="form-group">
+                        <label for="reg_name">Fullt navn *</label>
+                        <input type="text" id="reg_name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg_email">E-post *</label>
+                        <input type="email" id="reg_email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg_phone">Telefon</label>
+                        <input type="tel" id="reg_phone" name="phone">
+                    </div>
+                    <div id="registration_message" class="message"></div>
+                    <button type="submit" class="submit-btn">Meld meg på</button>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// Submit event registration
+async function submitEventRegistration(event, eventId) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = form.querySelector('.submit-btn');
+    const messageEl = document.getElementById('registration_message');
+    
+    const formData = {
+        event_id: eventId,
+        name: form.name.value,
+        email: form.email.value,
+        phone: form.phone.value
+    };
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sender...';
+    messageEl.textContent = '';
+    
+    try {
+        const response = await fetch('/api/register_event_public.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            messageEl.className = 'message success';
+            messageEl.textContent = result.message;
+            form.reset();
+            
+            setTimeout(() => {
+                document.querySelector('.registration-modal').remove();
+            }, 2000);
+        } else {
+            messageEl.className = 'message error';
+            messageEl.textContent = result.message;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Meld meg på';
+        }
+    } catch (error) {
+        messageEl.className = 'message error';
+        messageEl.textContent = 'Noe gikk galt. Vennligst prøv igjen.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Meld meg på';
     }
 }
 

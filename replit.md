@@ -55,7 +55,16 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Website settings: `tenant_website_general` (Ditt Nettsted)
     * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
-  - **API endpoint**: `get_public_website_data.php` with mock data fallback for development
+    * Events: `events_eventdata` (joined with output_products for event details)
+  - **Event registration**: Public customers can register for events directly from the website
+    * Registration form: Name, email, phone
+    * Automatic capacity checking (shows spots left)
+    * Prevents duplicate registrations by email
+    * Stores registrations in `events_checkin` table
+    * No authentication required for customers
+  - **API endpoints**: 
+    * `get_public_website_data.php` - Fetches all public data with mock fallback
+    * `register_event_public.php` - Public event registration (no auth required)
 
 ## External Dependencies
 - **Database**: Dual database support with PDO:

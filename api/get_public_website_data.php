@@ -137,12 +137,31 @@ try {
         $stmt->execute([$companyId]);
         $aboutData = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Get services (from output_products)
+        // Get services (from output_products) with event details
         $stmt = $db->prepare("
-            SELECT id, name, description, price, image_url 
-            FROM output_products 
-            WHERE company_id = ? AND is_visible = TRUE AND is_active = TRUE
-            ORDER BY name ASC
+            SELECT 
+                op.id, 
+                op.name, 
+                op.description, 
+                op.price, 
+                op.image_url,
+                op.product_type,
+                op.product_id,
+                ed.start_date,
+                ed.start_time,
+                ed.end_date,
+                ed.end_time,
+                ed.venue_name,
+                ed.max_attendees,
+                ed.ticket_price,
+                (SELECT COUNT(*) FROM events_checkin WHERE event_id = ed.id) as registered_count
+            FROM output_products op
+            LEFT JOIN events_eventdata ed ON op.product_type = 'event' AND op.product_id = ed.id
+            WHERE op.company_id = ? AND op.is_visible = TRUE AND op.is_active = TRUE
+            ORDER BY 
+                CASE WHEN op.product_type = 'event' THEN 0 ELSE 1 END,
+                ed.start_date ASC,
+                op.name ASC
             LIMIT 20
         ");
         $stmt->execute([$companyId]);
