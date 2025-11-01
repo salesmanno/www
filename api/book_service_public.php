@@ -187,6 +187,50 @@ try {
         }
     }
     
+    // Validate membership and determine price
+    $finalPrice = $service['price'] ?? 0;
+    $isMember = false;
+    
+    if (!empty($customerEmail) && !empty($customerPhone)) {
+        // Extract email prefix (everything before @)
+        $emailPrefix = strtolower(explode('@', $customerEmail)[0]);
+        
+        // Extract last 5 digits of phone number
+        $phoneDigits = preg_replace('/\D/', '', $customerPhone); // Remove non-digits
+        $phoneLast5 = substr($phoneDigits, -5);
+        
+        if (!empty($emailPrefix) && strlen($phoneLast5) === 5) {
+            // Check membership_members for active member matching both criteria
+            // Use database-compatible syntax
+            $dbType = getDBType();
+            if ($dbType === 'postgresql' || $dbType === 'pgsql') {
+                // PostgreSQL
+                $emailSubstring = "LOWER(SUBSTRING(email FROM 1 FOR POSITION('@' IN email) - 1))";
+                $phonePattern = "RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 5)";
+            } else {
+                // MySQL
+                $emailSubstring = "LOWER(SUBSTRING_INDEX(email, '@', 1))";
+                $phonePattern = "RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 5)";
+            }
+            
+            $stmt = $db->prepare("
+                SELECT member_id 
+                FROM membership_members 
+                WHERE company_id = ? 
+                    AND {$emailSubstring} = ?
+                    AND {$phonePattern} = ?
+                    AND status = 'active'
+                    AND (expiry_date IS NULL OR expiry_date > NOW())
+                LIMIT 1
+            ");
+            $stmt->execute([$companyId, $emailPrefix, $phoneLast5]);
+            
+            if ($stmt->fetch()) {
+                $isMember = true;
+            }
+        }
+    }
+    
     // Create booking
     $bookingId = bin2hex(random_bytes(16)); // Generate UUID-like ID
     
@@ -195,8 +239,8 @@ try {
             id, company_id, service_id, assigned_staff_id,
             customer_name, customer_email, customer_phone,
             date_from, time_from, time_to,
-            status, payment_method, payment_status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', NOW())
+            status, payment_method, payment_status, is_member, booking_price, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?, ?, NOW())
     ");
     
     $stmt->execute([
@@ -210,14 +254,21 @@ try {
         $bookingDate,
         $bookingTime,
         $endTime,
-        $paymentMethod
+        $paymentMethod,
+        $isMember,
+        $finalPrice
     ]);
     
     $db->commit();
     
+    $message = 'Bookingen er registrert!';
+    if ($isMember) {
+        $message .= ' Medlemspris er tildelt.';
+    }
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Bookingen er registrert!',
+        'message' => $message,
         'booking' => [
             'id' => $bookingId,
             'service_name' => $service['name'],
@@ -225,7 +276,9 @@ try {
             'time' => substr($bookingTime, 0, 5),
             'duration' => $duration,
             'customer_name' => $customerName,
-            'customer_email' => $customerEmail
+            'customer_email' => $customerEmail,
+            'is_member' => $isMember,
+            'final_price' => $finalPrice
         ]
     ]);
     

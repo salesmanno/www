@@ -96,6 +96,7 @@ try {
             ed.title, 
             ed.max_attendees, 
             ed.ticket_price,
+            ed.member_ticket_price,
             (SELECT COUNT(*) FROM events_checkin WHERE event_id = ed.id) as registered_count
         FROM events_eventdata ed
         WHERE ed.id = ? AND ed.is_active = TRUE
@@ -124,6 +125,51 @@ try {
     if ($stmt->fetch()) {
         echo json_encode(['success' => false, 'message' => 'Denne e-postadressen er allerede registrert for dette arrangementet']);
         exit;
+    }
+    
+    // Validate membership and determine price
+    $finalPrice = $event['ticket_price'] ?? 0;
+    $isMember = false;
+    
+    if (!empty($email) && !empty($phone) && $event['member_ticket_price'] !== null) {
+        // Extract email prefix (everything before @)
+        $emailPrefix = strtolower(explode('@', $email)[0]);
+        
+        // Extract last 5 digits of phone number
+        $phoneDigits = preg_replace('/\D/', '', $phone); // Remove non-digits
+        $phoneLast5 = substr($phoneDigits, -5);
+        
+        if (!empty($emailPrefix) && strlen($phoneLast5) === 5) {
+            // Check membership_members for active member matching both criteria
+            // Use database-compatible syntax
+            $dbType = getDBType();
+            if ($dbType === 'postgresql' || $dbType === 'pgsql') {
+                // PostgreSQL
+                $emailSubstring = "LOWER(SUBSTRING(email FROM 1 FOR POSITION('@' IN email) - 1))";
+                $phonePattern = "RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 5)";
+            } else {
+                // MySQL
+                $emailSubstring = "LOWER(SUBSTRING_INDEX(email, '@', 1))";
+                $phonePattern = "RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 5)";
+            }
+            
+            $stmt = $db->prepare("
+                SELECT member_id 
+                FROM membership_members 
+                WHERE company_id = ? 
+                    AND {$emailSubstring} = ?
+                    AND {$phonePattern} = ?
+                    AND status = 'active'
+                    AND (expiry_date IS NULL OR expiry_date > NOW())
+                LIMIT 1
+            ");
+            $stmt->execute([$event['company_id'], $emailPrefix, $phoneLast5]);
+            
+            if ($stmt->fetch()) {
+                $isMember = true;
+                $finalPrice = $event['member_ticket_price'];
+            }
+        }
     }
     
     // Generate UUID
@@ -164,14 +210,21 @@ try {
         $city,
         $postal,
         $customFieldsJson,
-        $event['ticket_price'] ?? 0,
+        $finalPrice,
         $payment_method
     ]);
     
+    $message = 'Påmelding registrert!';
+    if ($isMember) {
+        $message .= ' Medlemspris er tildelt.';
+    }
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Påmelding registrert! Du vil motta bekreftelse på e-post.',
-        'registration_id' => $checkin_id
+        'message' => $message,
+        'registration_id' => $checkin_id,
+        'is_member' => $isMember,
+        'final_price' => $finalPrice
     ]);
     
 } catch (Exception $e) {
