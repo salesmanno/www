@@ -79,15 +79,12 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * No authentication required for customers
     * No capacity details shown to public (privacy)
     * Success message auto-closes overlay after 2 seconds
-  - **Service booking**: Full-screen overlay booking page with interactive calendar and time selection
+  - **Service booking**: Full-screen overlay booking page with simplified time slot selection
     * Service cards display "📅 Book time" button for regular services (non-events)
     * Click button opens full-screen booking overlay with slide-up animation
     * **Date selector**: Horizontal scrollable date picker showing next 14 weekdays
-    * **Staff calendar**: Grid-based availability calendar showing time slots (30-min intervals, 08:00-18:00)
-    * **Privacy-first design**: Staff shown as numbered columns (Ansatt 1, 2, 3...) - no names disclosed
-    * **Visual indicators**: ✓ (green) for available, ✗ (red) for booked, selected slots highlighted in purple gradient
-    * **Interactive booking**: Click any available slot to select date/time/staff
-    * **Booking summary**: Shows selected date, time, and staff number before confirmation
+    * **Simplified time slots**: Shows simple LEDIG (available) or OPPTATT (booked) status for each time slot (30-min intervals, 08:00-18:00)
+    * **No staff visibility**: Removed staff-grid columns for privacy and simplicity
     * **Customer form**: Name, email, phone (all required with validation)
     * **Smart allocation**: Automatically assigns available staff member for selected time slot
     * **Duplicate prevention**: Prevents same customer from booking same service multiple times
@@ -95,6 +92,22 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Stores bookings in `service_bookings` table
     * No authentication required for public booking
     * Success message auto-closes overlay after 2.5 seconds
+  - **Membership registration**: Full-screen overlay registration for membership sign-ups
+    * Membership cards display "👤 Bli medlem" button
+    * Click button opens full-screen registration overlay with slide-up animation
+    * **Minimal required fields**: Name, email, phone (all validated on frontend and backend)
+    * **Duplicate prevention**: Prevents same email from registering multiple times as active member
+    * **Server-side validation**: API enforces all three required fields (name, email, phone)
+    * Stores registrations in `tenant_members` table with status='pending'
+    * No authentication required for public registration
+    * Success message auto-closes overlay after 2.5 seconds
+  - **Contact information in Om Oss**: Displays company contact details with interactive map
+    * **Contact info section**: Shows address (📍), phone (📞), and email (✉️) with icons
+    * **Dynamic data**: Contact information fetched from `tenant_website_general` table
+    * **Interactive elements**: Clickable phone (tel:) and email (mailto:) links
+    * **Map integration**: Google Maps button dynamically generated from tenant's contact_address
+    * **Tenant-specific**: Each company's map link opens their specific address location
+    * **Styling**: Gradient background, hover effects, responsive design
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`
     * Shows event details: title, description, date/time, venue, capacity
@@ -107,6 +120,7 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * `register_event_public.php` - Public event registration (no auth required)
     * `get_public_service_availability.php` - Fetches available time slots for service booking (14 days, weekdays only, 30-min intervals)
     * `book_service_public.php` - Creates service booking with automatic staff assignment (no auth required)
+    * `register_membership_public.php` - Public membership registration with minimal required fields (name, email, phone)
 
 ## External Dependencies
 - **Database**: Dual database support with PDO:
