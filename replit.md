@@ -46,9 +46,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
   - **Three-page layout**: Om Oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
   - **Modern gradient design**: Smooth animations and mobile-first responsive design
-  - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top
+  - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top with tagline "en tjeneste til [company name] levert av Salesman.no" on right side
   - **Navigation header**: Clean, distinct header with clickable tabs and visual indicator for active page
-  - **Dual navigation**: Users can navigate by clicking header tabs OR using arrow buttons/swipe gestures
+  - **Navigation**: Users navigate by clicking header tabs or swipe gestures (arrow buttons hidden)
   - **Data sources**:
     * Company info: `tenant_companies` (Ditt Firma)
     * Website config: `tenant_website_config` (Ditt Nettsted)
