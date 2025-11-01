@@ -62,8 +62,15 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * Prevents duplicate registrations by email
     * Stores registrations in `events_checkin` table
     * No authentication required for customers
+  - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
+    * Displays all upcoming events from `events_eventdata`
+    * Shows event details: title, description, date/time, venue, capacity
+    * Registration form with required fields (name, email, phone)
+    * Real-time capacity tracking and "full" status
+    * Responsive card layout with event images
   - **API endpoints**: 
-    * `get_public_website_data.php` - Fetches all public data with mock fallback
+    * `get_public_website_data.php` - Fetches all public data for main website
+    * `get_public_events.php` - Fetches all upcoming events for reservations page
     * `register_event_public.php` - Public event registration (no auth required)
 
 ## External Dependencies
