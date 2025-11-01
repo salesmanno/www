@@ -13,6 +13,12 @@ const pages = ['about', 'home', 'services'];
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
+    // Set initial page position (home = index 1, so -100vw)
+    const container = document.getElementById('pagesContainer');
+    const homeIndex = pages.indexOf('home');
+    const offset = -homeIndex * 100;
+    container.style.transform = `translateX(${offset}vw)`;
+    
     loadData();
     setupSwipeListeners();
     setupDotNavigation();
@@ -133,6 +139,11 @@ function updatePageContent(data) {
                             ${isService ? `
                                 <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(bookingData).replace(/'/g, "&apos;")})'>
                                     📅 Book time
+                                </button>
+                            ` : ''}
+                            ${service.product_type === 'membership' ? `
+                                <button class="book-service-btn" onclick='openMembershipRegistration(${JSON.stringify(service).replace(/'/g, "&apos;")})'>
+                                    👤 Bli medlem
                                 </button>
                             ` : ''}
                         </div>
@@ -386,7 +397,6 @@ let currentServiceData = null;
 let currentAvailability = null;
 let selectedDate = null;
 let selectedTime = null;
-let selectedStaff = null;
 
 async function openServiceBooking(serviceData) {
     currentServiceData = serviceData;
@@ -491,35 +501,22 @@ function renderTimeSlots() {
     return `
         <div class="booking-time-section">
             <h3 class="form-title">Velg tidspunkt</h3>
-            <div class="staff-calendar">
-                <div class="staff-calendar-header">
-                    <div class="time-column-header">Tid</div>
-                    ${Array.from({length: currentAvailability.staff_count}, (_, i) => 
-                        `<div class="staff-column-header">Ansatt ${i + 1}</div>`
-                    ).join('')}
-                </div>
-                <div class="staff-calendar-body">
-                    ${timeSlots.map(slot => {
-                        const isSelected = selectedTime === slot.time;
-                        const hasAvailability = slot.is_available;
-                        
-                        return `
-                            <div class="time-slot-row ${hasAvailability ? '' : 'unavailable'}">
-                                <div class="time-label">${slot.time_display}</div>
-                                ${Object.entries(slot.staff).map(([staffNum, isAvailable]) => `
-                                    <div class="staff-cell ${isAvailable ? 'available' : 'booked'} ${isSelected && selectedStaff == staffNum ? 'selected' : ''}" 
-                                         ${isAvailable ? `onclick="selectTimeSlot('${slot.time}', ${staffNum})"` : ''}>
-                                        ${isAvailable ? '✓' : '✗'}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-            <div class="calendar-legend">
-                <div class="legend-item"><span class="legend-icon available">✓</span> Ledig</div>
-                <div class="legend-item"><span class="legend-icon booked">✗</span> Opptatt</div>
+            <div class="time-slots-list">
+                ${timeSlots.map(slot => {
+                    const isSelected = selectedTime === slot.time;
+                    const isAvailable = slot.is_available;
+                    const statusText = isAvailable ? 'LEDIG' : 'OPPTATT';
+                    const statusClass = isAvailable ? 'available' : 'unavailable';
+                    
+                    return `
+                        <button type="button" 
+                                class="time-slot-button ${statusClass} ${isSelected ? 'selected' : ''}" 
+                                ${isAvailable ? `onclick="selectSimpleTimeSlot('${slot.time}')"` : 'disabled'}>
+                            <span class="time-slot-time">${slot.time_display}</span>
+                            <span class="time-slot-status ${statusClass}">${statusText}</span>
+                        </button>
+                    `;
+                }).join('')}
             </div>
         </div>
     `;
@@ -541,7 +538,6 @@ function renderBookingForm() {
             <div class="booking-summary">
                 <div class="summary-item">📅 ${dateDisplay}</div>
                 <div class="summary-item">⏰ Kl. ${timeDisplay}</div>
-                <div class="summary-item">👤 Ansatt ${selectedStaff}</div>
             </div>
             
             <div class="form-field">
@@ -569,13 +565,11 @@ function renderBookingForm() {
 function selectDate(date) {
     selectedDate = date;
     selectedTime = null;
-    selectedStaff = null;
     renderServiceBookingModal();
 }
 
-function selectTimeSlot(time, staffNum) {
+function selectSimpleTimeSlot(time) {
     selectedTime = time;
-    selectedStaff = staffNum;
     renderServiceBookingModal();
     
     // Scroll to booking form
@@ -601,7 +595,6 @@ async function submitServiceBooking(e) {
         service_id: serviceId,
         date: selectedDate,
         time: selectedTime,
-        preferred_staff: selectedStaff,
         customer_name: form.name.value.trim(),
         customer_email: form.email.value.trim(),
         customer_phone: form.phone.value.trim()
@@ -652,9 +645,106 @@ function closeServiceBooking() {
     overlay.classList.remove('active');
     selectedDate = null;
     selectedTime = null;
-    selectedStaff = null;
     currentServiceData = null;
     currentAvailability = null;
+}
+
+// Membership Registration
+function openMembershipRegistration(membershipData) {
+    const overlay = document.getElementById('membershipRegistrationOverlay');
+    const content = document.getElementById('membershipContent');
+    
+    content.innerHTML = `
+        <h2 class="registration-event-title">${escapeHtml(membershipData.name)}</h2>
+        
+        <div class="registration-event-info">
+            ${membershipData.description ? `<p class="event-info-description">${escapeHtml(membershipData.description)}</p>` : ''}
+            <div class="event-info-item">💰 ${formatPrice(membershipData.price)} kr per år</div>
+            <div class="event-info-notice">ℹ️ Du vil motta bekreftelse på e-post</div>
+        </div>
+        
+        <form id="membershipForm" class="registration-form" onsubmit="submitMembershipRegistration(event, '${membershipData.id}')">
+            <h3 class="form-title">Registrer deg som medlem</h3>
+            
+            <div class="form-field">
+                <label for="member_name">Fullt navn *</label>
+                <input type="text" id="member_name" name="name" required minlength="2" placeholder="Ola Nordmann">
+            </div>
+            
+            <div class="form-field">
+                <label for="member_email">E-postadresse *</label>
+                <input type="email" id="member_email" name="email" required placeholder="ola@example.com">
+            </div>
+            
+            <div class="form-field">
+                <label for="member_phone">Telefonnummer *</label>
+                <input type="tel" id="member_phone" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
+            </div>
+            
+            <div id="membershipMessage" class="registration-message" style="display: none;"></div>
+            
+            <button type="submit" class="submit-registration-btn">Bli medlem</button>
+        </form>
+    `;
+    
+    overlay.classList.add('active');
+}
+
+async function submitMembershipRegistration(e, membershipId) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const messageEl = document.getElementById('membershipMessage');
+    
+    const formData = {
+        membership_id: membershipId,
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        phone: form.phone.value.trim()
+    };
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sender...';
+    messageEl.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/register_membership_public.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            messageEl.className = 'registration-message success';
+            messageEl.textContent = result.message || 'Medlemskap registrert! Du vil motta bekreftelse på e-post.';
+            messageEl.style.display = 'block';
+            form.reset();
+            
+            setTimeout(() => {
+                closeMembershipRegistration();
+            }, 2500);
+        } else {
+            messageEl.className = 'registration-message error';
+            messageEl.textContent = result.message || 'En feil oppstod. Vennligst prøv igjen.';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error submitting membership:', error);
+        messageEl.className = 'registration-message error';
+        messageEl.textContent = 'En feil oppstod. Vennligst prøv igjen senere.';
+        messageEl.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Bli medlem';
+    }
+}
+
+function closeMembershipRegistration() {
+    const overlay = document.getElementById('membershipRegistrationOverlay');
+    overlay.classList.remove('active');
 }
 
 // Submit event registration

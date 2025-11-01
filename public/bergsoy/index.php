@@ -111,6 +111,17 @@
         </div>
     </div>
 
+    <!-- Membership Registration Overlay -->
+    <div class="event-registration-overlay" id="membershipRegistrationOverlay">
+        <div class="event-registration-page">
+            <button class="close-registration" onclick="closeMembershipRegistration()">×</button>
+            
+            <div class="registration-content" id="membershipContent">
+                <!-- Dynamic content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
     <script src="../assets/js/customer-view.js" defer></script>
 </body>
 </html>
