@@ -15,12 +15,17 @@ try {
     }
     
     $membershipId = $input['membership_id'];
-    $name = trim($input['name']);
+    $fullName = trim($input['name']);
     $email = trim($input['email']);
     $phone = isset($input['phone']) ? trim($input['phone']) : null;
     
+    // Split name into first and last name
+    $nameParts = explode(' ', $fullName, 2);
+    $firstName = $nameParts[0];
+    $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
+    
     // Validate required fields
-    if (empty($name)) {
+    if (empty($fullName)) {
         echo json_encode(['success' => false, 'message' => 'Navn er påkrevd']);
         exit;
     }
@@ -53,10 +58,23 @@ try {
     
     $companyId = $membership['company_id'];
     $membershipTypeId = $membership['product_id']; // tenant_membership_types.id
+    $price = $membership['price'];
+    
+    // Get membership plan details to calculate expiry_date
+    $stmt = $db->prepare("SELECT duration_months FROM membership_plans WHERE id = ? AND company_id = ?");
+    $stmt->execute([$membershipTypeId, $companyId]);
+    $plan = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Calculate expiry_date based on membership duration
+    $durationMonths = 12; // Default to 1 year
+    if ($plan && isset($plan['duration_months']) && $plan['duration_months'] > 0) {
+        $durationMonths = $plan['duration_months'];
+    }
+    $expiryDate = date('Y-m-d', strtotime("+{$durationMonths} months"));
     
     // Check if email already registered as member for this company
     $stmt = $db->prepare("
-        SELECT id FROM tenant_members 
+        SELECT member_id FROM membership_members 
         WHERE company_id = ? AND email = ? AND status = 'active'
     ");
     $stmt->execute([$companyId, $email]);
@@ -66,37 +84,25 @@ try {
         exit;
     }
     
-    // Generate UUID
-    $dbType = getDBType();
-    if ($dbType === 'pgsql') {
-        $stmt = $db->query("SELECT gen_random_uuid()");
-        $memberId = $stmt->fetchColumn();
-    } else {
-        $memberId = sprintf(
-            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
-    }
-    
     // Insert new member
     $stmt = $db->prepare("
-        INSERT INTO tenant_members 
-        (id, company_id, membership_type_id, name, email, phone, status, start_date, created_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW(), NOW(), NOW())
+        INSERT INTO membership_members 
+        (company_id, membership_plan_id, first_name, last_name, email, phone, status, join_date, expiry_date) 
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_DATE, ?)
+        RETURNING member_id
     ");
     
     $stmt->execute([
-        $memberId,
         $companyId,
         $membershipTypeId,
-        $name,
+        $firstName,
+        $lastName,
         $email,
-        $phone
+        $phone,
+        $expiryDate
     ]);
+    
+    $memberId = $stmt->fetchColumn();
     
     echo json_encode([
         'success' => true,
