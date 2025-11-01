@@ -10,37 +10,37 @@ function getMockData($subdomain) {
         'bergsoy' => [
             'company' => [
                 'id' => 1,
-                'name' => 'Bergsøy',
-                'subdomain' => 'bergsoy',
-                'contact_email' => 'kontakt@bergsoy.no',
+                'name' => 'yourCompany',
+                'subdomain' => 'yourcompany',
+                'contact_email' => 'contact@yourcompany.com',
                 'contact_phone' => '+47 123 45 678',
-                'logo_url' => '/attached_assets/bergsoy_logo.png'
+                'logo_url' => null
             ],
             'config' => [
                 'is_published' => true,
                 'is_enabled' => true,
-                'display_name' => 'Bergsøy',
-                'seo_title' => 'Bergsøy - Din partner for kvalitet',
-                'seo_description' => 'Bergsøy leverer førsteklasses produkter og tjenester'
+                'display_name' => 'yourCompany',
+                'seo_title' => 'yourCompany - Your partner for quality',
+                'seo_description' => 'yourCompany delivers first-class products and services'
             ],
             'settings' => [
-                'site_title' => 'Bergsøy',
-                'site_description' => 'Din partner for kvalitet og service',
+                'site_title' => 'yourCompany',
+                'site_description' => 'Your partner for quality and service',
                 'primary_color' => '#667eea',
                 'secondary_color' => '#764ba2',
                 'hero_enabled' => true,
-                'hero_title' => 'Velkommen til Bergsøy',
-                'hero_description' => 'Din partner for kvalitet og service',
-                'hero_button_text' => 'Kontakt oss',
-                'contact_email' => 'kontakt@bergsoy.no',
+                'hero_title' => 'Welcome to yourCompany',
+                'hero_description' => 'Your partner for quality and service',
+                'hero_button_text' => 'Contact us',
+                'contact_email' => 'contact@yourcompany.com',
                 'contact_phone' => '+47 123 45 678',
-                'contact_address' => 'Bergsøy, Norge',
+                'contact_address' => 'Your City, Country',
                 'is_active' => true,
                 'maintenance_mode' => false
             ],
-            'aboutUs' => '<p>Bergsøy er et ledende selskap innen vår bransje. Vi er stolte av å levere førsteklasses produkter og tjenester til våre kunder.</p>
-                         <p>Vårt team består av erfarne profesjonelle som brenner for det de gjør. Vi legger vekt på kvalitet, innovasjon og kundetilfredshet i alt vi gjør.</p>
-                         <p>Kontakt oss i dag for å lære mer om hvordan vi kan hjelpe deg!</p>',
+            'aboutUs' => '<p>yourCompany is a leading company in our industry. We pride ourselves on delivering first-class products and services to our customers.</p>
+                         <p>Our team consists of experienced professionals who are passionate about what they do. We emphasize quality, innovation and customer satisfaction in everything we do.</p>
+                         <p>Contact us today to learn more about how we can help you!</p>',
             'services' => [
                 [
                     'id' => 1,
