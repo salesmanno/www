@@ -228,6 +228,9 @@ try {
         $tableName = $dbType === 'mysql' ? 'tenant_announcements' : 'x_tenant_announcements';
         $nowFunc = $dbType === 'mysql' ? 'NOW()' : 'CURRENT_TIMESTAMP';
         
+        // PostgreSQL uses VARCHAR for company_id, MySQL uses INT - cast to string for compatibility
+        $companyIdParam = (string)$companyId;
+        
         $stmt = $db->prepare("
             SELECT 
                 id,
@@ -247,7 +250,7 @@ try {
             ORDER BY is_pinned DESC, publish_at DESC
             LIMIT 10
         ");
-        $stmt->execute([$companyId]);
+        $stmt->execute([$companyIdParam]);
         $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Cast boolean fields
