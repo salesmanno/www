@@ -56,18 +56,26 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
     * Events: `events_eventdata` (joined with output_products for event details)
-  - **Event registration**: Full-screen overlay registration page with slide-up animation
+  - **Event registration**: Full-screen overlay registration page with slide-up animation and **customizable registration fields**
     * Event cards show on "Tjenester" page with event image, description, date/time, venue, and price
     * Click "Reserver billett" opens full-screen registration overlay
     * Smooth slide-up animation from bottom (similar to fane/tab swipe transitions)
     * Registration page displays: event image (300px), event name, event info box, and registration form
     * Event info box includes: description, date/time, venue, price, and "ℹ️ Medlemspriser tildeles automatisk" notice
     * Registration form header: "Påmeldingsinformasjon"
-    * Registration form fields: Name, email, phone (all required fields with validation and placeholders)
+    * **Dynamic registration fields**: Form fields are configurable per event from admin panel
+      - Admin can select which fields to include when creating/editing events: fornavn, etternavn, e-post, telefon, gateadresse, postnummer, poststed, postboks, alder
+      - Each field can be marked as required or optional
+      - Frontend dynamically generates form based on `event_registration_fields` table
+      - **Sensible defaults**: Events without field configuration show [fornavn, etternavn, e-post (required), telefon (optional)]
+      - **Backward compatibility**: Supports legacy 'name' field for existing data
+      - Standard fields (name, email, phone, street, zip, city, postal) stored in dedicated columns
+      - Additional custom fields stored in `custom_fields` JSON column
+      - **Minimum validation**: Name and valid email always required regardless of configuration
     * Close button (×) with rotate animation on hover
     * Automatic capacity checking (only shows "Fullt" when full on cards)
     * Prevents duplicate registrations by email
-    * Stores registrations in `events_checkin` table
+    * Stores registrations in `events_checkin` table with all configured fields
     * No authentication required for customers
     * No capacity details shown to public (privacy)
     * Success message auto-closes overlay after 2 seconds
