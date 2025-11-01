@@ -39,7 +39,10 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
 - **Clean Database Architecture**: Modular database design eliminating duplicates and redundancy, standardizing tables, adding cost price tracking, and introducing `service_bookings` and `unified_ledger` tables.
 
 ## Recent Changes
-- **November 1, 2025**: Customer website now active as main view
+- **November 1, 2025**: Customer website now active as main view with TRUE multi-tenant support
+  - **Multi-tenant architecture**: Automatic subdomain detection from URL (e.g., nordicfitness.salesman.no shows Nordic Fitness data, bergsoy.salesman.no shows Bergsøy data)
+  - **Generic placeholders**: No hardcoded company names; shows "Laster..." until API loads company-specific data
+  - **Dynamic content loading**: Company name, logo, and all content populated from database based on subdomain
   - **Main landing page**: Root URL (`/`) now redirects to customer view (`/public/bergsoy/`)
   - **Admin login relocated**: Moved to `/admin.php` (previously at `/`)
   - **News/announcements on homepage**: Public website displays news from `tenant_announcements` table

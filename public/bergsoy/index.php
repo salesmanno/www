@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bergsøy</title>
+    <title>Laster...</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="../assets/css/customer-view.css" rel="stylesheet">
 </head>
@@ -12,11 +12,11 @@
         <!-- Logo Section -->
         <div class="logo-section">
             <div class="logo-center">
-                <img src="/attached_assets/bergsoy_logo.png" alt="Bergsøy Logo" class="header-logo" id="headerLogo">
-                <h1 class="header-company-name" id="headerCompanyName">Bergsøy</h1>
+                <img src="" alt="Company Logo" class="header-logo" id="headerLogo" style="display: none;">
+                <h1 class="header-company-name" id="headerCompanyName">Laster...</h1>
             </div>
             <div class="header-tagline">
-                en tjeneste til <span id="headerCompanyNameTagline">Bergsøy</span> levert av Salesman.no
+                en tjeneste levert av Salesman.no
             </div>
         </div>
         

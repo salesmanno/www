@@ -1,6 +1,21 @@
 // Configuration
-const subdomain = 'bergsoy';
 const API_BASE = '/api';
+
+// Automatically detect subdomain from URL (e.g., nordicfitness.salesman.no -> nordicfitness)
+function getSubdomain() {
+    const hostname = window.location.hostname;
+    const parts = hostname.split('.');
+    
+    // If running on localhost or IP, use bergsoy as default
+    if (hostname === 'localhost' || hostname.startsWith('127.0.0.1') || hostname.includes('replit')) {
+        return 'bergsoy';
+    }
+    
+    // Return first part of domain (e.g., nordicfitness from nordicfitness.salesman.no)
+    return parts[0];
+}
+
+const subdomain = getSubdomain();
 
 // State
 let currentPage = 'home';
@@ -44,11 +59,22 @@ async function loadData() {
 function updatePageContent(data) {
     // Update company info in header
     if (data.company) {
-        const headerNameEl = document.getElementById('headerCompanyName');
-        if (headerNameEl) headerNameEl.textContent = data.company.name;
+        // Update page title
+        document.title = data.company.name;
         
-        const headerTaglineEl = document.getElementById('headerCompanyNameTagline');
-        if (headerTaglineEl) headerTaglineEl.textContent = data.company.name;
+        // Update company name in header
+        const headerNameEl = document.getElementById('headerCompanyName');
+        if (headerNameEl) {
+            headerNameEl.textContent = data.company.name;
+        }
+        
+        // Update logo
+        const headerLogoEl = document.getElementById('headerLogo');
+        if (headerLogoEl && data.company.logo_url) {
+            headerLogoEl.src = data.company.logo_url;
+            headerLogoEl.style.display = 'block';
+            headerLogoEl.alt = data.company.name + ' Logo';
+        }
     }
     
     // Update hero section with settings
