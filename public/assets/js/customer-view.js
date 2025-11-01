@@ -124,6 +124,9 @@ function updatePageContent(data) {
                             <h3>${escapeHtml(service.name)}</h3>
                             ${service.description ? `<p>${escapeHtml(service.description)}</p>` : ''}
                             ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
+                            <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(service).replace(/'/g, "&apos;")})'>
+                                📅 Book time
+                            </button>
                         </div>
                     `;
                 }
@@ -330,6 +333,276 @@ function openEventRegistration(eventData) {
 function closeEventRegistration() {
     const overlay = document.getElementById('eventRegistrationOverlay');
     overlay.classList.remove('active');
+}
+
+// Open service booking overlay
+let currentServiceData = null;
+let currentAvailability = null;
+let selectedDate = null;
+let selectedTime = null;
+let selectedStaff = null;
+
+async function openServiceBooking(serviceData) {
+    currentServiceData = serviceData;
+    const overlay = document.getElementById('serviceBookingOverlay');
+    const content = document.getElementById('serviceBookingContent');
+    
+    // Show loading state
+    content.innerHTML = `
+        <h2 class="registration-event-title">Book ${escapeHtml(serviceData.name)}</h2>
+        <div style="text-align: center; padding: 40px;">
+            <p>Laster tilgjengelige tider...</p>
+        </div>
+    `;
+    
+    overlay.classList.add('active');
+    
+    // Fetch availability
+    try {
+        const response = await fetch(`/api/get_public_service_availability.php?service_id=${serviceData.product_id}&days=14`);
+        const result = await response.json();
+        
+        if (result.success) {
+            currentAvailability = result;
+            renderServiceBookingModal();
+        } else {
+            content.innerHTML = `
+                <h2 class="registration-event-title">Book ${escapeHtml(serviceData.name)}</h2>
+                <div style="text-align: center; padding: 40px;">
+                    <p style="color: #e74c3c;">${result.message || 'Kunne ikke hente tilgjengelige tider'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error fetching availability:', error);
+        content.innerHTML = `
+            <h2 class="registration-event-title">Book ${escapeHtml(serviceData.name)}</h2>
+            <div style="text-align: center; padding: 40px;">
+                <p style="color: #e74c3c;">En feil oppstod. Vennligst prøv igjen senere.</p>
+            </div>
+        `;
+    }
+}
+
+function renderServiceBookingModal() {
+    const content = document.getElementById('serviceBookingContent');
+    const service = currentAvailability.service;
+    const availability = currentAvailability.availability;
+    const dates = Object.keys(availability).sort();
+    
+    // Auto-select first date if none selected
+    if (!selectedDate && dates.length > 0) {
+        selectedDate = dates[0];
+    }
+    
+    content.innerHTML = `
+        <h2 class="registration-event-title">${escapeHtml(service.name)}</h2>
+        
+        <div class="registration-event-info">
+            ${service.description ? `<p class="event-info-description">${escapeHtml(service.description)}</p>` : ''}
+            <div class="event-info-item">⏱️ Varighet: ${service.duration} minutter</div>
+            ${service.price ? `<div class="event-info-item">💰 ${formatPrice(service.price)} kr</div>` : ''}
+            <div class="event-info-notice">ℹ️ Medlemspriser tildeles automatisk</div>
+        </div>
+        
+        <div class="booking-calendar-section">
+            <h3 class="form-title">Velg dato</h3>
+            <div class="date-selector">
+                ${dates.map(date => {
+                    const dateObj = new Date(date);
+                    const dayName = dateObj.toLocaleDateString('no-NO', { weekday: 'short' });
+                    const dayNum = dateObj.getDate();
+                    const monthName = dateObj.toLocaleDateString('no-NO', { month: 'short' });
+                    const isSelected = selectedDate === date;
+                    
+                    return `
+                        <button type="button" class="date-option ${isSelected ? 'selected' : ''}" onclick="selectDate('${date}')">
+                            <div class="date-day">${dayName}</div>
+                            <div class="date-num">${dayNum}</div>
+                            <div class="date-month">${monthName}</div>
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        
+        ${selectedDate ? renderTimeSlots() : ''}
+        
+        ${selectedTime ? renderBookingForm() : ''}
+    `;
+}
+
+function renderTimeSlots() {
+    const dateData = currentAvailability.availability[selectedDate];
+    if (!dateData) return '';
+    
+    const slots = dateData.slots;
+    const timeSlots = Object.values(slots);
+    
+    return `
+        <div class="booking-time-section">
+            <h3 class="form-title">Velg tidspunkt</h3>
+            <div class="staff-calendar">
+                <div class="staff-calendar-header">
+                    <div class="time-column-header">Tid</div>
+                    ${Array.from({length: currentAvailability.staff_count}, (_, i) => 
+                        `<div class="staff-column-header">Ansatt ${i + 1}</div>`
+                    ).join('')}
+                </div>
+                <div class="staff-calendar-body">
+                    ${timeSlots.map(slot => {
+                        const isSelected = selectedTime === slot.time;
+                        const hasAvailability = slot.is_available;
+                        
+                        return `
+                            <div class="time-slot-row ${hasAvailability ? '' : 'unavailable'}">
+                                <div class="time-label">${slot.time_display}</div>
+                                ${Object.entries(slot.staff).map(([staffNum, isAvailable]) => `
+                                    <div class="staff-cell ${isAvailable ? 'available' : 'booked'} ${isSelected && selectedStaff == staffNum ? 'selected' : ''}" 
+                                         ${isAvailable ? `onclick="selectTimeSlot('${slot.time}', ${staffNum})"` : ''}>
+                                        ${isAvailable ? '✓' : '✗'}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            <div class="calendar-legend">
+                <div class="legend-item"><span class="legend-icon available">✓</span> Ledig</div>
+                <div class="legend-item"><span class="legend-icon booked">✗</span> Opptatt</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderBookingForm() {
+    const timeObj = new Date(`${selectedDate} ${selectedTime}`);
+    const timeDisplay = timeObj.toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' });
+    const dateDisplay = new Date(selectedDate).toLocaleDateString('no-NO', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long' 
+    });
+    
+    return `
+        <form id="serviceBookingForm" class="registration-form" onsubmit="submitServiceBooking(event)">
+            <h3 class="form-title">Bekreft booking</h3>
+            
+            <div class="booking-summary">
+                <div class="summary-item">📅 ${dateDisplay}</div>
+                <div class="summary-item">⏰ Kl. ${timeDisplay}</div>
+                <div class="summary-item">👤 Ansatt ${selectedStaff}</div>
+            </div>
+            
+            <div class="form-field">
+                <label for="booking_name">Fullt navn *</label>
+                <input type="text" id="booking_name" name="name" required minlength="2" placeholder="Ola Nordmann">
+            </div>
+            
+            <div class="form-field">
+                <label for="booking_email">E-postadresse *</label>
+                <input type="email" id="booking_email" name="email" required placeholder="ola@example.com">
+            </div>
+            
+            <div class="form-field">
+                <label for="booking_phone">Telefonnummer *</label>
+                <input type="tel" id="booking_phone" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
+            </div>
+            
+            <div id="bookingMessage" class="registration-message" style="display: none;"></div>
+            
+            <button type="submit" class="submit-registration-btn">Bekreft booking</button>
+        </form>
+    `;
+}
+
+function selectDate(date) {
+    selectedDate = date;
+    selectedTime = null;
+    selectedStaff = null;
+    renderServiceBookingModal();
+}
+
+function selectTimeSlot(time, staffNum) {
+    selectedTime = time;
+    selectedStaff = staffNum;
+    renderServiceBookingModal();
+    
+    // Scroll to booking form
+    setTimeout(() => {
+        const form = document.getElementById('serviceBookingForm');
+        if (form) {
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 100);
+}
+
+async function submitServiceBooking(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const messageEl = document.getElementById('bookingMessage');
+    
+    const formData = {
+        service_id: currentServiceData.product_id,
+        date: selectedDate,
+        time: selectedTime,
+        preferred_staff: selectedStaff,
+        customer_name: form.name.value.trim(),
+        customer_email: form.email.value.trim(),
+        customer_phone: form.phone.value.trim()
+    };
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sender...';
+    messageEl.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/book_service_public.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            messageEl.className = 'registration-message success';
+            messageEl.textContent = result.message || 'Bookingen er bekreftet!';
+            messageEl.style.display = 'block';
+            
+            form.reset();
+            
+            setTimeout(() => {
+                closeServiceBooking();
+            }, 2500);
+        } else {
+            messageEl.className = 'registration-message error';
+            messageEl.textContent = result.message || 'En feil oppstod. Vennligst prøv igjen.';
+            messageEl.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Bekreft booking';
+        }
+    } catch (error) {
+        console.error('Booking error:', error);
+        messageEl.className = 'registration-message error';
+        messageEl.textContent = 'En feil oppstod. Vennligst prøv igjen senere.';
+        messageEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Bekreft booking';
+    }
+}
+
+function closeServiceBooking() {
+    const overlay = document.getElementById('serviceBookingOverlay');
+    overlay.classList.remove('active');
+    selectedDate = null;
+    selectedTime = null;
+    selectedStaff = null;
+    currentServiceData = null;
+    currentAvailability = null;
 }
 
 // Submit event registration

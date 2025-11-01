@@ -100,6 +100,17 @@
         </div>
     </div>
 
+    <!-- Service Booking Overlay -->
+    <div class="event-registration-overlay" id="serviceBookingOverlay">
+        <div class="event-registration-page">
+            <button class="close-registration" onclick="closeServiceBooking()">×</button>
+            
+            <div class="registration-content" id="serviceBookingContent">
+                <!-- Dynamic content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
     <script src="../assets/js/customer-view.js"></script>
 </body>
 </html>
