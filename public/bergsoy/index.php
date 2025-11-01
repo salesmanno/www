@@ -89,6 +89,17 @@
         </div>
     </div>
 
+    <!-- Event Registration Overlay -->
+    <div class="event-registration-overlay" id="eventRegistrationOverlay">
+        <div class="event-registration-page">
+            <button class="close-registration" onclick="closeEventRegistration()">×</button>
+            
+            <div class="registration-content" id="registrationContent">
+                <!-- Dynamic content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
     <script src="../assets/js/customer-view.js"></script>
 </body>
 </html>

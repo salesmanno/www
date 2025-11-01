@@ -401,10 +401,6 @@ body {
     transition: all 0.3s ease;
 }
 
-.event-card.expanded {
-    transform: scale(1.02);
-}
-
 .event-image {
     width: 100%;
     height: 200px;
@@ -451,111 +447,188 @@ body {
     width: 100%;
 }
 
-.register-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.btn-arrow {
-    transition: transform 0.3s;
-    font-size: 1.2rem;
-}
-
 .register-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* Event Registration Form */
-.event-registration-form {
-    margin-top: 20px;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    border: 2px solid rgba(102, 126, 234, 0.3);
+/* Event Registration Overlay */
+.event-registration-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 3000;
     opacity: 0;
-    transform: translateY(-20px);
-    transition: all 0.3s ease;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
 }
 
-.event-registration-form.show {
+.event-registration-overlay.active {
     opacity: 1;
+    pointer-events: auto;
+}
+
+.event-registration-page {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 24px 24px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+}
+
+.event-registration-overlay.active .event-registration-page {
     transform: translateY(0);
 }
 
-.event-registration-form h4 {
-    margin-bottom: 16px;
-    color: #667eea;
-    font-size: 1.1rem;
+.close-registration {
+    position: sticky;
+    top: 20px;
+    right: 20px;
+    float: right;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 2rem;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.3s;
 }
 
-.event-registration-form .form-group {
-    margin-bottom: 16px;
+.close-registration:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
 }
 
-.event-registration-form label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 500;
-    color: #1a1a1a;
-    font-size: 0.9rem;
+.registration-content {
+    padding: 30px 20px;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
-.event-registration-form input {
+.registration-event-image {
     width: 100%;
-    padding: 10px 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    height: 300px;
+    object-fit: cover;
+    border-radius: 16px;
+    margin-bottom: 24px;
+}
+
+.registration-event-title {
+    color: white;
+    font-size: 2rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.registration-event-info {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 30px;
+}
+
+.event-info-description {
+    color: white;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+.event-info-item {
+    color: white;
+    margin: 8px 0;
+    font-size: 1.05rem;
+}
+
+.registration-form {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.form-title {
+    color: #667eea;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+}
+
+.form-field {
+    margin-bottom: 20px;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 8px;
+    color: #1a1a1a;
+    font-weight: 600;
     font-size: 0.95rem;
+}
+
+.form-field input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 1rem;
     transition: border-color 0.3s;
 }
 
-.event-registration-form input:focus {
+.form-field input:focus {
     outline: none;
     border-color: #667eea;
 }
 
-.event-registration-form .submit-btn {
+.submit-registration-btn {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: 600;
+    padding: 16px 24px;
+    border-radius: 10px;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.3s;
     width: 100%;
-    font-size: 1rem;
+    font-size: 1.1rem;
 }
 
-.event-registration-form .submit-btn:hover:not(:disabled) {
+.submit-registration-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
 
-.event-registration-form .submit-btn:disabled {
+.submit-registration-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-.event-registration-form [class*="form-message-"] {
-    padding: 10px;
+.registration-message {
+    padding: 12px;
     border-radius: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     text-align: center;
-    font-weight: 500;
-    font-size: 0.9rem;
+    font-weight: 600;
 }
 
-.event-registration-form .success {
+.registration-message.success {
     background: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
 }
 
-.event-registration-form .error {
+.registration-message.error {
     background: #f8d7da;
     color: #721c24;
     border: 1px solid #f5c6cb;

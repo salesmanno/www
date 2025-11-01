@@ -56,17 +56,19 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
     * News/announcements: `tenant_announcements` (displayed on homepage with date formatting)
     * Services: `output_products` (displayed on services page)
     * Events: `events_eventdata` (joined with output_products for event details)
-  - **Event registration**: Public customers can register for events directly from expandable cards on main site
-    * Event cards show on "Tjenester" page with event image (if available), description, date/time, venue, and price
-    * Click "Reserver billett" expands card inline to reveal registration form
-    * Smooth slide-down animation reveals form without leaving page or opening modal
-    * Registration form: Name, email, phone (all required fields with validation)
-    * Automatic capacity checking (only shows "Fullt" when full)
+  - **Event registration**: Full-screen overlay registration page with slide-up animation
+    * Event cards show on "Tjenester" page with event image, description, date/time, venue, and price
+    * Click "Reserver billett" opens full-screen registration overlay
+    * Smooth slide-up animation from bottom (similar to fane/tab swipe transitions)
+    * Registration page displays: event image (300px), event name, event info box, and registration form
+    * Registration form: Name, email, phone (all required fields with validation and placeholders)
+    * Close button (×) with rotate animation on hover
+    * Automatic capacity checking (only shows "Fullt" when full on cards)
     * Prevents duplicate registrations by email
     * Stores registrations in `events_checkin` table
     * No authentication required for customers
     * No capacity details shown to public (privacy)
-    * Arrow indicator (↓/↑) shows expand/collapse state
+    * Success message auto-closes overlay after 2 seconds
   - **Dedicated reservations page**: `/public/bergsoy/reservasjoner.php`
     * Displays all upcoming events from `events_eventdata`
     * Shows event details: title, description, date/time, venue, capacity

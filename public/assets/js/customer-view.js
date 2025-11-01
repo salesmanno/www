@@ -88,13 +88,13 @@ function updatePageContent(data) {
         if (servicesGrid) {
             servicesGrid.innerHTML = data.services.map(service => {
                 if (service.product_type === 'event') {
-                    // Event card with expandable registration
+                    // Event card - opens registration overlay
                     const spotsLeft = service.max_attendees ? service.max_attendees - (service.registered_count || 0) : null;
                     const isFull = spotsLeft !== null && spotsLeft <= 0;
-                    const eventId = service.product_id;
+                    const eventData = JSON.stringify(service).replace(/"/g, '&quot;');
                     
                     return `
-                        <div class="service-card event-card" id="event-${eventId}">
+                        <div class="service-card event-card">
                             ${service.image_url ? `<img src="${escapeHtml(service.image_url)}" alt="${escapeHtml(service.name)}" class="event-image">` : ''}
                             
                             <div class="event-card-content">
@@ -110,31 +110,10 @@ function updatePageContent(data) {
                                 ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
                                 
                                 ${!isFull ? `
-                                    <button class="register-btn" onclick="toggleEventRegistration('${eventId}')">
-                                        <span class="btn-text">Reserver billett</span>
-                                        <span class="btn-arrow">↓</span>
+                                    <button class="register-btn" onclick='openEventRegistration(${eventData})'>
+                                        Reserver billett
                                     </button>
                                 ` : '<div class="full-badge">Fullt booket</div>'}
-                                
-                                <div class="event-registration-form" id="form-${eventId}" style="display: none;">
-                                    <h4>Meld deg på arrangementet</h4>
-                                    <form onsubmit="submitEventRegistration(event, '${eventId}', '${escapeHtml(service.name)}')">
-                                        <div class="form-group">
-                                            <label>Fullt navn *</label>
-                                            <input type="text" name="name" required minlength="2" placeholder="Ola Nordmann">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>E-post *</label>
-                                            <input type="email" name="email" required placeholder="ola@example.com">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Telefon *</label>
-                                            <input type="tel" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
-                                        </div>
-                                        <div class="form-message-${eventId}" style="display: none;"></div>
-                                        <button type="submit" class="submit-btn">Send påmelding</button>
-                                    </form>
-                                </div>
                             </div>
                         </div>
                     `;
@@ -300,41 +279,65 @@ function formatEventDate(dateStr, timeStr) {
     return dateFormatted;
 }
 
-// Toggle event registration form
-function toggleEventRegistration(eventId) {
-    const form = document.getElementById(`form-${eventId}`);
-    const card = document.getElementById(`event-${eventId}`);
-    const button = card.querySelector('.register-btn');
-    const arrow = button.querySelector('.btn-arrow');
+// Open event registration overlay
+function openEventRegistration(eventData) {
+    const overlay = document.getElementById('eventRegistrationOverlay');
+    const content = document.getElementById('registrationContent');
     
-    if (form.style.display === 'none') {
-        // Show form with smooth animation
-        form.style.display = 'block';
-        setTimeout(() => {
-            form.classList.add('show');
-            card.classList.add('expanded');
-            arrow.textContent = '↑';
-            button.querySelector('.btn-text').textContent = 'Skjul skjema';
-        }, 10);
-    } else {
-        // Hide form
-        form.classList.remove('show');
-        card.classList.remove('expanded');
-        arrow.textContent = '↓';
-        button.querySelector('.btn-text').textContent = 'Reserver billett';
-        setTimeout(() => {
-            form.style.display = 'none';
-        }, 300);
-    }
+    // Build registration page content
+    content.innerHTML = `
+        ${eventData.image_url ? `<img src="${escapeHtml(eventData.image_url)}" alt="${escapeHtml(eventData.name)}" class="registration-event-image">` : ''}
+        
+        <h2 class="registration-event-title">${escapeHtml(eventData.name)}</h2>
+        
+        <div class="registration-event-info">
+            ${eventData.description ? `<p class="event-info-description">${escapeHtml(eventData.description)}</p>` : ''}
+            ${eventData.start_date ? `<div class="event-info-item">📅 ${formatEventDate(eventData.start_date, eventData.start_time)}</div>` : ''}
+            ${eventData.venue_name ? `<div class="event-info-item">📍 ${escapeHtml(eventData.venue_name)}</div>` : ''}
+            ${eventData.ticket_price ? `<div class="event-info-item">💰 ${formatPrice(eventData.ticket_price)} kr</div>` : ''}
+        </div>
+        
+        <form id="eventRegistrationForm" class="registration-form" onsubmit="submitEventRegistration(event, '${eventData.product_id}')">
+            <h3 class="form-title">Påmeldingsinformasjon</h3>
+            
+            <div class="form-field">
+                <label for="reg_name">Fullt navn *</label>
+                <input type="text" id="reg_name" name="name" required minlength="2" placeholder="Ola Nordmann">
+            </div>
+            
+            <div class="form-field">
+                <label for="reg_email">E-postadresse *</label>
+                <input type="email" id="reg_email" name="email" required placeholder="ola@example.com">
+            </div>
+            
+            <div class="form-field">
+                <label for="reg_phone">Telefonnummer *</label>
+                <input type="tel" id="reg_phone" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
+            </div>
+            
+            <div id="registrationMessage" class="registration-message" style="display: none;"></div>
+            
+            <button type="submit" class="submit-registration-btn">Send reservasjon</button>
+        </form>
+    `;
+    
+    // Show overlay with slide-up animation
+    overlay.classList.add('active');
+}
+
+// Close event registration overlay
+function closeEventRegistration() {
+    const overlay = document.getElementById('eventRegistrationOverlay');
+    overlay.classList.remove('active');
 }
 
 // Submit event registration
-async function submitEventRegistration(e, eventId, eventName) {
+async function submitEventRegistration(e, eventId) {
     e.preventDefault();
     
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
-    const messageContainer = document.querySelector(`.form-message-${eventId}`);
+    const messageEl = document.getElementById('registrationMessage');
     
     const formData = {
         event_id: eventId,
@@ -345,7 +348,7 @@ async function submitEventRegistration(e, eventId, eventName) {
     
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sender...';
-    messageContainer.style.display = 'none';
+    messageEl.style.display = 'none';
     
     try {
         const response = await fetch('/api/register_event_public.php', {
@@ -357,28 +360,28 @@ async function submitEventRegistration(e, eventId, eventName) {
         const result = await response.json();
         
         if (result.success) {
-            messageContainer.className = `form-message-${eventId} success`;
-            messageContainer.textContent = '✓ ' + result.message;
-            messageContainer.style.display = 'block';
+            messageEl.className = 'registration-message success';
+            messageEl.textContent = '✓ ' + result.message;
+            messageEl.style.display = 'block';
             form.reset();
             
             setTimeout(() => {
-                toggleEventRegistration(eventId);
+                closeEventRegistration();
                 loadData(); // Reload to update capacity
             }, 2000);
         } else {
-            messageContainer.className = `form-message-${eventId} error`;
-            messageContainer.textContent = result.message;
-            messageContainer.style.display = 'block';
+            messageEl.className = 'registration-message error';
+            messageEl.textContent = result.message;
+            messageEl.style.display = 'block';
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Send påmelding';
+            submitBtn.textContent = 'Send reservasjon';
         }
     } catch (error) {
-        messageContainer.className = `form-message-${eventId} error`;
-        messageContainer.textContent = 'Noe gikk galt. Vennligst prøv igjen.';
-        messageContainer.style.display = 'block';
+        messageEl.className = 'registration-message error';
+        messageEl.textContent = 'Noe gikk galt. Vennligst prøv igjen.';
+        messageEl.style.display = 'block';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Send påmelding';
+        submitBtn.textContent = 'Send reservasjon';
     }
 }
 
