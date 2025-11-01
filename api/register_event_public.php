@@ -66,6 +66,7 @@ try {
     $zip = isset($input['zip']) ? trim($input['zip']) : null;
     $city = isset($input['city']) ? trim($input['city']) : null;
     $postal = isset($input['postal']) ? trim($input['postal']) : null;
+    $payment_method = isset($input['payment_method']) ? trim($input['payment_method']) : null;
     
     // Enforce minimum required fields regardless of configuration
     if (empty($name)) {
@@ -146,8 +147,8 @@ try {
         INSERT INTO events_checkin 
         (id, event_id, attendee_name, attendee_email, attendee_phone, 
          attendee_street, attendee_zip, attendee_city, attendee_postal,
-         custom_fields, ticket_type, ticket_price, payment_status, checked_in, created_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, 'pending', " . dbBool(false) . ", NOW(), NOW())
+         custom_fields, ticket_type, ticket_price, payment_status, payment_method, checked_in, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, 'pending', ?, " . dbBool(false) . ", NOW(), NOW())
     ");
     
     $customFieldsJson = !empty($customFields) ? json_encode($customFields) : null;
@@ -163,7 +164,8 @@ try {
         $city,
         $postal,
         $customFieldsJson,
-        $event['ticket_price'] ?? 0
+        $event['ticket_price'] ?? 0,
+        $payment_method
     ]);
     
     echo json_encode([

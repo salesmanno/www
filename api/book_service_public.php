@@ -25,6 +25,7 @@ try {
     $customerEmail = trim($data['customer_email']);
     $customerPhone = trim($data['customer_phone']);
     $preferredStaff = isset($data['preferred_staff']) ? (int)$data['preferred_staff'] : null;
+    $paymentMethod = isset($data['payment_method']) ? trim($data['payment_method']) : null;
     
     // Validate email format
     if (!filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
@@ -194,8 +195,8 @@ try {
             id, company_id, service_id, assigned_staff_id,
             customer_name, customer_email, customer_phone,
             date_from, time_from, time_to,
-            status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+            status, payment_method, payment_status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', NOW())
     ");
     
     $stmt->execute([
@@ -208,7 +209,8 @@ try {
         $customerPhone,
         $bookingDate,
         $bookingTime,
-        $endTime
+        $endTime,
+        $paymentMethod
     ]);
     
     $db->commit();

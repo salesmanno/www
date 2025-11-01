@@ -354,8 +354,63 @@ function formatEventDate(dateStr, timeStr) {
     return dateFormatted;
 }
 
+// Global payment methods cache
+let paymentMethods = [];
+let paymentMethodsLoaded = false;
+let paymentMethodsPromise = null;
+
+// Fetch payment methods on page load
+async function fetchPaymentMethods() {
+    if (paymentMethodsPromise) {
+        return paymentMethodsPromise; // Return existing promise if already fetching
+    }
+    
+    paymentMethodsPromise = (async () => {
+        try {
+            const response = await fetch('/api/get_payment_methods.php');
+            const result = await response.json();
+            if (result.success && result.payment_methods) {
+                paymentMethods = result.payment_methods;
+            }
+        } catch (error) {
+            console.error('Error fetching payment methods:', error);
+        } finally {
+            paymentMethodsLoaded = true;
+        }
+    })();
+    
+    return paymentMethodsPromise;
+}
+
+// Call on page load
+fetchPaymentMethods();
+
+// Generate payment method dropdown HTML
+function renderPaymentMethodDropdown(required = false) {
+    if (!paymentMethods || paymentMethods.length === 0) {
+        return ''; // Return empty if no payment methods configured
+    }
+    
+    const requiredAttr = required ? 'required' : '';
+    const requiredLabel = required ? ' *' : '';
+    
+    return `
+        <div class="form-field">
+            <label for="payment_method">Betalingsmetode${requiredLabel}</label>
+            <select id="payment_method" name="payment_method" ${requiredAttr}>
+                ${paymentMethods.map(method => 
+                    `<option value="${method.provider_name}">${escapeHtml(method.display_name)}</option>`
+                ).join('')}
+            </select>
+        </div>
+    `;
+}
+
 // Open event registration overlay
-function openEventRegistration(eventData) {
+async function openEventRegistration(eventData) {
+    // Ensure payment methods are loaded before rendering form
+    await fetchPaymentMethods();
+    
     const overlay = document.getElementById('eventRegistrationOverlay');
     const content = document.getElementById('registrationContent');
     
@@ -429,6 +484,8 @@ function openEventRegistration(eventData) {
             
             ${formFieldsHtml}
             
+            ${renderPaymentMethodDropdown(true)}
+            
             <div id="registrationMessage" class="registration-message" style="display: none;"></div>
             
             <button type="submit" class="submit-registration-btn">Send reservasjon</button>
@@ -496,7 +553,7 @@ async function openServiceBooking(serviceData) {
     }
 }
 
-function renderServiceBookingModal() {
+async function renderServiceBookingModal() {
     const content = document.getElementById('serviceBookingContent');
     const service = currentAvailability.service;
     const availability = currentAvailability.availability;
@@ -506,6 +563,9 @@ function renderServiceBookingModal() {
     if (!selectedDate && dates.length > 0) {
         selectedDate = dates[0];
     }
+    
+    // If we need to render booking form, ensure payment methods are loaded
+    const bookingFormHtml = selectedTime ? await renderBookingForm() : '';
     
     content.innerHTML = `
         <h2 class="registration-event-title">${escapeHtml(service.name)}</h2>
@@ -540,7 +600,7 @@ function renderServiceBookingModal() {
         
         ${selectedDate ? renderTimeSlots() : ''}
         
-        ${selectedTime ? renderBookingForm() : ''}
+        ${bookingFormHtml}
     `;
 }
 
@@ -575,7 +635,10 @@ function renderTimeSlots() {
     `;
 }
 
-function renderBookingForm() {
+async function renderBookingForm() {
+    // Ensure payment methods are loaded before rendering form
+    await fetchPaymentMethods();
+    
     const timeObj = new Date(`${selectedDate} ${selectedTime}`);
     const timeDisplay = timeObj.toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' });
     const dateDisplay = new Date(selectedDate).toLocaleDateString('no-NO', { 
@@ -608,6 +671,8 @@ function renderBookingForm() {
                 <input type="tel" id="booking_phone" name="phone" required pattern="[0-9]{8,15}" placeholder="912 34 567">
             </div>
             
+            ${renderPaymentMethodDropdown(true)}
+            
             <div id="bookingMessage" class="registration-message" style="display: none;"></div>
             
             <button type="submit" class="submit-registration-btn">Bekreft booking</button>
@@ -621,9 +686,9 @@ function selectDate(date) {
     renderServiceBookingModal();
 }
 
-function selectSimpleTimeSlot(time) {
+async function selectSimpleTimeSlot(time) {
     selectedTime = time;
-    renderServiceBookingModal();
+    await renderServiceBookingModal();
     
     // Scroll to booking form
     setTimeout(() => {
@@ -650,7 +715,8 @@ async function submitServiceBooking(e) {
         time: selectedTime,
         customer_name: form.name.value.trim(),
         customer_email: form.email.value.trim(),
-        customer_phone: form.phone.value.trim()
+        customer_phone: form.phone.value.trim(),
+        payment_method: form.payment_method ? form.payment_method.value : null
     };
     
     submitBtn.disabled = true;
@@ -808,12 +874,15 @@ async function submitEventRegistration(e, eventId) {
     const submitBtn = form.querySelector('button[type="submit"]');
     const messageEl = document.getElementById('registrationMessage');
     
-    const formData = {
-        event_id: eventId,
-        name: form.name.value.trim(),
-        email: form.email.value.trim(),
-        phone: form.phone.value.trim()
-    };
+    // Collect all form fields dynamically
+    const formData = { event_id: eventId };
+    const formElements = form.elements;
+    
+    for (let element of formElements) {
+        if (element.name && element.type !== 'submit') {
+            formData[element.name] = element.value.trim();
+        }
+    }
     
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sender...';
