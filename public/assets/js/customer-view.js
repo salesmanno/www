@@ -83,6 +83,20 @@ function updatePageContent(data) {
         if (subtitleEl && data.settings.hero_description) {
             subtitleEl.textContent = data.settings.hero_description;
         }
+        
+        // Apply custom colors from settings
+        if (data.settings.header_bg_color) {
+            document.documentElement.style.setProperty('--header-bg-color', data.settings.header_bg_color);
+        }
+        if (data.settings.body_bg_color) {
+            document.documentElement.style.setProperty('--body-bg-color', data.settings.body_bg_color);
+        }
+        if (data.settings.primary_color) {
+            document.documentElement.style.setProperty('--primary-color', data.settings.primary_color);
+        }
+        if (data.settings.secondary_color) {
+            document.documentElement.style.setProperty('--secondary-color', data.settings.secondary_color);
+        }
     }
     
     // Update About Us content

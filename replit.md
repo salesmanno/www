@@ -52,9 +52,14 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
   - **Three-page layout**: Om oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
   - **Modern gradient design**: Smooth animations and mobile-first responsive design
-  - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top with tagline "en tjeneste til [company name] levert av Salesman.no" on right side
+  - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top with tagline "en tjeneste levert av Salesman.no" on right side
   - **Navigation header**: Clean, distinct header with clickable tabs and visual indicator for active page
   - **Navigation**: Users navigate by clicking header tabs or swipe gestures (arrow buttons hidden)
+  - **Custom colors**: Supports customizable colors from `tenant_website_general`:
+    * `header_bg_color` - Background color for logo section and navigation header
+    * `body_bg_color` - Background color for main content area
+    * `primary_color` - Primary theme color for gradients and accents
+    * `secondary_color` - Secondary theme color for gradients
   - **Data sources**:
     * Company info: `tenant_companies` (Ditt Firma)
     * Website config: `tenant_website_config` (Ditt Nettsted)
