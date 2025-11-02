@@ -84,7 +84,7 @@ function updatePageContent(data) {
             subtitleEl.textContent = data.settings.hero_description;
         }
         
-        // Apply custom colors from settings
+        // Apply custom colors and layout from settings
         if (data.settings.header_bg_color) {
             document.documentElement.style.setProperty('--header-bg-color', data.settings.header_bg_color);
         }
@@ -96,6 +96,21 @@ function updatePageContent(data) {
         }
         if (data.settings.secondary_color) {
             document.documentElement.style.setProperty('--secondary-color', data.settings.secondary_color);
+        }
+        if (data.settings.logo_height) {
+            document.documentElement.style.setProperty('--logo-height', data.settings.logo_height);
+        }
+        if (data.settings.header_height) {
+            document.documentElement.style.setProperty('--header-height', data.settings.header_height);
+        }
+        if (data.settings.font_family) {
+            document.documentElement.style.setProperty('--font-family', data.settings.font_family);
+        }
+        if (data.settings.border_radius) {
+            document.documentElement.style.setProperty('--border-radius', data.settings.border_radius);
+        }
+        if (data.settings.spacing_unit) {
+            document.documentElement.style.setProperty('--spacing-unit', data.settings.spacing_unit);
         }
     }
     
@@ -157,7 +172,7 @@ function updatePageContent(data) {
                 content += `<p style="margin-top: 1.5rem; font-size: 1rem; color: #1a1a1a; line-height: 1.8;">`;
                 
                 if (contactPhone) {
-                    content += `📞 <a href="tel:${escapeHtml(contactPhone)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactPhone)}</a>`;
+                    content += `<a href="tel:${escapeHtml(contactPhone)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactPhone)}</a>`;
                 }
                 
                 if (contactPhone && contactEmail) {
@@ -165,7 +180,7 @@ function updatePageContent(data) {
                 }
                 
                 if (contactEmail) {
-                    content += `✉️ <a href="mailto:${escapeHtml(contactEmail)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactEmail)}</a>`;
+                    content += `<a href="mailto:${escapeHtml(contactEmail)}" style="color: #1a1a1a; text-decoration: none; font-weight: 500;">${escapeHtml(contactEmail)}</a>`;
                 }
                 
                 if ((contactPhone || contactEmail) && orgNumber) {
@@ -228,9 +243,9 @@ function updatePageContent(data) {
                                 ${service.description ? `<p class="event-description">${escapeHtml(service.description)}</p>` : ''}
                                 
                                 <div class="event-details">
-                                    ${service.start_date ? `<div class="event-date">📅 ${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
-                                    ${service.venue_name ? `<div class="event-venue">📍 ${escapeHtml(service.venue_name)}</div>` : ''}
-                                    ${isFull ? `<div class="event-spots full">❌ Fullt</div>` : ''}
+                                    ${service.start_date ? `<div class="event-date">${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
+                                    ${service.venue_name ? `<div class="event-venue">${escapeHtml(service.venue_name)}</div>` : ''}
+                                    ${isFull ? `<div class="event-spots full">Fullt</div>` : ''}
                                 </div>
                                 
                                 ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
@@ -258,12 +273,12 @@ function updatePageContent(data) {
                             ${service.price ? `<div class="service-price">${formatPrice(service.price)} kr</div>` : ''}
                             ${isService ? `
                                 <button class="book-service-btn" onclick='openServiceBooking(${JSON.stringify(bookingData).replace(/'/g, "&apos;")})'>
-                                    📅 Book time
+                                    Book time
                                 </button>
                             ` : ''}
                             ${service.product_type === 'membership' ? `
                                 <button class="book-service-btn" onclick='openMembershipRegistration(${JSON.stringify(service).replace(/'/g, "&apos;")})'>
-                                    👤 Bli medlem
+                                    Bli medlem
                                 </button>
                             ` : ''}
                         </div>
@@ -540,10 +555,10 @@ async function openEventRegistration(eventData) {
         
         <div class="registration-event-info">
             ${eventData.description ? `<p class="event-info-description">${escapeHtml(eventData.description)}</p>` : ''}
-            ${eventData.start_date ? `<div class="event-info-item">📅 ${formatEventDate(eventData.start_date, eventData.start_time)}</div>` : ''}
-            ${eventData.venue_name ? `<div class="event-info-item">📍 ${escapeHtml(eventData.venue_name)}</div>` : ''}
-            ${eventData.ticket_price ? `<div class="event-info-item">💰 ${formatPrice(eventData.ticket_price)} kr</div>` : ''}
-            <div class="event-info-notice">ℹ️ Medlemspriser tildeles automatisk</div>
+            ${eventData.start_date ? `<div class="event-info-item">${formatEventDate(eventData.start_date, eventData.start_time)}</div>` : ''}
+            ${eventData.venue_name ? `<div class="event-info-item">${escapeHtml(eventData.venue_name)}</div>` : ''}
+            ${eventData.ticket_price ? `<div class="event-info-item">${formatPrice(eventData.ticket_price)} kr</div>` : ''}
+            <div class="event-info-notice">Medlemspriser tildeles automatisk</div>
         </div>
         
         <form id="eventRegistrationForm" class="registration-form" onsubmit="submitEventRegistration(event, '${eventData.product_id}')">
@@ -639,9 +654,9 @@ async function renderServiceBookingModal() {
         
         <div class="registration-event-info">
             ${service.description ? `<p class="event-info-description">${escapeHtml(service.description)}</p>` : ''}
-            <div class="event-info-item">⏱️ Varighet: ${service.duration} minutter</div>
-            ${service.price ? `<div class="event-info-item">💰 ${formatPrice(service.price)} kr</div>` : ''}
-            <div class="event-info-notice">ℹ️ Medlemspriser tildeles automatisk</div>
+            <div class="event-info-item">Varighet: ${service.duration} minutter</div>
+            ${service.price ? `<div class="event-info-item">${formatPrice(service.price)} kr</div>` : ''}
+            <div class="event-info-notice">Medlemspriser tildeles automatisk</div>
         </div>
         
         <div class="booking-calendar-section">
@@ -719,8 +734,8 @@ async function renderBookingForm() {
             <h3 class="form-title">Bekreft booking</h3>
             
             <div class="booking-summary">
-                <div class="summary-item">📅 ${dateDisplay}</div>
-                <div class="summary-item">⏰ Kl. ${timeDisplay}</div>
+                <div class="summary-item">${dateDisplay}</div>
+                <div class="summary-item">Kl. ${timeDisplay}</div>
             </div>
             
             <div class="form-field">
@@ -845,8 +860,8 @@ function openMembershipRegistration(membershipData) {
         
         <div class="registration-event-info">
             ${membershipData.description ? `<p class="event-info-description">${escapeHtml(membershipData.description)}</p>` : ''}
-            <div class="event-info-item">💰 ${formatPrice(membershipData.price)} kr per år</div>
-            <div class="event-info-notice">ℹ️ Du vil motta bekreftelse på e-post</div>
+            <div class="event-info-item">${formatPrice(membershipData.price)} kr per år</div>
+            <div class="event-info-notice">Du vil motta bekreftelse på e-post</div>
         </div>
         
         <form id="membershipForm" class="registration-form" onsubmit="submitMembershipRegistration(event, '${membershipData.id}')">

@@ -39,6 +39,7 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
 - **Clean Database Architecture**: Modular database design eliminating duplicates and redundancy, standardizing tables, adding cost price tracking, and introducing `service_bookings` and `unified_ledger` tables.
 
 ## Recent Changes
+- **November 2, 2025**: Removed all emojis from customer website for professional appearance; Added configurable layout settings to `tenant_website_general` (logo_height, header_height, font_family, border_radius, spacing_unit, button_style)
 - **November 1, 2025**: Customer website now active as main view with TRUE multi-tenant support
   - **Multi-tenant architecture**: Automatic subdomain detection from URL (e.g., nordicfitness.salesman.no shows Nordic Fitness data, bergsoy.salesman.no shows Bergsøy data)
   - **Generic placeholders**: No hardcoded company names; shows "Laster..." until API loads company-specific data
@@ -55,11 +56,12 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Logo header**: Company logo and name (from `tenant_companies.name`) displayed at the top with tagline "en tjeneste levert av Salesman.no" on right side
   - **Navigation header**: Clean, distinct header with clickable tabs and visual indicator for active page
   - **Navigation**: Users navigate by clicking header tabs or swipe gestures (arrow buttons hidden)
-  - **Custom colors**: Supports customizable colors from `tenant_website_general`:
-    * `header_bg_color` - Background color for logo section and navigation header
-    * `body_bg_color` - Background color for main content area
-    * `primary_color` - Primary theme color for gradients and accents
-    * `secondary_color` - Secondary theme color for gradients
+  - **Customizable design**: All design elements configurable via `tenant_website_general`:
+    * **Colors**: `header_bg_color`, `body_bg_color`, `primary_color`, `secondary_color`
+    * **Layout**: `logo_height`, `header_height`, `logo_position`, `nav_position`
+    * **Typography**: `font_family`
+    * **Spacing**: `border_radius`, `spacing_unit`, `button_style`
+    * All settings applied via CSS variables for consistent theming
   - **Data sources**:
     * Company info: `tenant_companies` (Ditt Firma)
     * Website config: `tenant_website_config` (Ditt Nettsted)
