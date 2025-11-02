@@ -15,8 +15,8 @@
                 <img src="" alt="Company Logo" class="header-logo" id="headerLogo" style="display: none;">
                 <h1 class="header-company-name" id="headerCompanyName">Laster...</h1>
             </div>
-            <div class="header-tagline">
-                en tjeneste levert av <a href="https://salesman.no" target="_blank" style="color: inherit; text-decoration: none;">Salesman.no</a>
+            <div class="header-tagline" id="headerTagline">
+                en tjeneste til <span id="companyNameTagline">...</span> fra <a href="https://salesman.no" target="_blank" style="color: inherit; text-decoration: none;">Salesman.no</a>
             </div>
         </div>
         

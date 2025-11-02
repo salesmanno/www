@@ -68,6 +68,12 @@ function updatePageContent(data) {
             headerNameEl.textContent = data.company.name;
         }
         
+        // Update company name in tagline
+        const companyNameTagline = document.getElementById('companyNameTagline');
+        if (companyNameTagline) {
+            companyNameTagline.textContent = data.company.name;
+        }
+        
         // Update logo
         const headerLogoEl = document.getElementById('headerLogo');
         if (headerLogoEl && data.company.logo_url) {
@@ -239,22 +245,47 @@ function updatePageContent(data) {
                             ${service.image_url ? `<img src="${escapeHtml(service.image_url)}" alt="${escapeHtml(service.name)}" class="event-image">` : ''}
                             
                             <div class="event-card-content">
-                                <h3>${escapeHtml(service.name)}</h3>
+                                <h3 class="event-title">${escapeHtml(service.name)}</h3>
+                                
                                 ${service.description ? `<p class="event-description">${escapeHtml(service.description)}</p>` : ''}
                                 
-                                <div class="event-details">
-                                    ${service.start_date ? `<div class="event-date">${formatEventDate(service.start_date, service.start_time)}</div>` : ''}
-                                    ${service.venue_name ? `<div class="event-venue">${escapeHtml(service.venue_name)}</div>` : ''}
-                                    ${isFull ? `<div class="event-spots full">Fullt</div>` : ''}
+                                <div class="event-info-grid">
+                                    ${service.start_date ? `
+                                        <div class="event-info-row">
+                                            <span class="event-info-label">Dato:</span>
+                                            <span class="event-info-value">${formatEventDate(service.start_date, service.start_time)}</span>
+                                        </div>
+                                    ` : ''}
+                                    ${service.venue_name ? `
+                                        <div class="event-info-row">
+                                            <span class="event-info-label">Sted:</span>
+                                            <span class="event-info-value">${escapeHtml(service.venue_name)}</span>
+                                        </div>
+                                    ` : ''}
+                                    ${service.ticket_price ? `
+                                        <div class="event-info-row">
+                                            <span class="event-info-label">Pris:</span>
+                                            <span class="event-info-value">${formatPrice(service.ticket_price)} kr</span>
+                                        </div>
+                                    ` : `
+                                        <div class="event-info-row">
+                                            <span class="event-info-label">Pris:</span>
+                                            <span class="event-info-value">Gratis</span>
+                                        </div>
+                                    `}
+                                    ${isFull ? `
+                                        <div class="event-info-row">
+                                            <span class="event-info-label">Status:</span>
+                                            <span class="event-info-value event-full">Fullt booket</span>
+                                        </div>
+                                    ` : ''}
                                 </div>
-                                
-                                ${service.ticket_price ? `<div class="service-price">${formatPrice(service.ticket_price)} kr</div>` : '<div class="service-price">Gratis</div>'}
                                 
                                 ${!isFull ? `
                                     <button class="register-btn" onclick='openEventRegistration(${eventData})'>
                                         Reserver billett
                                     </button>
-                                ` : '<div class="full-badge">Fullt booket</div>'}
+                                ` : ''}
                             </div>
                         </div>
                     `;
