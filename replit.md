@@ -46,6 +46,9 @@ The design prioritizes a clean, compact dashboard with a simple navigation heade
   - **Main landing page**: Root URL (`/`) now redirects to customer view (`/public/bergsoy/`)
   - **Admin login relocated**: Moved to `/admin.php` (previously at `/`)
   - **News/announcements on homepage**: Public website displays news from `tenant_announcements` table
+    * Supports images via `image_url` field (200px height, rounded corners, full width)
+    * Shows title, content, publish date, and optional image
+    * Pinned announcements marked with 📌 icon
   - **Multi-tenant routing**: Automatic subdomain detection with fallback to default (bergsøy)
   - **Three-page layout**: Om oss (left), Hjem (center), Tjenester (right) with swipe/touch navigation
   - **Modern gradient design**: Smooth animations and mobile-first responsive design

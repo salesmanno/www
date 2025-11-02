@@ -180,6 +180,7 @@ function updatePageContent(data) {
         if (newsContainer) {
             newsContainer.innerHTML = data.announcements.map(news => `
                 <div class="news-card ${news.is_pinned ? 'pinned' : ''}">
+                    ${news.image_url ? `<img src="${escapeHtml(news.image_url)}" alt="${escapeHtml(news.title)}" class="news-image">` : ''}
                     <h3>${escapeHtml(news.title)}</h3>
                     <p>${escapeHtml(news.content)}</p>
                     <div class="news-date">${formatDate(news.publish_at || news.created_at)}</div>

@@ -237,6 +237,7 @@ try {
                 id,
                 title,
                 content,
+                image_url,
                 announcement_type,
                 priority,
                 publish_at,
