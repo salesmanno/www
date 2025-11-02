@@ -55,8 +55,14 @@ async function loadData() {
     }
 }
 
+// Store hasMembershipModule globally
+let hasMembershipModule = false;
+
 // Update page content with API data
 function updatePageContent(data) {
+    // Store membership module status
+    hasMembershipModule = data.hasMembershipModule || false;
+    
     // Update company info in header
     if (data.company) {
         // Update page title

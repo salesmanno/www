@@ -159,6 +159,8 @@ try {
                 ed.venue_name,
                 ed.max_attendees,
                 COALESCE(ed.ticket_price, op.price) as ticket_price,
+                ed.member_ticket_price,
+                ed.is_member_exclusive,
                 COALESCE(ec.count, 0) as registered_count
             FROM output_products op
             LEFT JOIN events_eventdata ed ON op.product_type = 'event' AND op.product_id = ed.id
@@ -296,6 +298,15 @@ try {
             $defaultSettings['border_radius'] = '24px';
         }
         
+        // Check if company has membership module (any product with type 'membership')
+        $hasMembershipModule = false;
+        foreach ($services as $service) {
+            if ($service['product_type'] === 'membership') {
+                $hasMembershipModule = true;
+                break;
+            }
+        }
+        
         echo json_encode([
             'success' => true,
             'company' => $company,
@@ -303,7 +314,8 @@ try {
             'settings' => $defaultSettings,
             'aboutUs' => $defaultAboutUs,
             'services' => $services,
-            'announcements' => $announcements
+            'announcements' => $announcements,
+            'hasMembershipModule' => $hasMembershipModule
         ]);
         
     } catch (Exception $dbException) {
