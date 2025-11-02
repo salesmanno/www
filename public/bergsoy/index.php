@@ -16,7 +16,7 @@
                 <h1 class="header-company-name" id="headerCompanyName">Laster...</h1>
             </div>
             <div class="header-tagline">
-                en tjeneste levert av Salesman.no
+                en tjeneste levert av <a href="https://salesman.no" target="_blank" style="color: inherit; text-decoration: none;">Salesman.no</a>
             </div>
         </div>
         
@@ -66,7 +66,6 @@
                         
                         <!-- News/Announcements Section -->
                         <div class="news-section" id="newsSection">
-                            <h2 class="section-title">Nyheter</h2>
                             <div class="news-container" id="newsContainer">
                                 <p>Laster nyheter...</p>
                             </div>
