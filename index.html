@@ -12,134 +12,113 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #ffffff;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 40px 20px;
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            max-width: 900px;
+            max-width: 1000px;
             width: 100%;
-            padding: 60px 40px;
-            text-align: center;
         }
 
         .logo {
-            max-width: 500px;
+            max-width: 550px;
             width: 100%;
             height: auto;
-            margin-bottom: 40px;
+            margin: 0 auto 60px;
+            display: block;
+        }
+
+        .content {
+            max-width: 700px;
+            margin: 0 auto;
         }
 
         .tagline {
             color: #1a2f4a;
-            font-size: 24px;
-            font-weight: 300;
-            margin-bottom: 40px;
-            line-height: 1.6;
+            font-size: 28px;
+            font-weight: 400;
+            margin-bottom: 50px;
+            line-height: 1.5;
+            text-align: center;
         }
 
         .services {
-            background: #f8f9fa;
-            border-left: 4px solid #1a2f4a;
-            padding: 30px;
-            margin: 40px 0;
-            text-align: left;
-            border-radius: 8px;
-        }
-
-        .services h2 {
-            color: #1a2f4a;
-            font-size: 22px;
-            margin-bottom: 15px;
-        }
-
-        .services p {
-            color: #555;
+            color: #333;
             line-height: 1.8;
-            font-size: 16px;
+            font-size: 17px;
+            margin-bottom: 60px;
+            text-align: center;
         }
 
-        .contact-section {
-            margin-top: 40px;
-            padding-top: 40px;
-            border-top: 2px solid #e9ecef;
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 50px 0;
         }
 
-        .contact-section h2 {
-            color: #1a2f4a;
-            font-size: 28px;
-            margin-bottom: 30px;
-        }
-
-        .contact-info {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 30px;
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 50px;
         }
 
         .contact-item {
-            background: #f8f9fa;
-            padding: 25px 35px;
-            border-radius: 12px;
-            min-width: 250px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .contact-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
         }
 
         .contact-label {
-            color: #666;
-            font-size: 14px;
+            color: #888;
+            font-size: 13px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            font-weight: 500;
         }
 
         .contact-value {
             color: #1a2f4a;
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 24px;
+            font-weight: 500;
         }
 
         .contact-value a {
             color: #1a2f4a;
             text-decoration: none;
-            transition: color 0.3s ease;
+            transition: opacity 0.2s ease;
         }
 
         .contact-value a:hover {
-            color: #3d5a80;
+            opacity: 0.7;
         }
 
         @media (max-width: 768px) {
-            .container {
-                padding: 40px 25px;
+            .logo {
+                max-width: 400px;
+                margin-bottom: 40px;
             }
 
             .tagline {
+                font-size: 22px;
+            }
+
+            .services {
+                font-size: 16px;
+            }
+
+            .contact-grid {
+                grid-template-columns: 1fr;
+                gap: 35px;
+            }
+
+            .contact-value {
                 font-size: 20px;
-            }
-
-            .contact-info {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .contact-item {
-                width: 100%;
             }
         }
     </style>
@@ -148,24 +127,20 @@
     <div class="container">
         <img src="attached_assets/EBF96C6D-D9D9-4976-9382-9C21A41822F4_1762084787475.png" alt="Salesman.no Logo" class="logo">
         
-        <p class="tagline">
-            Din partner for profesjonell salgsstøtte og CRM-løsninger
-        </p>
+        <div class="content">
+            <p class="tagline">
+                Din partner for profesjonell salgsstøtte og CRM-løsninger
+            </p>
 
-        <div class="services">
-            <h2>Våre tjenester</h2>
-            <p>
+            <p class="services">
                 Vi tilbyr skreddersydde CRM-systemer og salgsstøtteverktøy som hjelper din bedrift med å 
                 effektivisere salgsprosessen, administrere kunderelasjoner og øke konverteringsraten. 
-                Med våre moderne løsninger får du full kontroll over kundedata, salgsrapporter og oppfølging 
-                - alt samlet på ett sted.
+                Med våre moderne løsninger får du full kontroll over kundedata, salgsrapporter og oppfølging.
             </p>
-        </div>
 
-        <div class="contact-section">
-            <h2>Kontakt oss</h2>
-            
-            <div class="contact-info">
+            <div class="divider"></div>
+
+            <div class="contact-grid">
                 <div class="contact-item">
                     <div class="contact-label">Telefon</div>
                     <div class="contact-value">
