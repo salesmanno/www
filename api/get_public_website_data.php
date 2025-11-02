@@ -278,10 +278,10 @@ try {
         // MIDLERTIDIG DEMO: Legg til layout-settings for å vise at frontend bruker dem
         // Alltid legg til demo-verdier hvis de mangler i databasen
         if (!isset($defaultSettings['header_bg_color'])) {
-            $defaultSettings['header_bg_color'] = '#2d3748';
+            $defaultSettings['header_bg_color'] = '#ffffff';
         }
         if (!isset($defaultSettings['body_bg_color'])) {
-            $defaultSettings['body_bg_color'] = '#edf2f7';
+            $defaultSettings['body_bg_color'] = '#ffffff';
         }
         if (!isset($defaultSettings['logo_height'])) {
             $defaultSettings['logo_height'] = '70px';
