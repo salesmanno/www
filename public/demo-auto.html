@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Demo - Konfigurerbar Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            /* STANDARD verdier (før database-data lastes) */
+            --header-bg-color: #ffffff;
+            --body-bg-color: #f8f9fa;
+            --logo-height: 50px;
+            --header-height: 80px;
+            --font-family: 'Inter', sans-serif;
+            --border-radius: 16px;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            background: var(--body-bg-color);
+            min-height: 100vh;
+            transition: all 0.3s ease;
+        }
+        
+        .header {
+            background: var(--header-bg-color);
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .content {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .before-after {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .column {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .column h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .value-item {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+        
+        .highlight {
+            background: #fff9c4;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size: 24px; font-weight: 700;">Live Demo: Data fra tenant_website_general</div>
+    </div>
+    
+    <div class="content">
+        <div class="card">
+            <h1>Automatisk loading av design-innstillinger</h1>
+            <p>Denne siden laster automatisk data fra <code>tenant_website_general</code> og oppdaterer designet.</p>
+            <p style="margin-top: 10px;"><strong>Se hvordan siden endrer seg når dataene lastes!</strong></p>
+            
+            <div class="before-after">
+                <div class="column">
+                    <h3>FØR (standard CSS-verdier):</h3>
+                    <div class="value-item">header_bg_color: #ffffff</div>
+                    <div class="value-item">body_bg_color: #f8f9fa</div>
+                    <div class="value-item">logo_height: 50px</div>
+                    <div class="value-item">header_height: 80px</div>
+                    <div class="value-item">font_family: Inter</div>
+                    <div class="value-item">border_radius: 16px</div>
+                </div>
+                
+                <div class="column">
+                    <h3>ETTER (fra database):</h3>
+                    <div class="value-item highlight" id="after_header_bg">Laster...</div>
+                    <div class="value-item highlight" id="after_body_bg">Laster...</div>
+                    <div class="value-item highlight" id="after_logo">Laster...</div>
+                    <div class="value-item highlight" id="after_header">Laster...</div>
+                    <div class="value-item highlight" id="after_font">Laster...</div>
+                    <div class="value-item highlight" id="after_radius">Laster...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Bevis på at dataene brukes:</h2>
+            <ul style="line-height: 1.8; margin-left: 20px;">
+                <li>Header-boksen over har høyde fra <code>--header-height</code></li>
+                <li>Header-bakgrunn kommer fra <code>--header-bg-color</code></li>
+                <li>Bakgrunnsfargen på siden kommer fra <code>--body-bg-color</code></li>
+                <li>Alle kort har hjørneradius fra <code>--border-radius</code></li>
+                <li>Tekst-fonten kommer fra <code>--font-family</code></li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // AUTOMATISK loading ved sideopplasting
+        async function loadAndApplySettings() {
+            try {
+                const response = await fetch('/api/get_public_website_data.php?subdomain=bergsoy');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error('API feilet');
+                }
+                
+                const settings = data.settings || {};
+                
+                // Sett CSS-variabler OG oppdater visning
+                if (settings.header_bg_color) {
+                    document.documentElement.style.setProperty('--header-bg-color', settings.header_bg_color);
+                    document.getElementById('after_header_bg').textContent = 'header_bg_color: ' + settings.header_bg_color;
+                }
+                if (settings.body_bg_color) {
+                    document.documentElement.style.setProperty('--body-bg-color', settings.body_bg_color);
+                    document.getElementById('after_body_bg').textContent = 'body_bg_color: ' + settings.body_bg_color;
+                }
+                if (settings.logo_height) {
+                    document.documentElement.style.setProperty('--logo-height', settings.logo_height);
+                    document.getElementById('after_logo').textContent = 'logo_height: ' + settings.logo_height;
+                }
+                if (settings.header_height) {
+                    document.documentElement.style.setProperty('--header-height', settings.header_height);
+                    document.getElementById('after_header').textContent = 'header_height: ' + settings.header_height;
+                }
+                if (settings.font_family) {
+                    document.documentElement.style.setProperty('--font-family', settings.font_family);
+                    document.getElementById('after_font').textContent = 'font_family: ' + settings.font_family;
+                }
+                if (settings.border_radius) {
+                    document.documentElement.style.setProperty('--border-radius', settings.border_radius);
+                    document.getElementById('after_radius').textContent = 'border_radius: ' + settings.border_radius;
+                }
+                
+            } catch (error) {
+                console.error('Feil ved lasting:', error);
+            }
+        }
+        
+        // Last automatisk ved oppstart
+        loadAndApplySettings();
+    </script>
+</body>
+</html>

@@ -275,6 +275,27 @@ try {
             'contact_address' => 'Eksempelveien 42, 6000 Ålesund'
         ];
         
+        // MIDLERTIDIG DEMO: Legg til layout-settings for å vise at frontend bruker dem
+        // Alltid legg til demo-verdier hvis de mangler i databasen
+        if (!isset($defaultSettings['header_bg_color'])) {
+            $defaultSettings['header_bg_color'] = '#2d3748';
+        }
+        if (!isset($defaultSettings['body_bg_color'])) {
+            $defaultSettings['body_bg_color'] = '#edf2f7';
+        }
+        if (!isset($defaultSettings['logo_height'])) {
+            $defaultSettings['logo_height'] = '70px';
+        }
+        if (!isset($defaultSettings['header_height'])) {
+            $defaultSettings['header_height'] = '100px';
+        }
+        if (!isset($defaultSettings['font_family'])) {
+            $defaultSettings['font_family'] = 'Georgia, serif';
+        }
+        if (!isset($defaultSettings['border_radius'])) {
+            $defaultSettings['border_radius'] = '24px';
+        }
+        
         echo json_encode([
             'success' => true,
             'company' => $company,

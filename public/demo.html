@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo - Konfigurerbar Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --header-bg-color: #ffffff;
+            --body-bg-color: #f8f9fa;
+            --logo-height: 50px;
+            --header-height: 80px;
+            --font-family: 'Inter', sans-serif;
+            --border-radius: 16px;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            background: var(--body-bg-color);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: var(--header-bg-color);
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .logo {
+            height: var(--logo-height);
+            width: auto;
+        }
+        
+        .content {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .variable-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .button:hover {
+            background: #5568d3;
+        }
+        
+        #status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size: 24px; font-weight: 700;">Demo: Konfigurerbar Design</div>
+    </div>
+    
+    <div class="content">
+        <div class="card">
+            <h1>Demonstrasjon av tenant_website_general</h1>
+            <p>Denne siden viser at data fra <code>tenant_website_general</code> faktisk brukes til å style nettsiden.</p>
+            
+            <h3 style="margin-top: 30px;">Nåværende CSS-variabler:</h3>
+            <div id="variablesDisplay"></div>
+            
+            <button class="button" onclick="loadAndApplySettings()">Last inn data fra API og oppdater design</button>
+            
+            <div id="status"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Eksempel på elementer som bruker variablene:</h2>
+            <p>Header-høyde kommer fra <code>--header-height</code></p>
+            <p>Bakgrunnsfarge kommer fra <code>--body-bg-color</code></p>
+            <p>Border radius kommer fra <code>--border-radius</code></p>
+            <p>Font kommer fra <code>--font-family</code></p>
+        </div>
+    </div>
+    
+    <script>
+        function displayCurrentVariables() {
+            const root = document.documentElement;
+            const variables = {
+                'header_bg_color': getComputedStyle(root).getPropertyValue('--header-bg-color').trim(),
+                'body_bg_color': getComputedStyle(root).getPropertyValue('--body-bg-color').trim(),
+                'logo_height': getComputedStyle(root).getPropertyValue('--logo-height').trim(),
+                'header_height': getComputedStyle(root).getPropertyValue('--header-height').trim(),
+                'font_family': getComputedStyle(root).getPropertyValue('--font-family').trim(),
+                'border_radius': getComputedStyle(root).getPropertyValue('--border-radius').trim()
+            };
+            
+            let html = '';
+            for (const [key, value] of Object.entries(variables)) {
+                html += `<div class="variable-display">--${key}: ${value}</div>`;
+            }
+            
+            document.getElementById('variablesDisplay').innerHTML = html;
+        }
+        
+        async function loadAndApplySettings() {
+            const status = document.getElementById('status');
+            status.textContent = 'Laster data fra API...';
+            status.className = '';
+            
+            try {
+                const response = await fetch('/api/get_public_website_data.php?subdomain=bergsoy');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error('API feilet');
+                }
+                
+                const settings = data.settings || {};
+                
+                // Sett CSS-variabler
+                if (settings.header_bg_color) {
+                    document.documentElement.style.setProperty('--header-bg-color', settings.header_bg_color);
+                }
+                if (settings.body_bg_color) {
+                    document.documentElement.style.setProperty('--body-bg-color', settings.body_bg_color);
+                }
+                if (settings.logo_height) {
+                    document.documentElement.style.setProperty('--logo-height', settings.logo_height);
+                }
+                if (settings.header_height) {
+                    document.documentElement.style.setProperty('--header-height', settings.header_height);
+                }
+                if (settings.font_family) {
+                    document.documentElement.style.setProperty('--font-family', settings.font_family);
+                }
+                if (settings.border_radius) {
+                    document.documentElement.style.setProperty('--border-radius', settings.border_radius);
+                }
+                
+                status.textContent = 'Suksess! Data hentet fra API og anvendt på siden.';
+                status.className = 'success';
+                
+                // Oppdater visning
+                displayCurrentVariables();
+                
+            } catch (error) {
+                status.textContent = 'Feil: ' + error.message;
+                status.className = 'error';
+            }
+        }
+        
+        // Vis nåværende variabler ved oppstart
+        displayCurrentVariables();
+    </script>
+</body>
+</html>
