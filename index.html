@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesman.no - Profesjonell Salgsstøtte</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            max-width: 900px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .logo {
+            max-width: 500px;
+            width: 100%;
+            height: auto;
+            margin-bottom: 40px;
+        }
+
+        .tagline {
+            color: #1a2f4a;
+            font-size: 24px;
+            font-weight: 300;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .services {
+            background: #f8f9fa;
+            border-left: 4px solid #1a2f4a;
+            padding: 30px;
+            margin: 40px 0;
+            text-align: left;
+            border-radius: 8px;
+        }
+
+        .services h2 {
+            color: #1a2f4a;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+
+        .services p {
+            color: #555;
+            line-height: 1.8;
+            font-size: 16px;
+        }
+
+        .contact-section {
+            margin-top: 40px;
+            padding-top: 40px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .contact-section h2 {
+            color: #1a2f4a;
+            font-size: 28px;
+            margin-bottom: 30px;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .contact-item {
+            background: #f8f9fa;
+            padding: 25px 35px;
+            border-radius: 12px;
+            min-width: 250px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .contact-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .contact-label {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .contact-value {
+            color: #1a2f4a;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .contact-value a {
+            color: #1a2f4a;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .contact-value a:hover {
+            color: #3d5a80;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 40px 25px;
+            }
+
+            .tagline {
+                font-size: 20px;
+            }
+
+            .contact-info {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .contact-item {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="attached_assets/EBF96C6D-D9D9-4976-9382-9C21A41822F4_1762084787475.png" alt="Salesman.no Logo" class="logo">
+        
+        <p class="tagline">
+            Din partner for profesjonell salgsstøtte og CRM-løsninger
+        </p>
+
+        <div class="services">
+            <h2>Våre tjenester</h2>
+            <p>
+                Vi tilbyr skreddersydde CRM-systemer og salgsstøtteverktøy som hjelper din bedrift med å 
+                effektivisere salgsprosessen, administrere kunderelasjoner og øke konverteringsraten. 
+                Med våre moderne løsninger får du full kontroll over kundedata, salgsrapporter og oppfølging 
+                - alt samlet på ett sted.
+            </p>
+        </div>
+
+        <div class="contact-section">
+            <h2>Kontakt oss</h2>
+            
+            <div class="contact-info">
+                <div class="contact-item">
+                    <div class="contact-label">Telefon</div>
+                    <div class="contact-value">
+                        <a href="tel:40469364">404 69 364</a>
+                    </div>
+                </div>
+
+                <div class="contact-item">
+                    <div class="contact-label">E-post</div>
+                    <div class="contact-value">
+                        <a href="mailto:magne.k@salesman.no">magne.k@salesman.no</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
