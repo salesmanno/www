@@ -23,16 +23,23 @@ A comprehensive system administration portal for managing all companies/tenants 
 - **Access**: Discrete redirect via logo click on main landing page → `/saas_portal/login.php`
 - **Authentication**: Separate authentication system for `saas_admins` table with red-themed UI
 - **Features**:
-  - Real-time company listing with Server-Sent Events (SSE)
+  - Real-time company listing with polling (updates every 3 seconds)
   - Create new companies with automatic tenant table initialization
+  - Organization number lookup integration with Brønnøysundregistrene API
   - Full CRUD operations for companies, staff, and administrators
   - Module assignment at both company and admin levels
-  - Cascade deletion of all company-related data
+  - Safe cascade deletion via `SafeDeleteCompany` stored procedure
   - Per-company management of employees, admins, and module privileges
 - **Auto-provisioning**: When creating a new company, automatically:
   - Creates all `tenant_*` table entries (customers, settings, website_config, etc.)
   - Grants all available system modules to the company
   - Does NOT create staff or admins (must be added manually)
+- **Safe Deletion**: Uses MySQL stored procedure `SafeDeleteCompany` that:
+  - Maintains referential integrity (no orphaned data)
+  - Explicit transaction control with automatic rollback on error
+  - Deletes all related data in correct order (children before parents)
+  - Covers 25+ tenant tables including events, sales, membership, reservations, etc.
+  - Procedure file: `saas_portal/sql/create_safe_delete_procedure.sql`
 - **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, and all related tenant tables
 
 ### UI/UX Decisions
