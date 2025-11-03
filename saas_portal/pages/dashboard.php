@@ -289,7 +289,6 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             
             container.innerHTML = companies.map(company => {
                 const companyNameEscaped = escapeHtml(company.name);
-                const companyNameJson = JSON.stringify(company.name);
                 
                 return `
                 <div class="company-card" onclick="viewCompany('${company.id}')">
@@ -317,7 +316,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                         <button class="btn btn-sm btn-outline-primary" onclick="editCompany('${company.id}', event)">
                             <i class="bi bi-pencil"></i> Rediger
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCompany('${company.id}', ${companyNameJson}, event)">
+                        <button class="btn btn-sm btn-outline-danger" data-company-id="${company.id}" data-company-name="${companyNameEscaped}" onclick="deleteCompanyBtn(this, event)">
                             <i class="bi bi-trash"></i> Slett
                         </button>
                     </div>
@@ -392,8 +391,10 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .catch(err => alert('Feil ved oppdatering: ' + err.message));
         }
         
-        function deleteCompany(id, name, event) {
+        function deleteCompanyBtn(btn, event) {
             event.stopPropagation();
+            const id = btn.getAttribute('data-company-id');
+            const name = btn.getAttribute('data-company-name');
             
             if (!confirm(`Er du sikker på at du vil slette "${name}"?\n\nAlle tilknyttede data (ansatte, events, medlemskap, etc.) vil bli permanent slettet.`)) {
                 return;
