@@ -65,7 +65,7 @@ try {
     $modules = $modulesStmt->fetchAll(PDO::FETCH_COLUMN);
     
     $insertModuleStmt = $db->prepare("
-        INSERT INTO tenant_company_modules (company_id, module_id, is_active, granted_at)
+        INSERT INTO tenant_company_modules (company_id, module_id, is_active, activated_at)
         VALUES (?, ?, " . dbBool(true) . ", NOW())
     ");
     
