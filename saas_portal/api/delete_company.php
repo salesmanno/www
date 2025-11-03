@@ -26,9 +26,7 @@ try {
     $tables = [
         'tenant_admin_sessions',
         'tenant_admin_modules',
-        'tenant_admins',
         'tenant_staff_modules',
-        'tenant_staff',
         'tenant_company_modules',
         'tenant_announcements',
         'tenant_customers',
@@ -51,7 +49,9 @@ try {
         'rental_objects',
         'rental_schedule',
         'service_bookings',
-        'unified_ledger'
+        'unified_ledger',
+        'tenant_admins',
+        'tenant_staff'
     ];
     
     foreach ($tables as $table) {
