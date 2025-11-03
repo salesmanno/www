@@ -185,21 +185,55 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 <div class="modal-body">
                     <form id="createCompanyForm">
                         <div class="mb-3">
+                            <label class="form-label">Organisasjonsnummer</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="org_number" name="org_number" placeholder="123456789" onkeypress="if(event.key==='Enter'){event.preventDefault();fetchOrgData();}">
+                                <button class="btn btn-outline-secondary" type="button" onclick="fetchOrgData()" id="fetchOrgBtn">
+                                    <i class="bi bi-search"></i> Hent data
+                                </button>
+                            </div>
+                            <small class="text-muted">Henter automatisk bedriftsinfo fra Brønnøysundregistrene (trykk Enter eller "Hent data")</small>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Bedriftsnavn *</label>
-                            <input type="text" class="form-control" name="name" required>
+                            <input type="text" class="form-control" name="name" id="create_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Juridisk navn</label>
+                            <input type="text" class="form-control" name="legal_name" id="create_legal_name">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Subdomain *</label>
-                            <input type="text" class="form-control" name="subdomain" required>
+                            <input type="text" class="form-control" name="subdomain" id="create_subdomain" required>
                             <small class="text-muted">Kun lowercase bokstaver og tall</small>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">E-post</label>
-                            <input type="email" class="form-control" name="email">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">E-post</label>
+                                <input type="email" class="form-control" name="email" id="create_email">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Telefon</label>
+                                <input type="text" class="form-control" name="phone" id="create_phone">
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Telefon</label>
-                            <input type="text" class="form-control" name="phone">
+                            <label class="form-label">Bransje</label>
+                            <input type="text" class="form-control" name="industry" id="create_industry">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Adresse</label>
+                            <input type="text" class="form-control" name="address_street" id="create_address_street">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Postnummer</label>
+                                <input type="text" class="form-control" name="address_zip" id="create_address_zip">
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Poststed</label>
+                                <input type="text" class="form-control" name="address_city" id="create_address_city">
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -329,6 +363,49 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        function fetchOrgData() {
+            const orgNumber = document.getElementById('org_number').value.trim();
+            
+            if (!orgNumber) {
+                alert('Vennligst fyll inn organisasjonsnummer');
+                return;
+            }
+            
+            const btn = document.getElementById('fetchOrgBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Henter...';
+            
+            fetch('/saas_portal/api/fetch_orgdata.php?org_number=' + encodeURIComponent(orgNumber))
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const d = data.data;
+                    document.getElementById('create_name').value = d.name || '';
+                    document.getElementById('create_legal_name').value = d.legal_name || '';
+                    document.getElementById('create_industry').value = d.industry || '';
+                    document.getElementById('create_address_street').value = d.address_street || '';
+                    document.getElementById('create_address_zip').value = d.address_zip || '';
+                    document.getElementById('create_address_city').value = d.address_city || '';
+                    
+                    if (d.name) {
+                        const subdomain = d.name.toLowerCase()
+                            .replace(/\s+as$/i, '')
+                            .replace(/\s+/g, '')
+                            .replace(/[^a-z0-9]/g, '')
+                            .substring(0, 20);
+                        document.getElementById('create_subdomain').value = subdomain;
+                    }
+                } else {
+                    alert('Feil: ' + data.message);
+                }
+            })
+            .catch(err => alert('Feil ved oppslag: ' + err.message))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-search"></i> Hent data';
+            });
         }
         
         function createCompany() {

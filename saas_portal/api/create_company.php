@@ -16,6 +16,12 @@ try {
     $subdomain = trim($_POST['subdomain'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
+    $org_number = trim($_POST['org_number'] ?? '');
+    $legal_name = trim($_POST['legal_name'] ?? '');
+    $industry = trim($_POST['industry'] ?? '');
+    $address_street = trim($_POST['address_street'] ?? '');
+    $address_zip = trim($_POST['address_zip'] ?? '');
+    $address_city = trim($_POST['address_city'] ?? '');
     
     if (empty($name) || empty($subdomain)) {
         echo json_encode(['success' => false, 'message' => 'Navn og subdomain er påkrevd']);
@@ -41,10 +47,19 @@ try {
     $company_id = bin2hex(random_bytes(18));
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_companies (id, name, subdomain, contact_email, contact_phone, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, " . dbBool(true) . ", NOW(), NOW())
+        INSERT INTO tenant_companies (
+            id, name, subdomain, contact_email, contact_phone, 
+            org_number, legal_name, industry, 
+            address_street, address_zip, address_city, 
+            is_active, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " . dbBool(true) . ", NOW(), NOW())
     ");
-    $stmt->execute([$company_id, $name, $subdomain, $email, $phone]);
+    $stmt->execute([
+        $company_id, $name, $subdomain, $email, $phone, 
+        $org_number, $legal_name, $industry, 
+        $address_street, $address_zip, $address_city
+    ]);
     
     $modulesStmt = $db->query("SELECT id FROM system_modules WHERE is_active = " . dbBool(true));
     $modules = $modulesStmt->fetchAll(PDO::FETCH_COLUMN);
