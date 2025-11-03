@@ -23,7 +23,7 @@ try {
     $db = getDBConnection();
     $db->beginTransaction();
     
-    // Slett tabeller med foreign keys først (basert på faktisk database-skjema)
+    // FASE 1: Slett barn-tabeller med foreign keys først
     $relatedDeletes = [
         // Events check-in må slettes først (har FK til customers og events)
         "DELETE FROM events_checkin WHERE event_id IN (SELECT id FROM events_eventdata WHERE company_id = ?)",
@@ -52,7 +52,15 @@ try {
         }
     }
     
-    // Nå sletter vi hovedtabellene i riktig rekkefølge
+    // FASE 2: Nullstill foreign keys som peker til admins/staff FØR sletting
+    try {
+        $stmt = $db->prepare("UPDATE tenant_website_config SET created_by = NULL WHERE company_id = ?");
+        $stmt->execute([$company_id]);
+    } catch (Exception $e) {
+        error_log("Warning updating tenant_website_config: " . $e->getMessage());
+    }
+    
+    // FASE 3: Slett hovedtabellene i riktig rekkefølge
     $mainTables = [
         'tenant_company_modules',
         'tenant_announcements',
