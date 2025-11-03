@@ -18,6 +18,23 @@ The Salesman Superportal System is an administration portal designed to centrali
 ## System Architecture
 The system is built on a PHP 8.2 backend with dual database support (MySQL production, PostgreSQL development/backup), emphasizing modularity and granular access control.
 
+### SaaS Admin Portal (NEW)
+A comprehensive system administration portal for managing all companies/tenants in the system:
+- **Access**: Discrete redirect via logo click on main landing page → `/saas_portal/login.php`
+- **Authentication**: Separate authentication system for `saas_admins` table with red-themed UI
+- **Features**:
+  - Real-time company listing with Server-Sent Events (SSE)
+  - Create new companies with automatic tenant table initialization
+  - Full CRUD operations for companies, staff, and administrators
+  - Module assignment at both company and admin levels
+  - Cascade deletion of all company-related data
+  - Per-company management of employees, admins, and module privileges
+- **Auto-provisioning**: When creating a new company, automatically:
+  - Creates all `tenant_*` table entries (customers, settings, website_config, etc.)
+  - Grants all available system modules to the company
+  - Does NOT create staff or admins (must be added manually)
+- **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, and all related tenant tables
+
 ### UI/UX Decisions
 The design prioritizes a clean, compact dashboard with Bootstrap 5 tabs for modules. The customer-facing website features a multi-tenant architecture with dynamic content loading, modern gradient design, mobile-first responsiveness, and configurable design elements via `tenant_website_general` settings.
 
