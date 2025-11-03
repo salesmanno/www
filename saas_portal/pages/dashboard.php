@@ -263,13 +263,19 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             eventSource = new EventSource('/saas_portal/api/companies_stream.php');
             
             eventSource.onmessage = function(event) {
+                console.log('SSE data received:', event.data);
                 const companies = JSON.parse(event.data);
                 renderCompanies(companies);
             };
             
-            eventSource.onerror = function() {
-                console.error('SSE connection error');
-                setTimeout(initSSE, 5000);
+            eventSource.onerror = function(error) {
+                console.error('SSE connection error', error);
+                document.getElementById('companiesList').innerHTML = '<div class="alert alert-danger">Feil ved lasting av bedrifter. Laster siden på nytt...</div>';
+                setTimeout(() => window.location.reload(), 2000);
+            };
+            
+            eventSource.onopen = function() {
+                console.log('SSE connection opened');
             };
         }
         
@@ -352,8 +358,8 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     const c = data.company;
                     document.getElementById('edit_company_id').value = c.id;
                     document.getElementById('edit_name').value = c.name;
-                    document.getElementById('edit_email').value = c.email || '';
-                    document.getElementById('edit_phone').value = c.phone || '';
+                    document.getElementById('edit_email').value = c.contact_email || '';
+                    document.getElementById('edit_phone').value = c.contact_phone || '';
                     document.getElementById('edit_is_active').value = c.is_active;
                     
                     new bootstrap.Modal(document.getElementById('editCompanyModal')).show();

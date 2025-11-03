@@ -41,7 +41,7 @@ try {
     $company_id = bin2hex(random_bytes(18));
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_companies (id, name, subdomain, email, phone, is_active, created_at, updated_at)
+        INSERT INTO tenant_companies (id, name, subdomain, contact_email, contact_phone, is_active, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, " . dbBool(true) . ", NOW(), NOW())
     ");
     $stmt->execute([$company_id, $name, $subdomain, $email, $phone]);

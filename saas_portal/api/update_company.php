@@ -27,7 +27,7 @@ try {
     
     $stmt = $db->prepare("
         UPDATE tenant_companies 
-        SET name = ?, email = ?, phone = ?, is_active = ?, updated_at = NOW()
+        SET name = ?, contact_email = ?, contact_phone = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     ");
     $stmt->execute([$name, $email, $phone, $is_active, $company_id]);
