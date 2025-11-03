@@ -24,8 +24,20 @@ function getDBConnection() {
             $conn = new PDO($mysqlDsn, DB_USER, DB_PASS, $options);
             $dbType = 'mysql';
         } catch (PDOException $e) {
-            error_log("MySQL connection failed: " . $e->getMessage());
-            throw new Exception("KRITISK FEIL: Kan ikke koble til MySQL database (Domeneshop). Feilmelding: " . $e->getMessage());
+            $errorCode = $e->getCode();
+            $errorMsg = $e->getMessage();
+            error_log("MySQL connection failed: " . $errorMsg);
+            
+            // Gi mer spesifikk feilmelding basert på feilkode
+            if (strpos($errorMsg, 'Cannot assign requested address') !== false || $errorCode == 2002) {
+                throw new Exception("❌ DATABASE TILKOBLINGSFEIL: Kan ikke nå MySQL-server på Domeneshop.\n\nMulige årsaker:\n- Domeneshop MySQL-server er nede\n- IP-adressen til Replit er ikke whitelistet\n- Feil hostname eller port\n\nFeilkode: " . $errorCode . "\nTeknisk: " . $errorMsg);
+            } else if (strpos($errorMsg, 'Access denied') !== false || $errorCode == 1045) {
+                throw new Exception("❌ DATABASE AUTENTISERINGSFEIL: Brukernavn eller passord er feil.\n\nFeilkode: " . $errorCode . "\nTeknisk: " . $errorMsg);
+            } else if (strpos($errorMsg, 'Unknown database') !== false || $errorCode == 1049) {
+                throw new Exception("❌ DATABASE EKSISTERER IKKE: Databasen finnes ikke på serveren.\n\nFeilkode: " . $errorCode . "\nTeknisk: " . $errorMsg);
+            } else {
+                throw new Exception("❌ DATABASE TILKOBLINGSFEIL:\n\nFeilkode: " . $errorCode . "\nFeilmelding: " . $errorMsg);
+            }
         }
     }
     

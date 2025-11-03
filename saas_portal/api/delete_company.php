@@ -23,38 +23,61 @@ try {
     $db = getDBConnection();
     $db->beginTransaction();
     
-    $tables = [
-        'tenant_admin_sessions',
-        'tenant_admin_modules',
-        'tenant_staff_modules',
+    // Slett tabeller med foreign keys først (basert på faktisk database-skjema)
+    $relatedDeletes = [
+        // Events check-in må slettes først (har FK til customers og events)
+        "DELETE FROM events_checkin WHERE event_id IN (SELECT id FROM events_eventdata WHERE company_id = ?)",
+        
+        // Sales transactions må slettes først (har FK til products og orders)
+        "DELETE FROM sales_transactions WHERE company_id = ?",
+        
+        // Sales order items må slettes (har FK til orders)
+        "DELETE FROM sales_orders_items WHERE order_id IN (SELECT id FROM sales_orders WHERE company_id = ?)",
+        
+        // Service bookings må slettes (har FK til services)
+        "DELETE FROM reservation_service_bookings WHERE service_id IN (SELECT id FROM reservation_services WHERE company_id = ?)",
+        
+        // Admin/Staff sessions og modules (kan mangle company_id, bruker JOIN)
+        "DELETE FROM tenant_admin_sessions WHERE admin_id IN (SELECT id FROM tenant_admins WHERE company_id = ?)",
+        "DELETE FROM tenant_admin_modules WHERE admin_id IN (SELECT id FROM tenant_admins WHERE company_id = ?)",
+        "DELETE FROM tenant_staff_modules WHERE staff_id IN (SELECT id FROM tenant_staff WHERE company_id = ?)",
+    ];
+    
+    foreach ($relatedDeletes as $sql) {
+        try {
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$company_id]);
+        } catch (Exception $e) {
+            error_log("Warning: " . $e->getMessage());
+        }
+    }
+    
+    // Nå sletter vi hovedtabellene i riktig rekkefølge
+    $mainTables = [
         'tenant_company_modules',
         'tenant_announcements',
-        'tenant_customers',
-        'tenant_settings',
         'tenant_website_config',
         'tenant_website_general',
+        'tenant_settings',
         'tenant_subscriptions',
-        'events_eventdata',
-        'events_checkin',
         'events_results',
+        'events_eventdata',
         'membership_members',
         'membership_plans',
         'reservation_services',
-        'reservation_service_bookings',
-        'sales_products',
         'sales_orders',
-        'sales_orders_items',
+        'sales_products',
         'sales_cart',
-        'sales_transactions',
         'rental_objects',
         'rental_schedule',
         'service_bookings',
         'unified_ledger',
+        'tenant_customers',
         'tenant_admins',
         'tenant_staff'
     ];
     
-    foreach ($tables as $table) {
+    foreach ($mainTables as $table) {
         try {
             $stmt = $db->prepare("DELETE FROM $table WHERE company_id = ?");
             $stmt->execute([$company_id]);
