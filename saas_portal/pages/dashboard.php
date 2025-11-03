@@ -287,11 +287,15 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 return;
             }
             
-            container.innerHTML = companies.map(company => `
+            container.innerHTML = companies.map(company => {
+                const companyNameEscaped = escapeHtml(company.name);
+                const companyNameJson = JSON.stringify(company.name);
+                
+                return `
                 <div class="company-card" onclick="viewCompany('${company.id}')">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h4>${escapeHtml(company.name)}</h4>
+                            <h4>${companyNameEscaped}</h4>
                             <div class="subdomain">${escapeHtml(company.subdomain)}</div>
                             <div class="company-stats">
                                 <span class="stat-item">
@@ -313,12 +317,13 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                         <button class="btn btn-sm btn-outline-primary" onclick="editCompany('${company.id}', event)">
                             <i class="bi bi-pencil"></i> Rediger
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCompany('${company.id}', '${escapeHtml(company.name)}', event)">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCompany('${company.id}', ${companyNameJson}, event)">
                             <i class="bi bi-trash"></i> Slett
                         </button>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
         
         function escapeHtml(text) {
@@ -340,7 +345,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('createCompanyModal')).hide();
                     form.reset();
-                    alert('Bedrift opprettet!');
+                    console.log('Company created successfully');
                 } else {
                     alert('Feil: ' + data.message);
                 }
@@ -379,11 +384,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(data => {
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('editCompanyModal')).hide();
-                    alert('Bedrift oppdatert!');
+                    console.log('Company updated successfully');
                 } else {
                     alert('Feil: ' + data.message);
                 }
-            });
+            })
+            .catch(err => alert('Feil ved oppdatering: ' + err.message));
         }
         
         function deleteCompany(id, name, event) {
@@ -405,10 +411,14 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert('Bedrift slettet');
+                    console.log('Company deleted successfully');
                 } else {
                     alert('Feil: ' + data.message);
                 }
+            })
+            .catch(err => {
+                console.error('Delete error:', err);
+                alert('Feil ved sletting: ' + err.message);
             });
         }
         
