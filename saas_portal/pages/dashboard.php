@@ -287,30 +287,25 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let eventSource;
+        window.addEventListener('DOMContentLoaded', function() {
+            loadCompanies();
+            setInterval(loadCompanies, 3000);
+        });
         
-        function initSSE() {
-            if (eventSource) {
-                eventSource.close();
-            }
-            
-            eventSource = new EventSource('/saas_portal/api/companies_stream.php');
-            
-            eventSource.onmessage = function(event) {
-                console.log('SSE data received:', event.data);
-                const companies = JSON.parse(event.data);
-                renderCompanies(companies);
-            };
-            
-            eventSource.onerror = function(error) {
-                console.error('SSE connection error', error);
-                document.getElementById('companiesList').innerHTML = '<div class="alert alert-danger">Feil ved lasting av bedrifter. Laster siden på nytt...</div>';
-                setTimeout(() => window.location.reload(), 2000);
-            };
-            
-            eventSource.onopen = function() {
-                console.log('SSE connection opened');
-            };
+        function loadCompanies() {
+            fetch('/saas_portal/api/get_companies.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    renderCompanies(data.companies);
+                } else {
+                    console.error('Failed to load companies:', data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Load companies error:', err);
+                document.getElementById('companiesList').innerHTML = '<div class="alert alert-danger">Feil ved lasting av bedrifter</div>';
+            });
         }
         
         function renderCompanies(companies) {
