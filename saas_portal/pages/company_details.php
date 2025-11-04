@@ -124,6 +124,11 @@ if (!$company) {
             <li class="nav-item">
                 <a class="nav-link" id="modules-tab" data-bs-toggle="tab" href="#modules">Moduler</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="email-tab" data-bs-toggle="tab" href="#email">
+                    <i class="bi bi-envelope"></i> Epost
+                </a>
+            </li>
         </ul>
         
         <div class="tab-content">
@@ -155,6 +160,98 @@ if (!$company) {
                 <div class="content-section">
                     <h3 class="section-title">Bedriftsmoduler</h3>
                     <div id="modulesList"></div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="email">
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-envelope"></i> Epost-konfigurasjon
+                    </h3>
+                    <p class="text-muted">Konfigurer SMTP og IMAP innstillinger for <?= htmlspecialchars($company['name']) ?></p>
+                    
+                    <form id="emailConfigForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="mb-3">SMTP (Utgående epost)</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">SMTP Server</label>
+                                    <input type="text" class="form-control" id="smtp_host" name="smtp_host" placeholder="smtp.example.com">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Port</label>
+                                        <input type="number" class="form-control" id="smtp_port" name="smtp_port" placeholder="587" value="587">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Kryptering</label>
+                                        <select class="form-select" id="smtp_encryption" name="smtp_encryption">
+                                            <option value="tls">TLS</option>
+                                            <option value="ssl">SSL</option>
+                                            <option value="none">Ingen</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Brukernavn</label>
+                                    <input type="text" class="form-control" id="smtp_username" name="smtp_username">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Passord</label>
+                                    <input type="password" class="form-control" id="smtp_password" name="smtp_password" placeholder="La stå tom for å beholde eksisterende">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Fra-adresse</label>
+                                    <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" placeholder="noreply@example.com">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Fra-navn</label>
+                                    <input type="text" class="form-control" id="smtp_from_name" name="smtp_from_name" placeholder="Min Bedrift AS">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5 class="mb-3">IMAP (Innkommende epost)</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">IMAP Server</label>
+                                    <input type="text" class="form-control" id="imap_host" name="imap_host" placeholder="imap.example.com">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Port</label>
+                                        <input type="number" class="form-control" id="imap_port" name="imap_port" placeholder="993" value="993">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Kryptering</label>
+                                        <select class="form-select" id="imap_encryption" name="imap_encryption">
+                                            <option value="ssl">SSL</option>
+                                            <option value="tls">TLS</option>
+                                            <option value="none">Ingen</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Brukernavn</label>
+                                    <input type="text" class="form-control" id="imap_username" name="imap_username">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Passord</label>
+                                    <input type="password" class="form-control" id="imap_password" name="imap_password" placeholder="La stå tom for å beholde eksisterende">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-secondary" onclick="testEmailConnection()">
+                                <i class="bi bi-check-circle"></i> Test tilkobling
+                            </button>
+                            <button type="button" class="btn btn-primary-custom" onclick="saveEmailConfig()">
+                                <i class="bi bi-save"></i> Lagre konfigurasjon
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="emailConfigStatus" class="mt-3"></div>
                 </div>
             </div>
         </div>
@@ -514,6 +611,99 @@ if (!$company) {
             div.textContent = text;
             return div.innerHTML;
         }
+        
+        function loadEmailConfig() {
+            fetch(`/saas_portal/api/get_email_config.php?company_id=${companyId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    const config = data.config;
+                    document.getElementById('smtp_host').value = config.smtp_host || '';
+                    document.getElementById('smtp_port').value = config.smtp_port || '587';
+                    document.getElementById('smtp_encryption').value = config.smtp_encryption || 'tls';
+                    document.getElementById('smtp_username').value = config.smtp_username || '';
+                    document.getElementById('smtp_from_email').value = config.smtp_from_email || '';
+                    document.getElementById('smtp_from_name').value = config.smtp_from_name || '';
+                    
+                    document.getElementById('imap_host').value = config.imap_host || '';
+                    document.getElementById('imap_port').value = config.imap_port || '993';
+                    document.getElementById('imap_encryption').value = config.imap_encryption || 'ssl';
+                    document.getElementById('imap_username').value = config.imap_username || '';
+                }
+            })
+            .catch(err => console.error('Load email config error:', err));
+        }
+        
+        function saveEmailConfig() {
+            const formData = new FormData(document.getElementById('emailConfigForm'));
+            formData.append('company_id', companyId);
+            
+            const data = {};
+            formData.forEach((value, key) => data[key] = value);
+            
+            fetch('/saas_portal/api/save_email_config.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(data => {
+                const status = document.getElementById('emailConfigStatus');
+                if (data.success) {
+                    status.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Epost-konfigurasjon lagret!</div>';
+                    setTimeout(() => status.innerHTML = '', 3000);
+                } else {
+                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('emailConfigStatus').innerHTML = 
+                    `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved lagring</div>`;
+            });
+        }
+        
+        function testEmailConnection() {
+            const formData = new FormData(document.getElementById('emailConfigForm'));
+            formData.append('company_id', companyId);
+            
+            const data = {};
+            formData.forEach((value, key) => data[key] = value);
+            
+            const status = document.getElementById('emailConfigStatus');
+            status.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass"></i> Tester tilkobling...</div>';
+            
+            fetch('/saas_portal/api/test_email_connection.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    status.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> <strong>Test vellykket!</strong><br>
+                            ${data.smtp_test ? '✓ SMTP tilkobling OK<br>' : ''}
+                            ${data.imap_test ? '✓ IMAP tilkobling OK' : ''}
+                        </div>`;
+                } else {
+                    status.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> <strong>Test delvis vellykket</strong><br>
+                            ${data.smtp_test ? '✓ SMTP: OK<br>' : '✗ SMTP: ' + (data.smtp_error || 'Feil') + '<br>'}
+                            ${data.imap_test ? '✓ IMAP: OK' : '✗ IMAP: ' + (data.imap_error || 'Feil')}
+                        </div>`;
+                }
+            })
+            .catch(err => {
+                status.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Feil ved testing av tilkobling</div>';
+            });
+        }
+        
+        // Laste epost-konfigurasjon når fanen åpnes
+        document.getElementById('email-tab').addEventListener('shown.bs.tab', function () {
+            loadEmailConfig();
+        });
         
         loadAdmins();
         loadStaff();
