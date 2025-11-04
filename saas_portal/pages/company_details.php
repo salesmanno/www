@@ -122,9 +122,6 @@ if (!$company) {
                 <a class="nav-link" id="staff-tab" data-bs-toggle="tab" href="#staff">Ansatte</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="modules-tab" data-bs-toggle="tab" href="#modules">Moduler</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" id="email-tab" data-bs-toggle="tab" href="#email">
                     <i class="bi bi-envelope"></i> Epost
                 </a>
@@ -158,13 +155,6 @@ if (!$company) {
                         </button>
                     </div>
                     <div id="staffList"></div>
-                </div>
-            </div>
-            
-            <div class="tab-pane fade" id="modules">
-                <div class="content-section">
-                    <h3 class="section-title">Bedriftsmoduler</h3>
-                    <div id="modulesList"></div>
                 </div>
             </div>
             
@@ -940,7 +930,6 @@ if (!$company) {
         
         loadAdmins();
         loadStaff();
-        loadModules();
     </script>
 </body>
 </html>
