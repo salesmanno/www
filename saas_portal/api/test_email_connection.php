@@ -19,21 +19,45 @@ try {
     
     // Test SMTP-tilkobling
     if (!empty($data['smtp_host']) && !empty($data['smtp_username'])) {
-        $errno = 0;
-        $errstr = '';
-        $smtp = @fsockopen(
-            $data['smtp_host'], 
-            $data['smtp_port'] ?? 587, 
-            $errno, 
-            $errstr, 
-            5
-        );
-        
-        if ($smtp) {
-            $smtp_test = true;
-            fclose($smtp);
-        } else {
-            $smtp_error = $errstr ? "Kunne ikke koble til: $errstr ($errno)" : "Tilkobling feilet";
+        try {
+            $port = $data['smtp_port'] ?? 587;
+            $encryption = $data['smtp_encryption'] ?? 'tls';
+            
+            // Prøv å opprette socket-tilkobling med SSL/TLS-støtte
+            $context = stream_context_create([
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true
+                ]
+            ]);
+            
+            $errno = 0;
+            $errstr = '';
+            
+            // Bruk korrekt protokoll basert på kryptering
+            if ($encryption === 'ssl') {
+                $smtp = @stream_socket_client(
+                    "ssl://{$data['smtp_host']}:$port",
+                    $errno,
+                    $errstr,
+                    5,
+                    STREAM_CLIENT_CONNECT,
+                    $context
+                );
+            } else {
+                // For TLS og ingen kryptering, test basic tilkobling
+                $smtp = @fsockopen($data['smtp_host'], $port, $errno, $errstr, 5);
+            }
+            
+            if ($smtp) {
+                $smtp_test = true;
+                fclose($smtp);
+            } else {
+                $smtp_error = $errstr ? "Kunne ikke koble til: $errstr ($errno)" : "Tilkobling feilet (port $port, $encryption)";
+            }
+        } catch (Exception $e) {
+            $smtp_error = "Feil ved testing: " . $e->getMessage();
         }
     } else {
         $smtp_error = "SMTP host eller brukernavn mangler";
