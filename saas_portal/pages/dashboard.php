@@ -498,12 +498,6 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         function viewCompany(id) {
             window.location.href = '/saas_portal/pages/company_details.php?id=' + id;
         }
-        
-        initSSE();
-        
-        window.addEventListener('beforeunload', () => {
-            if (eventSource) eventSource.close();
-        });
     </script>
 </body>
 </html>
