@@ -29,6 +29,7 @@ try {
     
     if ($exists) {
         // Oppdater eksisterende konfigurasjon
+        // VIKTIG: Når credentials endres, må tilkoblingsstatus resettes
         $sql = "UPDATE tenant_email_config SET 
                 smtp_host = ?,
                 smtp_port = ?,
@@ -40,6 +41,10 @@ try {
                 imap_port = ?,
                 imap_encryption = ?,
                 imap_username = ?,
+                is_connected = 0,
+                last_test_status = 'not_tested',
+                last_test_at = NULL,
+                last_error_message = NULL,
                 updated_at = NOW()";
         
         $params = [
@@ -77,8 +82,9 @@ try {
                 company_id, smtp_host, smtp_port, smtp_encryption, smtp_username, smtp_password,
                 smtp_from_email, smtp_from_name,
                 imap_host, imap_port, imap_encryption, imap_username, imap_password,
+                is_connected, last_test_status,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'not_tested', NOW(), NOW())
         ");
         
         $stmt->execute([

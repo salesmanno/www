@@ -241,16 +241,22 @@ if (!$company) {
                             </div>
                         </div>
                         
-                        <div class="d-flex justify-content-between mt-4">
-                            <button type="button" class="btn btn-outline-secondary" onclick="testEmailConnection()">
-                                <i class="bi bi-check-circle"></i> Test tilkobling
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <div>
+                                <button type="button" class="btn btn-outline-secondary" onclick="testEmailConnection()">
+                                    <i class="bi bi-check-circle"></i> Test tilkobling
+                                </button>
+                                <button type="button" class="btn btn-success ms-2" id="connectEmailBtn" onclick="connectEmail()">
+                                    <i class="bi bi-link-45deg"></i> Koble opp
+                                </button>
+                            </div>
                             <button type="button" class="btn btn-primary-custom" onclick="saveEmailConfig()">
                                 <i class="bi bi-save"></i> Lagre konfigurasjon
                             </button>
                         </div>
                     </form>
                     
+                    <div id="emailConnectionStatus" class="mt-3 alert" style="display: none;"></div>
                     <div id="emailConfigStatus" class="mt-3"></div>
                 </div>
             </div>
@@ -876,6 +882,44 @@ if (!$company) {
             })
             .catch(err => {
                 status.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Feil ved testing av tilkobling</div>';
+            });
+        }
+        
+        function connectEmail() {
+            const statusDiv = document.getElementById('emailConnectionStatus');
+            const btn = document.getElementById('connectEmailBtn');
+            
+            statusDiv.className = 'mt-3 alert alert-info';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<i class="bi bi-hourglass"></i> Kobler opp email-system...';
+            btn.disabled = true;
+            
+            fetch('/saas_portal/api/connect_email.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ company_id: companyId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                if (data.success) {
+                    statusDiv.className = 'mt-3 alert alert-success';
+                    statusDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill"></i> <strong>Email koblet opp!</strong><br>
+                        <small>${data.message}</small>
+                    `;
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 5000);
+                } else {
+                    statusDiv.className = 'mt-3 alert alert-danger';
+                    statusDiv.innerHTML = `<i class="bi bi-x-circle-fill"></i> ${data.message}`;
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                statusDiv.className = 'mt-3 alert alert-danger';
+                statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> Feil ved oppkobling';
             });
         }
         

@@ -21,7 +21,7 @@ try {
         SELECT sm.id, sm.name
         FROM system_modules sm
         INNER JOIN tenant_company_modules tcm ON sm.id = tcm.module_id
-        WHERE tcm.company_id = ? AND tcm.is_active = " . dbBool(true) . " AND sm.is_active = " . dbBool(true) . "
+        WHERE tcm.company_id = ? AND tcm.is_active = " . dbBool(true) . "
     ");
     $stmt->execute([$company_id]);
     $companyModules = $stmt->fetchAll(PDO::FETCH_ASSOC);
