@@ -14,8 +14,14 @@ class DomeneshopService {
     
     public function __construct($db) {
         $this->db = $db;
-        $this->apiToken = getenv('DOMENESHOP_API_TOKEN');
-        $this->apiSecret = getenv('DOMENESHOP_API_SECRET');
+        
+        // Hent credentials fra database først, deretter fallback til environment
+        $stmt = $db->prepare("SELECT config_key, config_value FROM saas_system_config WHERE config_key IN ('domeneshop_api_token', 'domeneshop_api_secret')");
+        $stmt->execute();
+        $configs = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        
+        $this->apiToken = $configs['domeneshop_api_token'] ?? getenv('DOMENESHOP_API_TOKEN');
+        $this->apiSecret = $configs['domeneshop_api_secret'] ?? getenv('DOMENESHOP_API_SECRET');
         
         if (!$this->apiToken || !$this->apiSecret) {
             throw new Exception('Domeneshop API credentials ikke konfigurert');
