@@ -592,24 +592,6 @@ if (!$company) {
             });
         }
         
-        function loadModules() {
-            fetch(`/saas_portal/api/get_company_modules.php?company_id=${companyId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-                const list = document.getElementById('modulesList');
-                list.innerHTML = (data.modules || []).map(m => `
-                    <div class="module-checkbox form-check">
-                        <input class="form-check-input" type="checkbox" id="mod_${m.id}" ${m.granted ? 'checked' : ''} 
-                            onchange="toggleModule('${m.id}', this.checked)">
-                        <label class="form-check-label" for="mod_${m.id}">
-                            <strong>${escapeHtml(m.name)}</strong> - ${escapeHtml(m.description || '')}
-                        </label>
-                    </div>
-                `).join('');
-            });
-        }
-        
         function showCreateAdmin() {
             new bootstrap.Modal(document.getElementById('createAdminModal')).show();
         }
@@ -697,21 +679,6 @@ if (!$company) {
                     alert('Moduler oppdatert');
                 } else {
                     alert('Feil: ' + data.message);
-                }
-            });
-        }
-        
-        function toggleModule(moduleId, active) {
-            fetch('/saas_portal/api/toggle_company_module.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({company_id: companyId, module_id: moduleId, is_active: active})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
-                    alert('Feil: ' + data.message);
-                    loadModules();
                 }
             });
         }
