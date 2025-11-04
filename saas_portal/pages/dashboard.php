@@ -287,9 +287,70 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Global references for auto-fill functionality
+        let emailInput, subdomainInput;
+        let lastAutoSubdomain = '';
+        let lastAutoEmail = '';
+        
         window.addEventListener('DOMContentLoaded', function() {
             loadCompanies();
             setInterval(loadCompanies, 3000);
+            
+            // Auto-utfylling av epost og subdomain basert på firmanavn
+            const nameInput = document.getElementById('create_name');
+            emailInput = document.getElementById('create_email');
+            subdomainInput = document.getElementById('create_subdomain');
+            
+            nameInput.addEventListener('input', function() {
+                const companyName = this.value.trim();
+                
+                if (!companyName) {
+                    return;
+                }
+                
+                // Generer subdomain (kun hvis feltet er tomt eller auto-generert)
+                const sanitizedSubdomain = companyName.toLowerCase()
+                    .replace(/\s+as$/i, '')
+                    .replace(/\s+/g, '')
+                    .replace(/[^a-z0-9]/g, '')
+                    .substring(0, 20);
+                    
+                if (!subdomainInput.dataset.manuallyEdited) {
+                    subdomainInput.value = sanitizedSubdomain;
+                    lastAutoSubdomain = sanitizedSubdomain;
+                }
+                
+                // Generer e-post (kun hvis feltet er tomt eller auto-generert)
+                if (!emailInput.dataset.manuallyEdited && sanitizedSubdomain) {
+                    const autoEmail = sanitizedSubdomain + '@salesman.no';
+                    emailInput.value = autoEmail;
+                    lastAutoEmail = autoEmail;
+                }
+            });
+            
+            // Merk felter som manuelt redigert når brukeren endrer dem
+            subdomainInput.addEventListener('input', function() {
+                // Hvis verdien er forskjellig fra siste auto-genererte verdi, er det manuell redigering
+                if (this.value !== lastAutoSubdomain) {
+                    this.dataset.manuallyEdited = 'true';
+                }
+            });
+            
+            emailInput.addEventListener('input', function() {
+                // Hvis verdien er forskjellig fra siste auto-genererte verdi, er det manuell redigering
+                if (this.value !== lastAutoEmail) {
+                    this.dataset.manuallyEdited = 'true';
+                }
+            });
+            
+            // Nullstill manual override flagg når modal åpnes
+            const createModal = document.getElementById('createCompanyModal');
+            createModal.addEventListener('shown.bs.modal', function() {
+                delete emailInput.dataset.manuallyEdited;
+                delete subdomainInput.dataset.manuallyEdited;
+                lastAutoSubdomain = '';
+                lastAutoEmail = '';
+            });
         });
         
         function loadCompanies() {
@@ -390,7 +451,19 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                             .replace(/\s+/g, '')
                             .replace(/[^a-z0-9]/g, '')
                             .substring(0, 20);
-                        document.getElementById('create_subdomain').value = subdomain;
+                        
+                        // Auto-fyll subdomain hvis ikke manuelt redigert
+                        if (!subdomainInput.dataset.manuallyEdited) {
+                            document.getElementById('create_subdomain').value = subdomain;
+                            lastAutoSubdomain = subdomain;
+                        }
+                        
+                        // Auto-fyll e-post hvis ikke manuelt redigert
+                        if (!emailInput.dataset.manuallyEdited && subdomain) {
+                            const autoEmail = subdomain + '@salesman.no';
+                            document.getElementById('create_email').value = autoEmail;
+                            lastAutoEmail = autoEmail;
+                        }
                     }
                 } else {
                     alert('Feil: ' + data.message);
