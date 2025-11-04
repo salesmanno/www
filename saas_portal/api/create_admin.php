@@ -33,12 +33,13 @@ try {
     
     $password_hash = password_hash($password, PASSWORD_BCRYPT);
     $admin_id = bin2hex(random_bytes(18));
+    $saas_admin_id = $_SESSION['saas_admin_id'];
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_admins (id, company_id, username, password_hash, tenant_staff_id, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, " . dbBool(true) . ", NOW())
+        INSERT INTO tenant_admins (id, company_id, username, password_hash, tenant_staff_id, is_active, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, " . dbBool(true) . ", ?, NOW())
     ");
-    $stmt->execute([$admin_id, $company_id, $username, $password_hash, $staff_id ?: null]);
+    $stmt->execute([$admin_id, $company_id, $username, $password_hash, $staff_id ?: null, $saas_admin_id]);
     
     echo json_encode(['success' => true, 'admin_id' => $admin_id]);
     
