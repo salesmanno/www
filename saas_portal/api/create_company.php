@@ -76,10 +76,10 @@ try {
     }
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_customers (id, company_id, created_by, created_at)
-        VALUES (?, ?, ?, NOW())
+        INSERT INTO tenant_customers (id, company_id, created_at)
+        VALUES (?, ?, NOW())
     ");
-    $stmt->execute([bin2hex(random_bytes(18)), $company_id, $saas_admin_id]);
+    $stmt->execute([bin2hex(random_bytes(18)), $company_id]);
     
     $stmt = $db->prepare("
         INSERT INTO tenant_settings (id, company_id, created_by, created_at)
@@ -100,10 +100,10 @@ try {
     $stmt->execute([bin2hex(random_bytes(18)), $company_id, $saas_admin_id]);
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_subscriptions (id, company_id, created_by, created_at)
-        VALUES (?, ?, ?, NOW())
+        INSERT INTO tenant_subscriptions (id, company_id, created_at)
+        VALUES (?, ?, NOW())
     ");
-    $stmt->execute([bin2hex(random_bytes(18)), $company_id, $saas_admin_id]);
+    $stmt->execute([bin2hex(random_bytes(18)), $company_id]);
     
     $db->commit();
     
