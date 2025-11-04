@@ -45,20 +45,22 @@ try {
     }
     
     $company_id = bin2hex(random_bytes(18));
+    $saas_admin_id = $_SESSION['saas_admin_id'];
     
     $stmt = $db->prepare("
         INSERT INTO tenant_companies (
             id, name, subdomain, contact_email, contact_phone, 
             org_number, legal_name, industry, 
             address_street, address_zip, address_city, 
-            is_active, created_at, updated_at
+            onboarded_by, is_active, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " . dbBool(true) . ", NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " . dbBool(true) . ", NOW(), NOW())
     ");
     $stmt->execute([
         $company_id, $name, $subdomain, $email, $phone, 
         $org_number, $legal_name, $industry, 
-        $address_street, $address_zip, $address_city
+        $address_street, $address_zip, $address_city,
+        $saas_admin_id
     ]);
     
     $modulesStmt = $db->query("SELECT id FROM system_modules WHERE is_active = " . dbBool(true));
