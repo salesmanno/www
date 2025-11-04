@@ -18,14 +18,15 @@ try {
     $is_active = $data['is_active'] ?? false;
     
     $db = getDBConnection();
+    $saas_admin_id = $_SESSION['saas_admin_id'];
     
     if ($is_active) {
         $stmt = $db->prepare("
-            INSERT INTO tenant_company_modules (company_id, module_id, is_active, granted_at)
-            VALUES (?, ?, " . dbBool(true) . ", NOW())
-            ON DUPLICATE KEY UPDATE is_active = " . dbBool(true) . ", granted_at = NOW()
+            INSERT INTO tenant_company_modules (company_id, module_id, is_active, granted_at, assigned_by)
+            VALUES (?, ?, " . dbBool(true) . ", NOW(), ?)
+            ON DUPLICATE KEY UPDATE is_active = " . dbBool(true) . ", granted_at = NOW(), assigned_by = ?
         ");
-        $stmt->execute([$company_id, $module_id]);
+        $stmt->execute([$company_id, $module_id, $saas_admin_id, $saas_admin_id]);
     } else {
         $stmt = $db->prepare("
             UPDATE tenant_company_modules 

@@ -67,12 +67,12 @@ try {
     $modules = $modulesStmt->fetchAll(PDO::FETCH_COLUMN);
     
     $insertModuleStmt = $db->prepare("
-        INSERT INTO tenant_company_modules (company_id, module_id, is_active, activated_at)
-        VALUES (?, ?, " . dbBool(true) . ", NOW())
+        INSERT INTO tenant_company_modules (company_id, module_id, is_active, activated_at, assigned_by)
+        VALUES (?, ?, " . dbBool(true) . ", NOW(), ?)
     ");
     
     foreach ($modules as $module_id) {
-        $insertModuleStmt->execute([$company_id, $module_id]);
+        $insertModuleStmt->execute([$company_id, $module_id, $saas_admin_id]);
     }
     
     $stmt = $db->prepare("
