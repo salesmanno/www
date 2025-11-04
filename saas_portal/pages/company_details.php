@@ -677,9 +677,14 @@ if (!$company) {
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('adminModulesModal')).hide();
                     alert('Moduler oppdatert');
+                    loadAdmins();
                 } else {
                     alert('Feil: ' + data.message);
                 }
+            })
+            .catch(err => {
+                console.error('Save admin modules error:', err);
+                alert('Feil ved lagring av moduler');
             });
         }
         
