@@ -40,7 +40,13 @@ A comprehensive system administration portal for managing all companies/tenants 
   - Deletes all related data in correct order (children before parents)
   - Covers 25+ tenant tables including events, sales, membership, reservations, etc.
   - Procedure file: `saas_portal/sql/create_safe_delete_procedure.sql`
-- **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, and all related tenant tables
+- **Company Configuration Tabs**:
+  - **Administratorer**: Manage admin accounts with module privileges
+  - **Ansatte**: Manage employees (tenant_staff)
+  - **Epost**: Configure SMTP/IMAP settings per company (`tenant_email_config` table)
+  - **Betaling**: Configure payment gateways (Vipps, Stripe, PayPal) via `economy_payment_gateways` table
+- **Module Management**: Company modules (tenant_company_modules) are managed automatically during provisioning; individual admin privileges (tenant_admin_modules) are managed per administrator
+- **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, tenant_email_config, economy_payment_gateways, and all related tenant tables
 
 ### UI/UX Decisions
 The design prioritizes a clean, compact dashboard with Bootstrap 5 tabs for modules. The customer-facing website features a multi-tenant architecture with dynamic content loading, modern gradient design, mobile-first responsiveness, and configurable design elements via `tenant_website_general` settings.
