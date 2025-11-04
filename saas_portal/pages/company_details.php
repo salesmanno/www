@@ -129,6 +129,11 @@ if (!$company) {
                     <i class="bi bi-envelope"></i> Epost
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="payment-tab" data-bs-toggle="tab" href="#payment">
+                    <i class="bi bi-credit-card"></i> Betaling
+                </a>
+            </li>
         </ul>
         
         <div class="tab-content">
@@ -252,6 +257,158 @@ if (!$company) {
                     </form>
                     
                     <div id="emailConfigStatus" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="payment">
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-credit-card"></i> Betalingskonfigurasjon
+                    </h3>
+                    <p class="text-muted">Konfigurer betalingsgatewayer for <?= htmlspecialchars($company['name']) ?></p>
+                    
+                    <ul class="nav nav-pills mb-4" id="paymentGatewayTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="vipps-pill" data-bs-toggle="pill" data-bs-target="#vipps-config" type="button">
+                                Vipps
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="stripe-pill" data-bs-toggle="pill" data-bs-target="#stripe-config" type="button">
+                                Stripe
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="paypal-pill" data-bs-toggle="pill" data-bs-target="#paypal-config" type="button">
+                                PayPal
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="paymentGatewayTabContent">
+                        <!-- Vipps Configuration -->
+                        <div class="tab-pane fade show active" id="vipps-config" role="tabpanel">
+                            <form id="vippsConfigForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Visningsnavn</label>
+                                        <input type="text" class="form-control" name="display_name" value="Vipps" readonly>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Aktiv</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="vipps_is_active" name="is_active">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Testmodus</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="vipps_test_mode" name="test_mode" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Client ID</label>
+                                    <input type="text" class="form-control" id="vipps_client_id" name="vipps_client_id">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Client Secret</label>
+                                    <input type="password" class="form-control" id="vipps_client_secret" name="vipps_client_secret" placeholder="La stå tom for å beholde eksisterende">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Merchant Serial Number</label>
+                                    <input type="text" class="form-control" id="vipps_merchant_serial" name="vipps_merchant_serial_number">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Subscription Key</label>
+                                    <input type="text" class="form-control" id="vipps_subscription_key" name="vipps_subscription_key">
+                                </div>
+                                <button type="button" class="btn btn-primary-custom" onclick="savePaymentGateway('vipps')">
+                                    <i class="bi bi-save"></i> Lagre Vipps-konfigurasjon
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Stripe Configuration -->
+                        <div class="tab-pane fade" id="stripe-config" role="tabpanel">
+                            <form id="stripeConfigForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Visningsnavn</label>
+                                        <input type="text" class="form-control" name="display_name" value="Stripe" readonly>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Aktiv</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="stripe_is_active" name="is_active">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Testmodus</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="stripe_test_mode" name="test_mode" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Public Key</label>
+                                    <input type="text" class="form-control" id="stripe_public_key" name="stripe_public_key">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Secret Key</label>
+                                    <input type="password" class="form-control" id="stripe_secret_key" name="stripe_secret_key" placeholder="La stå tom for å beholde eksisterende">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Webhook Secret</label>
+                                    <input type="text" class="form-control" id="stripe_webhook_secret" name="stripe_webhook_secret">
+                                </div>
+                                <button type="button" class="btn btn-primary-custom" onclick="savePaymentGateway('stripe')">
+                                    <i class="bi bi-save"></i> Lagre Stripe-konfigurasjon
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- PayPal Configuration -->
+                        <div class="tab-pane fade" id="paypal-config" role="tabpanel">
+                            <form id="paypalConfigForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Visningsnavn</label>
+                                        <input type="text" class="form-control" name="display_name" value="PayPal" readonly>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Aktiv</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="paypal_is_active" name="is_active">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Testmodus</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="paypal_test_mode" name="test_mode" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Client ID</label>
+                                    <input type="text" class="form-control" id="paypal_client_id" name="paypal_client_id">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Client Secret</label>
+                                    <input type="password" class="form-control" id="paypal_client_secret" name="paypal_client_secret" placeholder="La stå tom for å beholde eksisterende">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Webhook ID</label>
+                                    <input type="text" class="form-control" id="paypal_webhook_id" name="paypal_webhook_id">
+                                </div>
+                                <button type="button" class="btn btn-primary-custom" onclick="savePaymentGateway('paypal')">
+                                    <i class="bi bi-save"></i> Lagre PayPal-konfigurasjon
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div id="paymentConfigStatus" class="mt-3"></div>
                 </div>
             </div>
         </div>
@@ -703,6 +860,82 @@ if (!$company) {
         // Laste epost-konfigurasjon når fanen åpnes
         document.getElementById('email-tab').addEventListener('shown.bs.tab', function () {
             loadEmailConfig();
+        });
+        
+        // Betalingskonfigurasjon funksjoner
+        function loadPaymentGateways() {
+            fetch(`/saas_portal/api/get_payment_gateways.php?company_id=${companyId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.gateways) {
+                    data.gateways.forEach(gw => {
+                        if (gw.gateway_name === 'vipps') {
+                            document.getElementById('vipps_is_active').checked = gw.is_active == 1;
+                            document.getElementById('vipps_test_mode').checked = gw.test_mode == 1;
+                            document.getElementById('vipps_client_id').value = gw.vipps_client_id || '';
+                            document.getElementById('vipps_merchant_serial').value = gw.vipps_merchant_serial_number || '';
+                            document.getElementById('vipps_subscription_key').value = gw.vipps_subscription_key || '';
+                        } else if (gw.gateway_name === 'stripe') {
+                            document.getElementById('stripe_is_active').checked = gw.is_active == 1;
+                            document.getElementById('stripe_test_mode').checked = gw.test_mode == 1;
+                            document.getElementById('stripe_public_key').value = gw.stripe_public_key || '';
+                            document.getElementById('stripe_webhook_secret').value = gw.stripe_webhook_secret || '';
+                        } else if (gw.gateway_name === 'paypal') {
+                            document.getElementById('paypal_is_active').checked = gw.is_active == 1;
+                            document.getElementById('paypal_test_mode').checked = gw.test_mode == 1;
+                            document.getElementById('paypal_client_id').value = gw.paypal_client_id || '';
+                            document.getElementById('paypal_webhook_id').value = gw.paypal_webhook_id || '';
+                        }
+                    });
+                }
+            })
+            .catch(err => console.error('Load payment gateways error:', err));
+        }
+        
+        function savePaymentGateway(gateway) {
+            let formData, displayName;
+            if (gateway === 'vipps') {
+                formData = new FormData(document.getElementById('vippsConfigForm'));
+                displayName = 'Vipps';
+            } else if (gateway === 'stripe') {
+                formData = new FormData(document.getElementById('stripeConfigForm'));
+                displayName = 'Stripe';
+            } else if (gateway === 'paypal') {
+                formData = new FormData(document.getElementById('paypalConfigForm'));
+                displayName = 'PayPal';
+            }
+            
+            formData.append('company_id', companyId);
+            formData.append('gateway_name', gateway);
+            formData.append('display_name', displayName);
+            
+            const data = {};
+            formData.forEach((value, key) => data[key] = value);
+            
+            fetch('/saas_portal/api/save_payment_gateway.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(data => {
+                const status = document.getElementById('paymentConfigStatus');
+                if (data.success) {
+                    status.innerHTML = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> ${displayName}-konfigurasjon lagret!</div>`;
+                    setTimeout(() => status.innerHTML = '', 3000);
+                } else {
+                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('paymentConfigStatus').innerHTML = 
+                    `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved lagring</div>`;
+            });
+        }
+        
+        // Laste betalingskonfigurasjon når fanen åpnes
+        document.getElementById('payment-tab').addEventListener('shown.bs.tab', function () {
+            loadPaymentGateways();
         });
         
         loadAdmins();
