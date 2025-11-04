@@ -131,6 +131,11 @@ if (!$company) {
                     <i class="bi bi-credit-card"></i> Betaling
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="dns-tab" data-bs-toggle="tab" href="#dns">
+                    <i class="bi bi-globe"></i> DNS
+                </a>
+            </li>
         </ul>
         
         <div class="tab-content">
@@ -399,6 +404,61 @@ if (!$company) {
                     </div>
                     
                     <div id="paymentConfigStatus" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="dns">
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-globe"></i> DNS & Subdomain-administrasjon
+                    </h3>
+                    <p class="text-muted">Administrer DNS-records og subdomener for <?= htmlspecialchars($company['name']) ?></p>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Subdomain:</strong> <?= htmlspecialchars($company['subdomain']) ?>.salesman.no
+                                <br>
+                                <strong>Status:</strong> <span id="dnsStatus">Laster...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Opprett subdomain</h5>
+                                    <p class="card-text text-muted">Opprett DNS A-record for <?= htmlspecialchars($company['subdomain']) ?>.salesman.no</p>
+                                    <button class="btn btn-primary-custom" id="createSubdomainBtn" onclick="createSubdomain()">
+                                        <i class="bi bi-plus-circle"></i> Opprett subdomain
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Slett subdomain</h5>
+                                    <p class="card-text text-muted">Fjern DNS-record for dette subdomenet</p>
+                                    <button class="btn btn-danger" id="deleteSubdomainBtn" onclick="deleteSubdomain()" disabled>
+                                        <i class="bi bi-trash"></i> Slett subdomain
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>DNS-informasjon</h5>
+                        <div id="dnsInfo">
+                            <p class="text-muted">Laster DNS-informasjon...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="dnsMessage" class="mt-3"></div>
                 </div>
             </div>
         </div>
@@ -898,6 +958,136 @@ if (!$company) {
         // Laste betalingskonfigurasjon når fanen åpnes
         document.getElementById('payment-tab').addEventListener('shown.bs.tab', function () {
             loadPaymentGateways();
+        });
+        
+        // DNS-administrasjon funksjoner
+        function loadDNSInfo() {
+            fetch(`/saas_portal/api/get_subdomain_info.php?company_id=${companyId}`)
+            .then(r => r.json())
+            .then(data => {
+                const statusEl = document.getElementById('dnsStatus');
+                const infoEl = document.getElementById('dnsInfo');
+                const createBtn = document.getElementById('createSubdomainBtn');
+                const deleteBtn = document.getElementById('deleteSubdomainBtn');
+                
+                if (data.success) {
+                    if (data.subdomain_exists) {
+                        statusEl.innerHTML = '<span class="badge bg-success">Aktiv</span>';
+                        createBtn.disabled = true;
+                        deleteBtn.disabled = false;
+                        
+                        infoEl.innerHTML = `
+                            <table class="table table-sm">
+                                <tr><th>Subdomain:</th><td>${data.subdomain}.salesman.no</td></tr>
+                                <tr><th>DNS Record ID:</th><td>${data.record_id || 'N/A'}</td></tr>
+                                <tr><th>IP-adresse:</th><td>${data.ip_address || 'N/A'}</td></tr>
+                                <tr><th>TTL:</th><td>${data.ttl || 'N/A'}</td></tr>
+                                <tr><th>DNS opprettet:</th><td>${data.dns_created || 'Ukjent'}</td></tr>
+                                <tr><th>Siste sjekk:</th><td>${data.last_check || 'Aldri'}</td></tr>
+                            </table>
+                        `;
+                    } else {
+                        statusEl.innerHTML = '<span class="badge bg-warning">Ikke opprettet</span>';
+                        createBtn.disabled = false;
+                        deleteBtn.disabled = true;
+                        
+                        infoEl.innerHTML = '<p class="text-muted">Subdomain er ikke opprettet ennå. Klikk "Opprett subdomain" for å opprette DNS-record.</p>';
+                    }
+                } else {
+                    statusEl.innerHTML = '<span class="badge bg-danger">Feil</span>';
+                    infoEl.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                console.error('DNS info error:', err);
+                document.getElementById('dnsStatus').innerHTML = '<span class="badge bg-danger">Feil</span>';
+                document.getElementById('dnsInfo').innerHTML = '<div class="alert alert-danger">Kunne ikke laste DNS-informasjon</div>';
+            });
+        }
+        
+        function createSubdomain() {
+            const btn = document.getElementById('createSubdomainBtn');
+            const msgEl = document.getElementById('dnsMessage');
+            
+            if (!confirm('Er du sikker på at du vil opprette subdomain for dette firmaet?')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Oppretter...';
+            msgEl.innerHTML = '';
+            
+            fetch('/saas_portal/api/create_subdomain.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({company_id: companyId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.innerHTML = '<i class="bi bi-plus-circle"></i> Opprett subdomain';
+                
+                if (data.success) {
+                    msgEl.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Subdomain opprettet!</div>';
+                    setTimeout(() => {
+                        msgEl.innerHTML = '';
+                        loadDNSInfo();
+                    }, 2000);
+                } else {
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('Create subdomain error:', err);
+                msgEl.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved oppretting av subdomain</div>';
+                btn.innerHTML = '<i class="bi bi-plus-circle"></i> Opprett subdomain';
+                btn.disabled = false;
+            });
+        }
+        
+        function deleteSubdomain() {
+            const btn = document.getElementById('deleteSubdomainBtn');
+            const msgEl = document.getElementById('dnsMessage');
+            
+            if (!confirm('Er du sikker på at du vil slette subdomenet? Dette kan ikke angres!')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sletter...';
+            msgEl.innerHTML = '';
+            
+            fetch('/saas_portal/api/delete_subdomain.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({company_id: companyId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.innerHTML = '<i class="bi bi-trash"></i> Slett subdomain';
+                
+                if (data.success) {
+                    msgEl.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Subdomain slettet!</div>';
+                    setTimeout(() => {
+                        msgEl.innerHTML = '';
+                        loadDNSInfo();
+                    }, 2000);
+                } else {
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('Delete subdomain error:', err);
+                msgEl.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved sletting av subdomain</div>';
+                btn.innerHTML = '<i class="bi bi-trash"></i> Slett subdomain';
+                btn.disabled = false;
+            });
+        }
+        
+        // Laste DNS-informasjon når fanen åpnes
+        document.getElementById('dns-tab').addEventListener('shown.bs.tab', function () {
+            loadDNSInfo();
         });
         
         loadAdmins();
