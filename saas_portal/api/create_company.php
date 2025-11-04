@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../includes/DomeneshopService.php';
 
 header('Content-Type: application/json');
 
@@ -99,13 +100,34 @@ try {
     ");
     $stmt->execute([bin2hex(random_bytes(18)), $company_id]);
     
+    // Opprett subdomain i Domeneshop
+    $dnsResult = null;
+    try {
+        // Hent Domeneshop domain ID fra konfigurasjon
+        $domainStmt = $db->prepare("SELECT config_value FROM saas_system_config WHERE config_key = 'domeneshop_domain_id'");
+        $domainStmt->execute();
+        $domainId = $domainStmt->fetchColumn();
+        
+        if ($domainId) {
+            $domeneshop = new DomeneshopService($db);
+            $dnsResult = $domeneshop->createSubdomain($domainId, $subdomain);
+        } else {
+            $dnsResult = ['success' => false, 'message' => 'Domeneshop domain ID ikke konfigurert'];
+        }
+    } catch (Exception $dnsError) {
+        // Log feil men fortsett - DNS er ikke kritisk for bedriftsopprettelse
+        error_log("Domeneshop DNS error: " . $dnsError->getMessage());
+        $dnsResult = ['success' => false, 'message' => $dnsError->getMessage()];
+    }
+    
     $db->commit();
     
     echo json_encode([
         'success' => true,
         'message' => 'Bedrift opprettet',
         'company_id' => $company_id,
-        'modules_granted' => count($modules)
+        'modules_granted' => count($modules),
+        'dns' => $dnsResult
     ]);
     
 } catch (Exception $e) {
