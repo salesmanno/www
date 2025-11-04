@@ -88,12 +88,6 @@ try {
     $stmt->execute([bin2hex(random_bytes(18)), $company_id, $saas_admin_id]);
     
     $stmt = $db->prepare("
-        INSERT INTO tenant_website_config (id, company_id, created_by, created_at)
-        VALUES (?, ?, ?, NOW())
-    ");
-    $stmt->execute([bin2hex(random_bytes(18)), $company_id, $saas_admin_id]);
-    
-    $stmt = $db->prepare("
         INSERT INTO tenant_website_general (id, company_id, created_by, created_at)
         VALUES (?, ?, ?, NOW())
     ");
