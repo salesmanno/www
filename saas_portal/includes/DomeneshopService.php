@@ -155,9 +155,17 @@ class DomeneshopService {
      */
     public function createSubdomain($domainId, $subdomain, $ipAddress = null, $ttl = 3600) {
         try {
-            // Hvis ingen IP angitt, bruk Replit IP (kan hentes dynamisk)
+            // Hvis ingen IP angitt, hent fra konfigurasjon eller fallback
             if (!$ipAddress) {
-                $ipAddress = $this->getReplitIP();
+                // Prøv å hente produksjons-IP fra database-konfigurasjon
+                $stmt = $this->db->prepare("SELECT config_value FROM saas_system_config WHERE config_key = 'production_server_ip'");
+                $stmt->execute();
+                $ipAddress = $stmt->fetchColumn();
+                
+                // Fallback til auto-deteksjon hvis ikke konfigurert
+                if (!$ipAddress) {
+                    $ipAddress = $this->getReplitIP();
+                }
             }
             
             $data = [
@@ -172,7 +180,7 @@ class DomeneshopService {
             return [
                 'success' => true,
                 'record' => $result['data'],
-                'message' => 'Subdomain opprettet'
+                'message' => 'Subdomain opprettet med IP: ' . $ipAddress
             ];
         } catch (Exception $e) {
             return [
