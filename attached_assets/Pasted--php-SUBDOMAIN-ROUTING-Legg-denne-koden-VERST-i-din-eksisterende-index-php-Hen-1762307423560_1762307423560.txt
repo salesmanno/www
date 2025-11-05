@@ -1,0 +1,116 @@
+<?php
+// === SUBDOMAIN ROUTING - Legg denne koden ØVERST i din eksisterende index.php ===
+
+// Hent subdomain fra host
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$subdomain = '';
+
+if (preg_match('/^([^.]+)\.salesman\.no$/', $host, $matches)) {
+    $subdomain = $matches[1];
+}
+
+// Hvis det ER et subdomain, håndter bedriftsnettsted
+if (!empty($subdomain) && $subdomain !== 'www') {
+    
+    // Database connection (bruk din eksisterende)
+    try {
+        $pdo = new PDO("mysql:host=localhost;dbname=salesmanno04", "brukernavn", "passord");
+    } catch (PDOException $e) {
+        die("Database feil: " . $e->getMessage());
+    }
+    
+    // Finn bedrift basert på subdomain
+    $stmt = $pdo->prepare("
+        SELECT tc.*, twg.* 
+        FROM tenant_companies tc
+        LEFT JOIN tenant_website_general twg ON twg.company_id = tc.id
+        WHERE tc.subdomain = ? AND tc.subdomain_active = 1
+        LIMIT 1
+    ");
+    
+    $stmt->execute([$subdomain]);
+    $company = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($company) {
+        // Vis bedriftens nettside
+        $requestPath = $_SERVER['REQUEST_URI'] ?? '/';
+        $cleanPath = trim(parse_url($requestPath, PHP_URL_PATH), '/');
+        
+        // Enkel routing for bedrifter
+        switch ($cleanPath) {
+            case '':
+                showCompanyHome($company);
+                exit; // VIKTIG: Avslutt her for subdomains
+            case 'om-oss':
+                showCompanyAbout($company);
+                exit;
+            case 'tjenester':
+                showCompanyServices($company);
+                exit;
+            case 'kontakt':
+                showCompanyContact($company);
+                exit;
+            default:
+                // Fall through til din eksisterende routing
+        }
+        
+        function showCompanyHome($company) {
+            echo "<!DOCTYPE html>
+            <html>
+            <head>
+                <title>" . htmlspecialchars($company['site_title'] ?? $company['name']) . "</title>
+                <style>
+                    :root {
+                        --primary-color: " . ($company['primary_color'] ?? '#3366CC') . ";
+                        --header-bg: " . ($company['header_bg_color'] ?? '#ffffff') . ";
+                        --body-bg: " . ($company['body_bg_color'] ?? '#f8f9fa') . ";
+                    }
+                    body { background: var(--body-bg); margin: 0; font-family: Arial; }
+                    header { background: var(--header-bg); padding: 20px; border-bottom: 2px solid var(--primary-color); }
+                    nav a { margin: 0 15px; text-decoration: none; color: var(--primary-color); font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <header>
+                    <h1>" . htmlspecialchars($company['site_title'] ?? $company['name']) . "</h1>
+                    <nav>
+                        <a href='/'>Hjem</a>
+                        <a href='/om-oss'>Om Oss</a>
+                        <a href='/tjenester'>Tjenester</a>
+                        <a href='/kontakt'>Kontakt</a>
+                    </nav>
+                </header>
+                
+                <main style='padding: 40px 20px;'>
+                    <h2>Velkommen til " . htmlspecialchars($company['name']) . "</h2>
+                    <p>" . htmlspecialchars($company['site_description'] ?? '') . "</p>
+                    <p>E-post: " . htmlspecialchars($company['contact_email']) . "</p>
+                </main>
+            </body>
+            </html>";
+        }
+        
+        function showCompanyAbout($company) {
+            echo "<h1>Om " . htmlspecialchars($company['name']) . "</h1>";
+            echo "<p>Informasjon om bedriften...</p>";
+            echo "<p><a href='/'>Tilbake til hjem</a></p>";
+        }
+        
+        function showCompanyServices($company) {
+            echo "<h1>Tjenester - " . htmlspecialchars($company['name']) . "</h1>";
+            echo "<p>Våre tjenester...</p>";
+            echo "<p><a href='/'>Tilbake til hjem</a></p>";
+        }
+        
+        function showCompanyContact($company) {
+            echo "<h1>Kontakt " . htmlspecialchars($company['name']) . "</h1>";
+            echo "<p>E-post: " . htmlspecialchars($company['contact_email']) . "</p>";
+            echo "<p><a href='/'>Tilbake til hjem</a></p>";
+        }
+    }
+}
+
+// === FORTSETT MED DIN EKSISTERENDE KODE NEDENFOR ===
+// Din nåværende webside, API-endpoints, etc. kjører normalt for salesman.no (uten subdomain)
+// ...
+?>

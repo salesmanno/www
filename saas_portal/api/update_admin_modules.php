@@ -63,8 +63,8 @@ try {
     
     // Sett inn nye moduler
     $insertStmt = $db->prepare("
-        INSERT INTO tenant_admin_modules (tenant_admin_id, module_id, is_active, granted_by, granted_at)
-        VALUES (?, ?, " . dbBool(true) . ", ?, NOW())
+        INSERT INTO tenant_admin_modules (tenant_admin_id, module_id, granted_by, granted_at)
+        VALUES (?, ?, ?, NOW())
     ");
     
     foreach ($module_ids as $module_id) {

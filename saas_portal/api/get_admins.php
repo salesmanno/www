@@ -21,9 +21,13 @@ try {
             ta.id as admin_id,
             ta.username,
             ta.is_active,
+            ta.last_login,
+            ta.created_at,
             ts.first_name,
             ts.last_name,
-            ts.email
+            ts.email,
+            ts.phone,
+            ts.job_title
         FROM tenant_admins ta
         LEFT JOIN tenant_staff ts ON ta.tenant_staff_id = ts.id
         WHERE ta.company_id = ?

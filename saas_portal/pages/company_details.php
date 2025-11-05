@@ -136,6 +136,11 @@ if (!$company) {
                     <i class="bi bi-globe"></i> DNS
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" id="company-data-tab" data-bs-toggle="tab" href="#company-data">
+                    <i class="bi bi-building"></i> Firmadata
+                </a>
+            </li>
         </ul>
         
         <div class="tab-content">
@@ -467,6 +472,120 @@ if (!$company) {
                     <div id="dnsMessage" class="mt-3"></div>
                 </div>
             </div>
+            
+            <div class="tab-pane fade" id="company-data">
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-building"></i> Firmadata
+                    </h3>
+                    <p class="text-muted">Administrer firmainformasjon og innstillinger</p>
+                    
+                    <form id="companyDataForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Firmanavn *</label>
+                                <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($company['name']) ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Juridisk navn</label>
+                                <input type="text" class="form-control" name="legal_name" value="<?= htmlspecialchars($company['legal_name'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Organisasjonsnummer</label>
+                                <input type="text" class="form-control" name="org_number" value="<?= htmlspecialchars($company['org_number'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bransje</label>
+                                <input type="text" class="form-control" name="industry" value="<?= htmlspecialchars($company['industry'] ?? '') ?>" placeholder="F.eks. IT, Reiseliv, Detaljhandel">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Om bedriften</label>
+                            <textarea class="form-control" name="about_us" rows="4" placeholder="Beskrivelse av bedriften..."><?= htmlspecialchars($company['about_us'] ?? '') ?></textarea>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="mb-3">Kontaktinformasjon</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">E-post</label>
+                                <input type="email" class="form-control" name="contact_email" value="<?= htmlspecialchars($company['contact_email'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Telefon</label>
+                                <input type="text" class="form-control" name="contact_phone" value="<?= htmlspecialchars($company['contact_phone'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nettside</label>
+                            <input type="url" class="form-control" name="website" value="<?= htmlspecialchars($company['website'] ?? '') ?>" placeholder="https://eksempel.no">
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="mb-3">Adresse</h5>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Gateadresse</label>
+                            <input type="text" class="form-control" name="address_street" value="<?= htmlspecialchars($company['address_street'] ?? '') ?>">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Postnummer</label>
+                                <input type="text" class="form-control" name="address_zip" value="<?= htmlspecialchars($company['address_zip'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Poststed</label>
+                                <input type="text" class="form-control" name="address_city" value="<?= htmlspecialchars($company['address_city'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Land</label>
+                                <input type="text" class="form-control" name="address_country" value="<?= htmlspecialchars($company['address_country'] ?? 'Norway') ?>">
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="mb-3">Ditt Firma-modul passord</h5>
+                        <p class="text-muted small">Dette passordet brukes for å låse opp "Ditt Firma"-modulen i hovedsystemet.</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nytt passord</label>
+                                <input type="password" class="form-control" name="admin_password" id="admin_password" placeholder="La stå tom for å beholde nåværende">
+                                <small class="text-muted">Minimum 6 tegn</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bekreft passord</label>
+                                <input type="password" class="form-control" name="admin_password_confirm" id="admin_password_confirm">
+                            </div>
+                        </div>
+                        
+                        <?php if (!empty($company['admin_password_hash'])): ?>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Passord er satt. Siste endring: <?= date('d.m.Y H:i', strtotime($company['password_last_changed'])) ?>
+                        </div>
+                        <?php else: ?>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> Ingen passord er satt for "Ditt Firma"-modulen
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary-custom">
+                                <i class="bi bi-save"></i> Lagre firmadata
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="companyDataMessage" class="mt-3"></div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -586,15 +705,23 @@ if (!$company) {
                             <tr>
                                 <th>Brukernavn</th>
                                 <th>Navn</th>
+                                <th>E-post</th>
+                                <th>Stilling</th>
+                                <th>Siste pålogging</th>
                                 <th>Status</th>
                                 <th>Handlinger</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.admins.map(a => `
+                            ${data.admins.map(a => {
+                                const lastLogin = a.last_login ? new Date(a.last_login).toLocaleString('no-NO') : 'Aldri';
+                                return `
                                 <tr>
-                                    <td>${escapeHtml(a.username)}</td>
+                                    <td><strong>${escapeHtml(a.username)}</strong></td>
                                     <td>${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</td>
+                                    <td>${escapeHtml(a.email || '-')}</td>
+                                    <td>${escapeHtml(a.job_title || '-')}</td>
+                                    <td><small>${lastLogin}</small></td>
                                     <td>${a.is_active == 1 ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-secondary">Inaktiv</span>'}</td>
                                     <td>
                                         <button class="btn btn-sm btn-outline-primary" onclick="manageAdminModules('${a.admin_id}', '${escapeHtml(a.username)}')">
@@ -605,7 +732,7 @@ if (!$company) {
                                         </button>
                                     </td>
                                 </tr>
-                            `).join('')}
+                            `}).join('')}
                         </tbody>
                     </table>
                 `;
@@ -1132,6 +1259,76 @@ if (!$company) {
         // Laste DNS-informasjon når fanen åpnes
         document.getElementById('dns-tab').addEventListener('shown.bs.tab', function () {
             loadDNSInfo();
+        });
+        
+        // Firmadata-skjema
+        document.getElementById('companyDataForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const password = formData.get('admin_password');
+            const passwordConfirm = formData.get('admin_password_confirm');
+            
+            // Valider passord hvis det er oppgitt
+            if (password && password.length > 0) {
+                if (password.length < 6) {
+                    document.getElementById('companyDataMessage').innerHTML = 
+                        '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Passordet må være minst 6 tegn</div>';
+                    return;
+                }
+                
+                if (password !== passwordConfirm) {
+                    document.getElementById('companyDataMessage').innerHTML = 
+                        '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Passordene stemmer ikke overens</div>';
+                    return;
+                }
+            }
+            
+            const data = {
+                company_id: companyId,
+                name: formData.get('name'),
+                legal_name: formData.get('legal_name'),
+                org_number: formData.get('org_number'),
+                industry: formData.get('industry'),
+                about_us: formData.get('about_us'),
+                contact_email: formData.get('contact_email'),
+                contact_phone: formData.get('contact_phone'),
+                website: formData.get('website'),
+                address_street: formData.get('address_street'),
+                address_zip: formData.get('address_zip'),
+                address_city: formData.get('address_city'),
+                address_country: formData.get('address_country'),
+                admin_password: password
+            };
+            
+            fetch('/saas_portal/api/update_company_data.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(data => {
+                const msgEl = document.getElementById('companyDataMessage');
+                if (data.success) {
+                    msgEl.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Firmadata lagret!</div>';
+                    
+                    // Tøm passord-feltene
+                    document.getElementById('admin_password').value = '';
+                    document.getElementById('admin_password_confirm').value = '';
+                    
+                    setTimeout(() => {
+                        msgEl.innerHTML = '';
+                        location.reload(); // Oppdater siden for å vise nye data
+                    }, 1500);
+                } else {
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                console.error('Update company data error:', err);
+                document.getElementById('companyDataMessage').innerHTML = 
+                    '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved lagring</div>';
+            });
         });
         
         loadAdmins();
