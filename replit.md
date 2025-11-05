@@ -34,6 +34,10 @@ A comprehensive system administration portal for managing all companies/tenants 
   - Creates all `tenant_*` table entries (customers, settings, website_config, etc.)
   - Grants all available system modules to the company
   - Does NOT create staff or admins (must be added manually)
+- **Subdomain Creation**: Automated DNS A-record creation via Domeneshop API
+  - Uses `production_server_ip` from `saas_system_config` (194.63.249.219 for www.salesman.no)
+  - Falls back to dynamic IP detection for development environments
+  - Domain ID: 2167680 for salesman.no
 - **Safe Deletion**: Uses MySQL stored procedure `SafeDeleteCompany` that:
   - Maintains referential integrity (no orphaned data)
   - Explicit transaction control with automatic rollback on error
