@@ -1,0 +1,249 @@
+<?php
+class SubdomainCreatorFTP {
+    private $pdo;
+    private $ftpConfig;
+    
+    public function __construct() {
+        $this->pdo = new PDO("mysql:host=localhost;dbname=salesmanno04", "brukernavn", "passord");
+        
+        $this->ftpConfig = [
+            'host' => 'ftp.domeneshop.no',
+            'username' => 'salesman',
+            'password' => 'ditt-passord',
+            'port' => 21,
+            'template_path' => 'tenant.copy'
+        ];
+    }
+    
+    public function createSubdomain($companyId, $subdomain) {
+        try {
+            // 1. Validering
+            if (!$this->isValidSubdomain($subdomain)) {
+                throw new Exception("Ugyldig subdomain navn");
+            }
+            
+            if (!$this->isSubdomainAvailable($subdomain)) {
+                throw new Exception("Subdomain er allerede i bruk");
+            }
+            
+            // 2. Opprett FTP tilkobling
+            $ftpConn = $this->connectFTP();
+            
+            // 3. Kopier template til nytt subdomain
+            $remotePath = $subdomain;
+            $this->copyTemplate($ftpConn, $remotePath);
+            
+            // 4. Oppdater template med bedriftsdata
+            $this->customizeTemplate($ftpConn, $remotePath, $companyId);
+            
+            // 5. Oppdater database
+            $this->updateCompanySubdomain($companyId, $subdomain);
+            
+            ftp_close($ftpConn);
+            
+            return [
+                'success' => true,
+                'subdomain' => $subdomain,
+                'url' => "https://{$subdomain}.salesman.no",
+                'ftp_path' => $remotePath
+            ];
+            
+        } catch (Exception $e) {
+            if (isset($ftpConn)) ftp_close($ftpConn);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    private function connectFTP() {
+        $conn = ftp_connect($this->ftpConfig['host'], $this->ftpConfig['port']);
+        if (!$conn) {
+            throw new Exception("Kunne ikke koble til FTP");
+        }
+        
+        $login = ftp_login($conn, $this->ftpConfig['username'], $this->ftpConfig['password']);
+        if (!$login) {
+            ftp_close($conn);
+            throw new Exception("FTP login feilet");
+        }
+        
+        ftp_pasv($conn, true); // Passive mode
+        return $conn;
+    }
+    
+    private function copyTemplate($ftpConn, $remotePath) {
+        // Opprett mappe for subdomain
+        if (!@ftp_chdir($ftpConn, $remotePath)) {
+            ftp_mkdir($ftpConn, $remotePath);
+        }
+        
+        // Kopier alle filer fra template mappen
+        $this->copyFTPDirectory($ftpConn, $this->ftpConfig['template_path'], $remotePath);
+    }
+    
+    private function copyFTPDirectory($ftpConn, $sourceDir, $destDir) {
+        $files = ftp_nlist($ftpConn, $sourceDir);
+        
+        foreach ($files as $file) {
+            if ($file == '.' || $file == '..') continue;
+            
+            $remoteFile = $sourceDir . '/' . $file;
+            $localFile = tempnam(sys_get_temp_dir(), 'ftp_');
+            
+            // Last ned fil
+            if (ftp_get($ftpConn, $localFile, $remoteFile, FTP_BINARY)) {
+                // Last opp til ny mappe
+                $destFile = $destDir . '/' . $file;
+                ftp_put($ftpConn, $destFile, $localFile, FTP_BINARY);
+            }
+            
+            unlink($localFile); // Slett midlertidig fil
+        }
+    }
+    
+    private function customizeTemplate($ftpConn, $remotePath, $companyId) {
+        // Hent bedriftsdata
+        $company = $this->getCompanyData($companyId);
+        
+        // Oppdater config filer med bedriftsdata
+        $configFiles = [
+            'config.php',
+            'settings.php', 
+            'company-config.php',
+            'includes/config.php'
+        ];
+        
+        foreach ($configFiles as $configFile) {
+            $remoteConfigPath = $remotePath . '/' . $configFile;
+            if ($this->ftpFileExists($ftpConn, $remoteConfigPath)) {
+                $this->updateConfigFile($ftpConn, $remoteConfigPath, $company);
+            }
+        }
+        
+        // Oppdater index.php eller hovedfiler
+        $this->updateMainFiles($ftpConn, $remotePath, $company);
+    }
+    
+    private function updateConfigFile($ftpConn, $remotePath, $company) {
+        // Last ned fil
+        $tempFile = tempnam(sys_get_temp_dir(), 'config_');
+        ftp_get($ftpConn, $tempFile, $remotePath, FTP_BINARY);
+        
+        // Les innhold
+        $content = file_get_contents($tempFile);
+        
+        // Erstatt placeholders
+        $replacements = [
+            '{{COMPANY_ID}}' => $company['id'],
+            '{{COMPANY_NAME}}' => $company['name'],
+            '{{COMPANY_EMAIL}}' => $company['contact_email'],
+            '{{SUBDOMAIN}}' => $company['subdomain'],
+            '{{SITE_TITLE}}' => $company['site_title'] ?? $company['name'],
+            '{{PRIMARY_COLOR}}' => $company['primary_color'] ?? '#3366CC',
+            '{{HEADER_BG_COLOR}}' => $company['header_bg_color'] ?? '#ffffff',
+            '{{BODY_BG_COLOR}}' => $company['body_bg_color'] ?? '#f8f9fa'
+        ];
+        
+        $newContent = str_replace(
+            array_keys($replacements),
+            array_values($replacements),
+            $content
+        );
+        
+        // Last opp tilbake
+        file_put_contents($tempFile, $newContent);
+        ftp_put($ftpConn, $remotePath, $tempFile, FTP_BINARY);
+        
+        unlink($tempFile);
+    }
+    
+    private function updateMainFiles($ftpConn, $remotePath, $company) {
+        $mainFiles = ['index.php', 'home.php', 'header.php'];
+        
+        foreach ($mainFiles as $file) {
+            $remoteFilePath = $remotePath . '/' . $file;
+            if ($this->ftpFileExists($ftpConn, $remoteFilePath)) {
+                $this->injectCompanyData($ftpConn, $remoteFilePath, $company);
+            }
+        }
+    }
+    
+    private function injectCompanyData($ftpConn, $remotePath, $company) {
+        $tempFile = tempnam(sys_get_temp_dir(), 'inject_');
+        ftp_get($ftpConn, $tempFile, $remotePath, FTP_BINARY);
+        
+        $content = file_get_contents($tempFile);
+        
+        // Inject company data på toppen av filen
+        $injection = "<?php\n";
+        $injection .= "// Auto-generated company data\n";
+        $injection .= "\$companyData = [\n";
+        $injection .= "    'id' => '{$company['id']}',\n";
+        $injection .= "    'name' => '{$company['name']}',\n";
+        $injection .= "    'email' => '{$company['contact_email']}',\n";
+        $injection .= "    'subdomain' => '{$company['subdomain']}',\n";
+        $injection .= "    'site_title' => '{$company['site_title']}',\n";
+        $injection .= "    'primary_color' => '{$company['primary_color']}',\n";
+        $injection .= "    'header_bg_color' => '{$company['header_bg_color']}',\n";
+        $injection .= "    'body_bg_color' => '{$company['body_bg_color']}'\n";
+        $injection .= "];\n";
+        $injection .= "?>\n";
+        
+        // Legg til company data før eksisterende PHP kode
+        if (strpos($content, '<?php') !== false) {
+            $newContent = str_replace('<?php', "<?php\n" . $injection, $content);
+        } else {
+            $newContent = $injection . $content;
+        }
+        
+        file_put_contents($tempFile, $newContent);
+        ftp_put($ftpConn, $remotePath, $tempFile, FTP_BINARY);
+        unlink($tempFile);
+    }
+    
+    private function ftpFileExists($ftpConn, $path) {
+        $listing = @ftp_nlist($ftpConn, $path);
+        return !empty($listing);
+    }
+    
+    private function isValidSubdomain($subdomain) {
+        return preg_match('/^[a-z0-9-]+$/', $subdomain) && strlen($subdomain) > 2;
+    }
+    
+    private function isSubdomainAvailable($subdomain) {
+        $stmt = $this->pdo->prepare("SELECT id FROM tenant_companies WHERE subdomain = ?");
+        $stmt->execute([$subdomain]);
+        return $stmt->rowCount() === 0;
+    }
+    
+    private function getCompanyData($companyId) {
+        $stmt = $this->pdo->prepare("
+            SELECT tc.*, twg.* 
+            FROM tenant_companies tc
+            LEFT JOIN tenant_website_general twg ON twg.company_id = tc.id
+            WHERE tc.id = ?
+        ");
+        $stmt->execute([$companyId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    private function updateCompanySubdomain($companyId, $subdomain) {
+        $stmt = $this->pdo->prepare("
+            UPDATE tenant_companies 
+            SET subdomain = ?, subdomain_active = 1, 
+                subdomain_dns_created = NOW(), subdomain_status = 'active'
+            WHERE id = ?
+        ");
+        return $stmt->execute([$subdomain, $companyId]);
+    }
+}
+
+// Eksempel bruk
+$creator = new SubdomainCreatorFTP();
+$result = $creator->createSubdomain('company-uuid-123', 'testbedrift');
+
+if ($result['success']) {
+    echo "✅ Subdomain opprettet: " . $result['url'];
+} else {
+    echo "❌ Feil: " . $result['error'];
+}
+?>
