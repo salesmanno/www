@@ -49,7 +49,7 @@ try {
     // Valgfrie felt
     $optionalFields = [
         'legal_name', 'org_number', 'industry', 'about_us',
-        'contact_email', 'contact_phone', 'website',
+        'contact_email', 'contact_phone', 'website', 'logo_url',
         'address_street', 'address_zip', 'address_city', 'address_country'
     ];
     
