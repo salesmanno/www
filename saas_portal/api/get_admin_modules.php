@@ -26,7 +26,7 @@ try {
     $stmt->execute([$company_id]);
     $companyModules = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $stmt = $db->prepare("SELECT module_id FROM tenant_admin_modules WHERE tenant_admin_id = ? AND is_active = " . dbBool(true));
+    $stmt = $db->prepare("SELECT module_id FROM tenant_admin_modules WHERE tenant_admin_id = ?");
     $stmt->execute([$admin_id]);
     $adminModuleIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
