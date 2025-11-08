@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/ActivityLogger.php';
 
 header('Content-Type: application/json');
 
@@ -21,6 +22,30 @@ try {
     }
     
     $db = getDBConnection();
+    
+    // Hent info BEFORE sletting for logging
+    $stmt = $db->prepare("SELECT name, subdomain FROM tenant_companies WHERE id = ?");
+    $stmt->execute([$company_id]);
+    $companyInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Logg aktivitet FØR sletting (slik at company_id fortsatt eksisterer)
+    if ($companyInfo) {
+        try {
+            $activityLogger = new ActivityLogger($db);
+            $activityLogger->log(
+                $company_id,
+                $_SESSION['saas_admin_id'],
+                "System",
+                'company_deleted',
+                "slettet bedrift: {$companyInfo['name']} ({$companyInfo['subdomain']}.salesman.no)",
+                null,
+                null,
+                60 // Viktig hendelse vises lenge
+            );
+        } catch (Exception $logError) {
+            error_log("Activity logging error: " . $logError->getMessage());
+        }
+    }
     
     // Kall stored procedure for trygg sletting
     // Prosedyren håndterer transaksjoner og rollback automatisk

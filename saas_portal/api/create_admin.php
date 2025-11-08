@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/ActivityLogger.php';
 
 header('Content-Type: application/json');
 
@@ -40,6 +41,29 @@ try {
         VALUES (?, ?, ?, ?, ?, " . dbBool(true) . ", ?, NOW())
     ");
     $stmt->execute([$admin_id, $company_id, $username, $password_hash, $staff_id ?: null, $saas_admin_id]);
+    
+    // Logg aktivitet
+    try {
+        $companyStmt = $db->prepare("SELECT name FROM tenant_companies WHERE id = ?");
+        $companyStmt->execute([$company_id]);
+        $companyName = $companyStmt->fetchColumn();
+        
+        if ($companyName) {
+            $activityLogger = new ActivityLogger($db);
+            $activityLogger->log(
+                $company_id,
+                $_SESSION['saas_admin_id'],
+                "System",
+                'admin_created',
+                "opprettet ny administrator: {$username}",
+                null,
+                null,
+                40
+            );
+        }
+    } catch (Exception $logError) {
+        error_log("Activity logging error: " . $logError->getMessage());
+    }
     
     echo json_encode(['success' => true, 'admin_id' => $admin_id]);
     

@@ -9,6 +9,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../includes/DomeneshopService.php';
+require_once __DIR__ . '/../services/ActivityLogger.php';
 
 header('Content-Type: application/json');
 
@@ -121,6 +122,14 @@ try {
     }
     
     $db->commit();
+    
+    // Logg aktivitet
+    try {
+        $activityLogger = new ActivityLogger($db);
+        $activityLogger->logCompanyCreated($company_id, $name, $saas_admin_id);
+    } catch (Exception $logError) {
+        error_log("Activity logging error: " . $logError->getMessage());
+    }
     
     echo json_encode([
         'success' => true,

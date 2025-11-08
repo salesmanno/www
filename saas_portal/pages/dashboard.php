@@ -162,15 +162,72 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     </nav>
     
     <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Bedriftsadministrasjon</h2>
-            <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal">
-                <i class="bi bi-plus-circle me-2"></i>Opprett ny bedrift
-            </button>
-        </div>
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="companies-tab" data-bs-toggle="tab" data-bs-target="#companies" type="button">
+                    <i class="bi bi-building"></i> Bedrifter
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button">
+                    <i class="bi bi-activity"></i> All aktivitet
+                </button>
+            </li>
+        </ul>
         
-        <div id="companiesList" class="loading">
-            <i class="bi bi-hourglass-split"></i> Laster bedrifter...
+        <div class="tab-content" id="dashboardTabContent">
+            <!-- Bedrifter Tab -->
+            <div class="tab-pane fade show active" id="companies" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Bedriftsadministrasjon</h2>
+                    <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal">
+                        <i class="bi bi-plus-circle me-2"></i>Opprett ny bedrift
+                    </button>
+                </div>
+                
+                <div id="companiesList" class="loading">
+                    <i class="bi bi-hourglass-split"></i> Laster bedrifter...
+                </div>
+            </div>
+            
+            <!-- All aktivitet Tab -->
+            <div class="tab-pane fade" id="activity" role="tabpanel">
+                <div class="row">
+                    <!-- Aktive brukere panel -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="bi bi-people"></i> Aktive brukere</h5>
+                            </div>
+                            <div class="card-body" id="activeSessionsPanel" style="max-height: 500px; overflow-y: auto;">
+                                <div class="text-center text-muted py-3">Laster...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Aktivitetslogg panel -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Aktivitetslogg</h5>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <label class="mb-0 small">Visning: <span id="visibilityValue">30</span>s</label>
+                                        <input type="range" class="form-range" id="visibilitySlider" min="5" max="120" value="30" style="width: 150px;">
+                                        <button class="btn btn-sm btn-outline-secondary" id="pauseBtn" onclick="togglePause()">
+                                            <i class="bi bi-pause"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body" style="height: 600px; overflow-y: auto;" id="activityFeed">
+                                <div class="text-center text-muted py-3">Laster aktivitetslogg...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -571,6 +628,221 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         function viewCompany(id) {
             window.location.href = '/saas_portal/pages/company_details.php?id=' + id;
         }
+        
+        // ============================================
+        // AKTIVITETSLOGG OG AKTIVE SESSIONS
+        // ============================================
+        
+        let activityPaused = false;
+        let lastActivityTimestamp = null;
+        let visibilitySeconds = 30;
+        let activityQueue = [];
+        let currentActivityIndex = 0;
+        
+        // Slider for synlighet
+        document.getElementById('visibilitySlider')?.addEventListener('input', function(e) {
+            visibilitySeconds = parseInt(e.target.value);
+            document.getElementById('visibilityValue').textContent = visibilitySeconds;
+        });
+        
+        // Toggle pause
+        function togglePause() {
+            activityPaused = !activityPaused;
+            const btn = document.getElementById('pauseBtn');
+            if (activityPaused) {
+                btn.innerHTML = '<i class="bi bi-play"></i>';
+                btn.classList.add('btn-success');
+            } else {
+                btn.innerHTML = '<i class="bi bi-pause"></i>';
+                btn.classList.remove('btn-success');
+            }
+        }
+        
+        // Last aktivitetslogg
+        function loadActivityStream() {
+            if (activityPaused) return;
+            
+            const params = new URLSearchParams({
+                limit: 50
+            });
+            
+            if (lastActivityTimestamp) {
+                params.append('since', lastActivityTimestamp);
+            }
+            
+            fetch(`/saas_portal/api/get_activity_stream.php?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.activities && data.activities.length > 0) {
+                    // Legg til nye aktiviteter i køen
+                    activityQueue = [...data.activities.reverse(), ...activityQueue];
+                    lastActivityTimestamp = data.timestamp;
+                    
+                    if (!activityPaused) {
+                        displayNextActivity();
+                    }
+                }
+            })
+            .catch(err => console.error('Activity stream error:', err));
+        }
+        
+        // Vis neste aktivitet fra køen
+        function displayNextActivity() {
+            if (activityPaused || activityQueue.length === 0) return;
+            
+            const activity = activityQueue.shift();
+            const feed = document.getElementById('activityFeed');
+            
+            // Fjern "Laster..."-melding ved første aktivitet
+            if (feed.querySelector('.text-muted')) {
+                feed.innerHTML = '';
+            }
+            
+            // Opprett aktivitets-element
+            const activityEl = document.createElement('div');
+            activityEl.className = 'alert alert-light border mb-2 activity-item';
+            activityEl.style.opacity = '0';
+            activityEl.style.transition = 'opacity 0.3s ease';
+            
+            // Velg ikon basert på type
+            let icon = 'bi-circle';
+            let iconColor = '#6c757d';
+            
+            switch(activity.action_type) {
+                case 'company_created':
+                    icon = 'bi-building-add';
+                    iconColor = '#28a745';
+                    break;
+                case 'sale':
+                    icon = 'bi-cart-check';
+                    iconColor = '#007bff';
+                    break;
+                case 'login':
+                    icon = 'bi-box-arrow-in-right';
+                    iconColor = '#17a2b8';
+                    break;
+                case 'module_changed':
+                    icon = 'bi-gear';
+                    iconColor = '#ffc107';
+                    break;
+            }
+            
+            const amountDisplay = activity.amount ? ` <strong>${activity.amount} kr</strong>` : '';
+            
+            activityEl.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <i class="bi ${icon} me-2" style="color: ${iconColor}; font-size: 1.2rem;"></i>
+                    <div class="flex-grow-1">
+                        <div><strong>${escapeHtml(activity.actor_display)}</strong></div>
+                        <div class="text-muted small">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">${new Date(activity.created_at).toLocaleString('no-NO')}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Legg til øverst
+            feed.insertBefore(activityEl, feed.firstChild);
+            
+            // Fade in
+            setTimeout(() => activityEl.style.opacity = '1', 10);
+            
+            // Fjern etter angitt tid (bruker activity.visibility_seconds eller fallback til slider)
+            const displayTime = (activity.visibility_seconds || visibilitySeconds) * 1000;
+            setTimeout(() => {
+                activityEl.style.opacity = '0';
+                setTimeout(() => activityEl.remove(), 300);
+            }, displayTime);
+            
+            // Vis neste etter kort pause
+            if (activityQueue.length > 0) {
+                setTimeout(() => displayNextActivity(), 1000);
+            }
+        }
+        
+        // Last aktive sessions
+        function loadActiveSessions() {
+            fetch('/saas_portal/api/get_active_sessions.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    renderActiveSessions(data);
+                }
+            })
+            .catch(err => console.error('Active sessions error:', err));
+        }
+        
+        // Render aktive sessions
+        function renderActiveSessions(data) {
+            const panel = document.getElementById('activeSessionsPanel');
+            
+            if (!data.by_company || data.by_company.length === 0) {
+                panel.innerHTML = '<div class="text-center text-muted py-3">Ingen aktive brukere</div>';
+                return;
+            }
+            
+            let html = `
+                <div class="mb-3">
+                    <div class="text-center">
+                        <h4 class="text-primary">${data.total_active_sessions}</h4>
+                        <small class="text-muted">Aktive sessions</small>
+                    </div>
+                    <div class="text-center mt-2">
+                        <small class="text-muted">${data.total_companies_active} bedrifter aktive</small>
+                    </div>
+                </div>
+                <hr>
+            `;
+            
+            data.by_company.forEach(company => {
+                html += `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>${escapeHtml(company.company_name)}</strong>
+                            <span class="badge bg-success">${company.active_users}</span>
+                        </div>
+                        <div class="mt-1">
+                `;
+                
+                company.users.forEach(user => {
+                    const idleTime = user.minutes_idle;
+                    const statusColor = idleTime < 5 ? 'success' : (idleTime < 15 ? 'warning' : 'secondary');
+                    
+                    html += `
+                        <div class="d-flex justify-content-between align-items-center text-sm mb-1">
+                            <span class="small">
+                                <i class="bi bi-circle-fill text-${statusColor}" style="font-size: 0.5rem;"></i>
+                                ${escapeHtml(user.username)}
+                            </span>
+                            <span class="text-muted small">${idleTime}m idle</span>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                    <hr>
+                `;
+            });
+            
+            panel.innerHTML = html;
+        }
+        
+        // Start polling når "All aktivitet"-tab åpnes
+        document.getElementById('activity-tab')?.addEventListener('shown.bs.tab', function () {
+            loadActivityStream();
+            loadActiveSessions();
+            
+            // Poll aktivitet hvert 3. sekund
+            setInterval(() => {
+                if (!activityPaused) {
+                    loadActivityStream();
+                }
+            }, 3000);
+            
+            // Poll sessions hvert 10. sekund
+            setInterval(loadActiveSessions, 10000);
+        });
     </script>
 </body>
 </html>

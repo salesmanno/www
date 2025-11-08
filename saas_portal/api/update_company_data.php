@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/ActivityLogger.php';
 
 header('Content-Type: application/json');
 
@@ -83,6 +84,23 @@ try {
     $stmt->execute($params);
     
     $db->commit();
+    
+    // Logg aktivitet
+    try {
+        $activityLogger = new ActivityLogger($db);
+        $activityLogger->log(
+            $company_id,
+            $_SESSION['saas_admin_id'],
+            "System",
+            'company_updated',
+            "oppdaterte firmadata ({$data['name']})",
+            null,
+            null,
+            25
+        );
+    } catch (Exception $logError) {
+        error_log("Activity logging error: " . $logError->getMessage());
+    }
     
     echo json_encode([
         'success' => true,

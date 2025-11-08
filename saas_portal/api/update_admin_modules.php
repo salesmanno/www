@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/ActivityLogger.php';
 
 header('Content-Type: application/json');
 
@@ -72,6 +73,34 @@ try {
     }
     
     $db->commit();
+    
+    // Logg aktivitet
+    try {
+        $companyStmt = $db->prepare("
+            SELECT tc.name, ta.username
+            FROM tenant_companies tc
+            INNER JOIN tenant_admins ta ON tc.id = ta.company_id
+            WHERE ta.id = ?
+        ");
+        $companyStmt->execute([$admin_id]);
+        $data = $companyStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($data) {
+            $activityLogger = new ActivityLogger($db);
+            $activityLogger->log(
+                $company_id,
+                $_SESSION['saas_admin_id'],
+                "{$data['name']}: System",
+                'modules_changed',
+                "oppdaterte modultilgang for admin {$data['username']} (" . count($module_ids) . " moduler)",
+                null,
+                null,
+                35
+            );
+        }
+    } catch (Exception $logError) {
+        error_log("Activity logging error: " . $logError->getMessage());
+    }
     
     echo json_encode(['success' => true]);
     
