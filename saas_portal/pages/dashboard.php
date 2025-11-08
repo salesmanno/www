@@ -142,6 +142,73 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             font-size: 0.9rem;
             padding: 0.5rem 1rem;
         }
+        
+        .nav-tabs .nav-link {
+            color: #374151;
+            font-weight: 600;
+            font-size: 1.05rem;
+            padding: 0.75rem 1.5rem;
+            border: 2px solid transparent;
+            background: white;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            color: var(--primary-red);
+            border-color: transparent transparent var(--primary-red);
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--primary-red);
+            background: white;
+            border-color: var(--primary-red) var(--primary-red) white;
+            border-width: 2px;
+        }
+        
+        .activity-item {
+            padding: 1rem;
+            border-left: 4px solid #e5e7eb;
+            background: #f9fafb;
+            margin-bottom: 0.75rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .activity-item:hover {
+            background: #f3f4f6;
+            border-left-color: var(--primary-red);
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .session-company {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+        
+        .session-company h6 {
+            color: #1f2937;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .session-user {
+            font-size: 0.9rem;
+            padding: 0.4rem 0.6rem;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 0.3rem;
+        }
     </style>
 </head>
 <body>
@@ -209,19 +276,39 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     <!-- Aktivitetslogg panel -->
                     <div class="col-md-8">
                         <div class="card">
-                            <div class="card-header bg-light">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Aktivitetslogg</h5>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <label class="mb-0 small">Visning: <span id="visibilityValue">30</span>s</label>
-                                        <input type="range" class="form-range" id="visibilitySlider" min="5" max="120" value="30" style="width: 150px;">
+                            <div class="card-header" style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 2px solid #e5e7eb;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0" style="color: #1f2937; font-weight: 700;">
+                                        <i class="bi bi-clock-history text-danger"></i> Aktivitetslogg
+                                    </h5>
+                                    <div class="d-flex align-items-center gap-2">
                                         <button class="btn btn-sm btn-outline-secondary" id="pauseBtn" onclick="togglePause()">
                                             <i class="bi bi-pause"></i>
                                         </button>
                                     </div>
                                 </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label mb-1 small fw-bold text-muted">Hendelsestype</label>
+                                        <select class="form-select form-select-sm" id="eventTypeFilter" onchange="filterActivities()">
+                                            <option value="all">Alle hendelser</option>
+                                            <option value="company_created">Bedrift opprettet</option>
+                                            <option value="company_updated">Bedrift oppdatert</option>
+                                            <option value="company_deleted">Bedrift slettet</option>
+                                            <option value="admin_created">Administrator opprettet</option>
+                                            <option value="admin_deleted">Administrator slettet</option>
+                                            <option value="admin_modules_updated">Moduler oppdatert</option>
+                                            <option value="staff_created">Ansatt opprettet</option>
+                                            <option value="staff_deleted">Ansatt slettet</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label mb-1 small fw-bold text-muted">Visning: <span id="visibilityValue">30</span> sekunder</label>
+                                        <input type="range" class="form-range" id="visibilitySlider" min="5" max="120" value="30">
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body" style="height: 600px; overflow-y: auto;" id="activityFeed">
+                            <div class="card-body" style="height: 600px; overflow-y: auto; background: #ffffff;" id="activityFeed">
                                 <div class="text-center text-muted py-3">Laster aktivitetslogg...</div>
                             </div>
                         </div>
@@ -638,12 +725,38 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         let visibilitySeconds = 30;
         let activityQueue = [];
         let currentActivityIndex = 0;
+        let currentFilter = 'all';
+        let allActivities = [];
         
         // Slider for synlighet
         document.getElementById('visibilitySlider')?.addEventListener('input', function(e) {
             visibilitySeconds = parseInt(e.target.value);
             document.getElementById('visibilityValue').textContent = visibilitySeconds;
         });
+        
+        // Filter aktiviteter
+        function filterActivities() {
+            currentFilter = document.getElementById('eventTypeFilter').value;
+            const feed = document.getElementById('activityFeed');
+            
+            // Tøm feed
+            feed.innerHTML = '';
+            
+            // Filtrer aktiviteter
+            const filtered = currentFilter === 'all' 
+                ? allActivities 
+                : allActivities.filter(a => a.action_type === currentFilter);
+            
+            if (filtered.length === 0) {
+                feed.innerHTML = '<div class="text-center text-muted py-3">Ingen aktiviteter av denne typen</div>';
+                return;
+            }
+            
+            // Vis filtrerte aktiviteter (nyeste først, maks 20)
+            filtered.slice(0, 20).forEach(activity => {
+                renderActivityItem(activity, feed);
+            });
+        }
         
         // Toggle pause
         function togglePause() {
@@ -674,6 +787,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.activities && data.activities.length > 0) {
+                    // Lagre alle aktiviteter
+                    allActivities = [...data.activities.reverse(), ...allActivities].slice(0, 100);
+                    
                     // Legg til nye aktiviteter i køen
                     activityQueue = [...data.activities.reverse(), ...activityQueue];
                     lastActivityTimestamp = data.timestamp;
@@ -686,11 +802,93 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .catch(err => console.error('Activity stream error:', err));
         }
         
+        // Render aktivitets-element (gjenbrukbar funksjon)
+        function renderActivityItem(activity, container) {
+            const activityEl = document.createElement('div');
+            activityEl.className = 'alert alert-light border mb-2 activity-item';
+            activityEl.setAttribute('data-action-type', activity.action_type);
+            
+            // Velg ikon basert på type
+            let icon = 'bi-circle';
+            let iconColor = '#6c757d';
+            
+            switch(activity.action_type) {
+                case 'company_created':
+                    icon = 'bi-building-add';
+                    iconColor = '#28a745';
+                    break;
+                case 'company_updated':
+                    icon = 'bi-building-gear';
+                    iconColor = '#17a2b8';
+                    break;
+                case 'company_deleted':
+                    icon = 'bi-building-x';
+                    iconColor = '#dc3545';
+                    break;
+                case 'admin_created':
+                    icon = 'bi-person-plus';
+                    iconColor = '#28a745';
+                    break;
+                case 'admin_deleted':
+                    icon = 'bi-person-x';
+                    iconColor = '#dc3545';
+                    break;
+                case 'admin_modules_updated':
+                    icon = 'bi-gear';
+                    iconColor = '#ffc107';
+                    break;
+                case 'staff_created':
+                    icon = 'bi-person-badge';
+                    iconColor = '#28a745';
+                    break;
+                case 'staff_deleted':
+                    icon = 'bi-person-dash';
+                    iconColor = '#dc3545';
+                    break;
+                case 'sale':
+                    icon = 'bi-cart-check';
+                    iconColor = '#007bff';
+                    break;
+                case 'login':
+                    icon = 'bi-box-arrow-in-right';
+                    iconColor = '#17a2b8';
+                    break;
+            }
+            
+            const amountDisplay = activity.amount ? ` <strong>${activity.amount} kr</strong>` : '';
+            
+            activityEl.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="activity-icon" style="background: ${iconColor}15; color: ${iconColor};">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div style="color: #1f2937; font-weight: 600;">${escapeHtml(activity.actor_display)}</div>
+                        <div class="text-muted" style="font-size: 0.95rem;">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
+                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.25rem;">
+                            <i class="bi bi-clock"></i> ${new Date(activity.created_at).toLocaleString('no-NO')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(activityEl);
+        }
+        
         // Vis neste aktivitet fra køen
         function displayNextActivity() {
             if (activityPaused || activityQueue.length === 0) return;
             
             const activity = activityQueue.shift();
+            
+            // Hvis filter er aktiv og ikke matcher, skip
+            if (currentFilter !== 'all' && activity.action_type !== currentFilter) {
+                if (activityQueue.length > 0) {
+                    setTimeout(() => displayNextActivity(), 100);
+                }
+                return;
+            }
+            
             const feed = document.getElementById('activityFeed');
             
             // Fjern "Laster..."-melding ved første aktivitet
@@ -703,6 +901,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             activityEl.className = 'alert alert-light border mb-2 activity-item';
             activityEl.style.opacity = '0';
             activityEl.style.transition = 'opacity 0.3s ease';
+            activityEl.setAttribute('data-action-type', activity.action_type);
             
             // Velg ikon basert på type
             let icon = 'bi-circle';
@@ -713,6 +912,34 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     icon = 'bi-building-add';
                     iconColor = '#28a745';
                     break;
+                case 'company_updated':
+                    icon = 'bi-building-gear';
+                    iconColor = '#17a2b8';
+                    break;
+                case 'company_deleted':
+                    icon = 'bi-building-x';
+                    iconColor = '#dc3545';
+                    break;
+                case 'admin_created':
+                    icon = 'bi-person-plus';
+                    iconColor = '#28a745';
+                    break;
+                case 'admin_deleted':
+                    icon = 'bi-person-x';
+                    iconColor = '#dc3545';
+                    break;
+                case 'admin_modules_updated':
+                    icon = 'bi-gear';
+                    iconColor = '#ffc107';
+                    break;
+                case 'staff_created':
+                    icon = 'bi-person-badge';
+                    iconColor = '#28a745';
+                    break;
+                case 'staff_deleted':
+                    icon = 'bi-person-dash';
+                    iconColor = '#dc3545';
+                    break;
                 case 'sale':
                     icon = 'bi-cart-check';
                     iconColor = '#007bff';
@@ -721,21 +948,21 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     icon = 'bi-box-arrow-in-right';
                     iconColor = '#17a2b8';
                     break;
-                case 'module_changed':
-                    icon = 'bi-gear';
-                    iconColor = '#ffc107';
-                    break;
             }
             
             const amountDisplay = activity.amount ? ` <strong>${activity.amount} kr</strong>` : '';
             
             activityEl.innerHTML = `
                 <div class="d-flex align-items-start">
-                    <i class="bi ${icon} me-2" style="color: ${iconColor}; font-size: 1.2rem;"></i>
+                    <div class="activity-icon" style="background: ${iconColor}15; color: ${iconColor};">
+                        <i class="bi ${icon}"></i>
+                    </div>
                     <div class="flex-grow-1">
-                        <div><strong>${escapeHtml(activity.actor_display)}</strong></div>
-                        <div class="text-muted small">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
-                        <div class="text-muted" style="font-size: 0.75rem;">${new Date(activity.created_at).toLocaleString('no-NO')}</div>
+                        <div style="color: #1f2937; font-weight: 600;">${escapeHtml(activity.actor_display)}</div>
+                        <div class="text-muted" style="font-size: 0.95rem;">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
+                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.25rem;">
+                            <i class="bi bi-clock"></i> ${new Date(activity.created_at).toLocaleString('no-NO')}
+                        </div>
                     </div>
                 </div>
             `;

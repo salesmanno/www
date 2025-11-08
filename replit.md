@@ -49,6 +49,14 @@ A comprehensive system administration portal for managing all companies/tenants 
   - **Ansatte**: Manage employees (tenant_staff)
   - **Epost**: Configure SMTP/IMAP settings per company (`tenant_email_config` table)
   - **Betaling**: Configure payment gateways (Vipps, Stripe, PayPal) via `economy_payment_gateways` table
+- **Activity Logging System**: Comprehensive activity tracking across all companies
+  - **Database**: `tenant_activity_logs` table with indexed fields (company_id, admin_id, action_type, created_at)
+  - **Service**: `ActivityLogger.php` with methods for logging various actions
+  - **Dashboard Tab**: "All aktivitet" showing real-time activity stream from all companies
+  - **Live Polling**: Updates every 3 seconds, configurable message visibility (5-120 seconds slider)
+  - **Active Sessions Panel**: Shows currently logged-in users per company with idle time indicators
+  - **Logging Coverage**: 8 critical APIs (company/admin/staff CRUD, module updates, company deletion)
+  - **Pattern**: Log BEFORE delete operations to capture entity data while it still exists
 - **Module Management**: Company modules (tenant_company_modules) are managed automatically during provisioning; individual admin privileges (tenant_admin_modules) are managed per administrator
 - **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, tenant_email_config, economy_payment_gateways, and all related tenant tables
 
