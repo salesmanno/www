@@ -144,24 +144,26 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         }
         
         .nav-tabs .nav-link {
-            color: #374151;
-            font-weight: 600;
-            font-size: 1.05rem;
-            padding: 0.75rem 1.5rem;
-            border: 2px solid transparent;
-            background: white;
+            color: #1f2937 !important;
+            font-weight: 600 !important;
+            font-size: 1.1rem !important;
+            padding: 0.75rem 1.5rem !important;
+            border: 2px solid #e5e7eb !important;
+            background: white !important;
         }
         
         .nav-tabs .nav-link:hover {
-            color: var(--primary-red);
-            border-color: transparent transparent var(--primary-red);
+            color: var(--primary-red) !important;
+            background: #fef2f2 !important;
+            border-color: var(--primary-red) var(--primary-red) #e5e7eb !important;
         }
         
         .nav-tabs .nav-link.active {
-            color: var(--primary-red);
-            background: white;
-            border-color: var(--primary-red) var(--primary-red) white;
-            border-width: 2px;
+            color: var(--primary-red) !important;
+            background: white !important;
+            border-color: var(--primary-red) var(--primary-red) white !important;
+            border-width: 2px !important;
+            font-weight: 700 !important;
         }
         
         .activity-item {
@@ -232,12 +234,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         <!-- Tab Navigation -->
         <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="companies-tab" data-bs-toggle="tab" data-bs-target="#companies" type="button">
+                <button class="nav-link active" id="companies-tab" data-bs-toggle="tab" data-bs-target="#companies" type="button" style="color: #1f2937 !important; font-weight: 600;">
                     <i class="bi bi-building"></i> Bedrifter
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button">
+                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" style="color: #1f2937 !important; font-weight: 600;">
                     <i class="bi bi-activity"></i> All aktivitet
                 </button>
             </li>
@@ -282,6 +284,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                         <i class="bi bi-clock-history text-danger"></i> Aktivitetslogg
                                     </h5>
                                     <div class="d-flex align-items-center gap-2">
+                                        <button class="btn btn-sm btn-success" id="showHistoryBtn" onclick="showActivityHistory()">
+                                            <i class="bi bi-list-ul"></i> Vis siste aktivitet
+                                        </button>
                                         <button class="btn btn-sm btn-outline-secondary" id="pauseBtn" onclick="togglePause()">
                                             <i class="bi bi-pause"></i>
                                         </button>
@@ -289,8 +294,8 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <label class="form-label mb-1 small fw-bold text-muted">Hendelsestype</label>
-                                        <select class="form-select form-select-sm" id="eventTypeFilter" onchange="filterActivities()">
+                                        <label class="form-label mb-1 small fw-bold" style="color: #1f2937;">Hendelsestype</label>
+                                        <select class="form-select form-select-sm" id="eventTypeFilter" onchange="filterActivities()" style="border: 1px solid #d1d5db;">
                                             <option value="all">Alle hendelser</option>
                                             <option value="company_created">Bedrift opprettet</option>
                                             <option value="company_updated">Bedrift oppdatert</option>
@@ -303,7 +308,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                         </select>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label mb-1 small fw-bold text-muted">Visning: <span id="visibilityValue">30</span> sekunder</label>
+                                        <label class="form-label mb-1 small fw-bold" style="color: #1f2937;">Visning: <span id="visibilityValue">30</span> sekunder</label>
                                         <input type="range" class="form-range" id="visibilitySlider" min="5" max="120" value="30">
                                     </div>
                                 </div>
@@ -737,6 +742,11 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         // Filter aktiviteter
         function filterActivities() {
             currentFilter = document.getElementById('eventTypeFilter').value;
+            showActivityHistory(); // Vis historikk når filter endres
+        }
+        
+        // Vis siste aktivitet (historikk)
+        function showActivityHistory() {
             const feed = document.getElementById('activityFeed');
             
             // Tøm feed
@@ -748,12 +758,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 : allActivities.filter(a => a.action_type === currentFilter);
             
             if (filtered.length === 0) {
-                feed.innerHTML = '<div class="text-center text-muted py-3">Ingen aktiviteter av denne typen</div>';
+                feed.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-info-circle me-2"></i>Ingen aktiviteter av denne typen</div>';
                 return;
             }
             
-            // Vis filtrerte aktiviteter (nyeste først, maks 20)
-            filtered.slice(0, 20).forEach(activity => {
+            // Vis filtrerte aktiviteter (nyeste først, maks 50)
+            filtered.slice(0, 50).forEach(activity => {
                 renderActivityItem(activity, feed);
             });
         }
