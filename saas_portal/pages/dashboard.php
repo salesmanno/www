@@ -219,8 +219,11 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             <a class="navbar-brand" href="#">
                 <i class="bi bi-building-gear me-2"></i>SaaS Admin Portal
             </a>
-            <div class="ms-auto d-flex align-items-center">
-                <span class="text-white me-3">
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <a href="/saas_portal/setup.php" class="btn btn-outline-light btn-sm" title="Database Setup">
+                    <i class="bi bi-hammer"></i> Setup
+                </a>
+                <span class="text-white me-2">
                     <i class="bi bi-person-circle me-2"></i><?= htmlspecialchars($admin_name) ?>
                 </span>
                 <a href="/saas_portal/auth/logout.php" class="btn btn-outline-light btn-sm">

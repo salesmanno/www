@@ -5,6 +5,44 @@ class ActivityLogger {
     
     public function __construct($db) {
         $this->db = $db;
+        $this->ensureTableExists();
+    }
+    
+    /**
+     * Sikrer at audit_logs-tabellen finnes
+     */
+    private function ensureTableExists() {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'audit_logs'");
+            if ($stmt->rowCount() === 0) {
+                // Tabell finnes ikke, opprett den
+                $this->db->exec("
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+                        company_id CHAR(36) NOT NULL,
+                        admin_id CHAR(36) NULL,
+                        actor_display VARCHAR(255) NOT NULL,
+                        action_type VARCHAR(50) NOT NULL,
+                        action_summary TEXT NOT NULL,
+                        amount DECIMAL(10,2) NULL,
+                        metadata JSON NULL,
+                        visibility_seconds INT DEFAULT 30,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        
+                        FOREIGN KEY (company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE,
+                        FOREIGN KEY (admin_id) REFERENCES tenant_admins(id) ON DELETE SET NULL,
+                        
+                        INDEX idx_created_at (created_at DESC),
+                        INDEX idx_company_created (company_id, created_at DESC),
+                        INDEX idx_action_type (action_type)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+                error_log("ActivityLogger: audit_logs table created successfully");
+            }
+        } catch (Exception $e) {
+            error_log("ActivityLogger: Could not ensure table exists: " . $e->getMessage());
+            // Fortsett uansett - logger skal ikke stoppe systemet
+        }
     }
     
     /**
@@ -34,7 +72,7 @@ class ActivityLogger {
             $visibilitySeconds = max(5, min(120, $visibilitySeconds));
             
             $stmt = $this->db->prepare("
-                INSERT INTO tenant_activity_logs (
+                INSERT INTO audit_logs (
                     company_id, admin_id, actor_display, action_type, 
                     action_summary, amount, metadata, visibility_seconds, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
@@ -148,7 +186,7 @@ class ActivityLogger {
                     tc.name as company_name,
                     tc.subdomain,
                     ta.username as admin_username
-                FROM tenant_activity_logs al
+                FROM audit_logs al
                 LEFT JOIN tenant_companies tc ON al.company_id = tc.id
                 LEFT JOIN tenant_admins ta ON al.admin_id = ta.id
             ";
@@ -180,7 +218,7 @@ class ActivityLogger {
     public function cleanupOldLogs($daysToKeep = 90) {
         try {
             $stmt = $this->db->prepare("
-                DELETE FROM tenant_activity_logs 
+                DELETE FROM audit_logs 
                 WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)
             ");
             $stmt->execute([$daysToKeep]);
