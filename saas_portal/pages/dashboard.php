@@ -762,11 +762,16 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 return;
             }
             
-            // Vis filtrerte aktiviteter (nyeste først, maks 50)
-            filtered.slice(0, 50).forEach(activity => {
+            // Vis alle filtrerte aktiviteter
+            filtered.forEach(activity => {
                 renderActivityItem(activity, feed);
             });
         }
+        
+        // Last aktivitetshistorikk når "All aktivitet"-fanen åpnes
+        document.getElementById('activity-tab').addEventListener('shown.bs.tab', function () {
+            loadActivityStream();
+        });
         
         // Toggle pause
         function togglePause() {
@@ -781,32 +786,22 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             }
         }
         
-        // Last aktivitetslogg
+        // Last all aktivitetslogg fra starten
         function loadActivityStream() {
-            if (activityPaused) return;
-            
             const params = new URLSearchParams({
-                limit: 50
+                limit: 1000  // Hent mange flere aktiviteter
             });
-            
-            if (lastActivityTimestamp) {
-                params.append('since', lastActivityTimestamp);
-            }
             
             fetch(`/saas_portal/api/get_activity_stream.php?${params}`)
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.activities && data.activities.length > 0) {
-                    // Lagre alle aktiviteter
-                    allActivities = [...data.activities.reverse(), ...allActivities].slice(0, 100);
-                    
-                    // Legg til nye aktiviteter i køen
-                    activityQueue = [...data.activities.reverse(), ...activityQueue];
+                    // Lagre alle aktiviteter (i omvendt rekkefølge - nyeste først)
+                    allActivities = data.activities.reverse();
                     lastActivityTimestamp = data.timestamp;
                     
-                    if (!activityPaused) {
-                        displayNextActivity();
-                    }
+                    // Vis alt historikken automatisk når man åpner fanen
+                    showActivityHistory();
                 }
             })
             .catch(err => console.error('Activity stream error:', err));
@@ -1065,20 +1060,21 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             panel.innerHTML = html;
         }
         
-        // Start polling når "All aktivitet"-tab åpnes
+        // Last all historikk når "All aktivitet"-tab åpnes (overrider tidligere listener)
+        // (Den tidligere listeneren på linje 775-777 lar lastActivityStream laste all historikk når tab åpnes)
+        
+        // Last aktive sessions når tab åpnes
         document.getElementById('activity-tab')?.addEventListener('shown.bs.tab', function () {
-            loadActivityStream();
             loadActiveSessions();
             
-            // Poll aktivitet hvert 3. sekund
-            setInterval(() => {
-                if (!activityPaused) {
-                    loadActivityStream();
-                }
-            }, 3000);
-            
             // Poll sessions hvert 10. sekund
-            setInterval(loadActiveSessions, 10000);
+            if (window.sessionPollInterval) clearInterval(window.sessionPollInterval);
+            window.sessionPollInterval = setInterval(loadActiveSessions, 10000);
+        });
+        
+        // Stopp polling når tab lukkes
+        document.getElementById('activity-tab')?.addEventListener('hidden.bs.tab', function () {
+            if (window.sessionPollInterval) clearInterval(window.sessionPollInterval);
         });
     </script>
 </body>
