@@ -1048,7 +1048,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                 <i class="bi bi-circle-fill text-${statusColor}" style="font-size: 0.5rem;"></i>
                                 ${escapeHtml(user.username)}
                             </span>
-                            <span class="text-muted small">${idleTime}m idle</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted small">${idleTime}m idle</span>
+                                <button class="btn btn-sm btn-outline-danger" onclick="logoutUser('${escapeHtml(user.admin_id)}', '${escapeHtml(user.username)}')">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
                     `;
                 });
@@ -1079,6 +1084,32 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         document.getElementById('activity-tab')?.addEventListener('hidden.bs.tab', function () {
             if (window.sessionPollInterval) clearInterval(window.sessionPollInterval);
         });
+        
+        // Logg ut bruker
+        function logoutUser(adminId, username) {
+            if (!confirm(`Er du sikker på at du vil logge ut ${username}?`)) {
+                return;
+            }
+            
+            fetch('/saas_portal/api/logout_user.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload sessions list
+                    loadActiveSessions();
+                } else {
+                    alert('Feil: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Logout error:', err);
+                alert('Feil ved utlogging: ' + err.message);
+            });
+        }
     </script>
 </body>
 </html>

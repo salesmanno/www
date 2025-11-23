@@ -91,9 +91,11 @@ The design prioritizes a clean, compact dashboard with Bootstrap 5 tabs for modu
 - **Storage**: Object storage for contract document uploads.
 
 ## Recent Changes
+- **Logout Feature for Active Users** (2025-11-23): Added logout button for each active user in "All aktivitet" panel with confirmation dialog and instant UI refresh
 - **Editable Subdomain in Firmadata Tab** (2025-11-23): Added fully editable subdomain field in company details Firmadata tab with real-time validation (lowercase, alphanumeric + dash), uniqueness check, and automatic normalization
-- Implemented comprehensive activity logging across 8 critical API endpoints (company/admin/staff CRUD, module updates)
-- Built complete "All aktivitet" dashboard with event type filtering dropdown (9 event types) and "Vis siste aktivitet" button
+- Fixed Firmadata form validation - changed URL fields from type="url" to type="text" to allow empty or non-standard values
+- Implemented comprehensive activity logging using existing `audit_logs` table with ActivityLogger service
+- Built complete "All aktivitet" dashboard with event type filtering dropdown (9 event types) and "Vis siste aktivitet" button to show all historical activities
 - Fixed UI visibility issues on activity and company tabs using !important CSS and inline styles for clear text visibility
-- Enhanced activity feed with colored icon circles and improved visual design
-- Added live polling (3 seconds), configurable visibility slider (5-120 seconds), and pause/play controls
+- Enhanced activity feed with colored icon circles, improved visual design, and activity type indicators
+- Added live polling for active sessions (10 seconds) and historical activity loading
