@@ -223,6 +223,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 <a href="/saas_portal/setup.php" class="btn btn-outline-light btn-sm" title="Database Setup">
                     <i class="bi bi-hammer"></i> Setup
                 </a>
+                <a href="/saas_portal/api/download_project.php" class="btn btn-outline-light btn-sm" title="Last ned prosjektfiler">
+                    <i class="bi bi-download"></i> Last ned
+                </a>
                 <span class="text-white me-2">
                     <i class="bi bi-person-circle me-2"></i><?= htmlspecialchars($admin_name) ?>
                 </span>
