@@ -533,12 +533,12 @@ if (!$company) {
                         
                         <div class="mb-3">
                             <label class="form-label">Nettside</label>
-                            <input type="url" class="form-control" name="website" value="<?= htmlspecialchars($company['website'] ?? '') ?>" placeholder="https://eksempel.no">
+                            <input type="text" class="form-control" name="website" value="<?= htmlspecialchars($company['website'] ?? '') ?>" placeholder="https://eksempel.no">
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Logo URL</label>
-                            <input type="url" class="form-control" name="logo_url" value="<?= htmlspecialchars($company['logo_url'] ?? '') ?>" placeholder="https://eksempel.no/logo.png">
+                            <input type="text" class="form-control" name="logo_url" value="<?= htmlspecialchars($company['logo_url'] ?? '') ?>" placeholder="https://eksempel.no/logo.png">
                             <small class="text-muted">Lenke til firmalogo (vises på nettside og i "Ditt Firma"-modulen)</small>
                         </div>
                         
