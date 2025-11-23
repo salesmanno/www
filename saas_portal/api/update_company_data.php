@@ -47,6 +47,30 @@ try {
         exit;
     }
     
+    // Håndter subdomain
+    if (isset($data['subdomain']) && !empty($data['subdomain'])) {
+        $subdomain = strtolower(trim($data['subdomain']));
+        
+        // Valider subdomain-format (kun små bokstaver, tall og bindestrek)
+        if (!preg_match('/^[a-z0-9-]+$/', $subdomain)) {
+            $db->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Subdomain kan kun inneholde små bokstaver, tall og bindestrek']);
+            exit;
+        }
+        
+        // Sjekk om subdomain allerede er i bruk av et annet firma
+        $stmt = $db->prepare("SELECT id FROM tenant_companies WHERE subdomain = ? AND id != ?");
+        $stmt->execute([$subdomain, $company_id]);
+        if ($stmt->fetch()) {
+            $db->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Dette subdomenet er allerede i bruk']);
+            exit;
+        }
+        
+        $fields[] = "subdomain = ?";
+        $params[] = $subdomain;
+    }
+    
     // Valgfrie felt
     $optionalFields = [
         'legal_name', 'org_number', 'industry', 'about_us',

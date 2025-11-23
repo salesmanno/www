@@ -487,20 +487,29 @@ if (!$company) {
                                 <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($company['name']) ?>" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Juridisk navn</label>
-                                <input type="text" class="form-control" name="legal_name" value="<?= htmlspecialchars($company['legal_name'] ?? '') ?>">
+                                <label class="form-label">Subdomain *</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" name="subdomain" id="subdomainInput" value="<?= htmlspecialchars($company['subdomain']) ?>" required pattern="[a-z0-9-]+" title="Kun små bokstaver, tall og bindestrek">
+                                    <span class="input-group-text">.salesman.no</span>
+                                </div>
+                                <small class="text-muted">Kun små bokstaver, tall og bindestrek. Eksempel: mittkule-firma</small>
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label class="form-label">Juridisk navn</label>
+                                <input type="text" class="form-control" name="legal_name" value="<?= htmlspecialchars($company['legal_name'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
                                 <label class="form-label">Organisasjonsnummer</label>
                                 <input type="text" class="form-control" name="org_number" value="<?= htmlspecialchars($company['org_number'] ?? '') ?>">
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Bransje</label>
-                                <input type="text" class="form-control" name="industry" value="<?= htmlspecialchars($company['industry'] ?? '') ?>" placeholder="F.eks. IT, Reiseliv, Detaljhandel">
-                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Bransje</label>
+                            <input type="text" class="form-control" name="industry" value="<?= htmlspecialchars($company['industry'] ?? '') ?>" placeholder="F.eks. IT, Reiseliv, Detaljhandel">
                         </div>
                         
                         <div class="mb-3">
