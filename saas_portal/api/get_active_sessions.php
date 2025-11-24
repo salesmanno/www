@@ -57,6 +57,7 @@ try {
         
         $byCompany[$companyId]['active_users']++;
         $byCompany[$companyId]['users'][] = [
+            'admin_id' => $session['tenant_admin_id'],
             'username' => $session['username'],
             'name' => $session['admin_name'],
             'last_activity' => $session['last_activity'],

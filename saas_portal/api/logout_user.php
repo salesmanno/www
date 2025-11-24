@@ -23,10 +23,11 @@ try {
     
     $db = getDBConnection();
     
-    // Delete all sessions for this admin
+    // Mark admin sessions as inactive
     $stmt = $db->prepare("
-        DELETE FROM sessions 
-        WHERE user_id = ? AND user_type = 'admin'
+        UPDATE tenant_admin_sessions 
+        SET is_active = 0, logout_at = NOW()
+        WHERE tenant_admin_id = ?
     ");
     $stmt->execute([$admin_id]);
     
