@@ -1302,6 +1302,7 @@ if (!$company) {
             const data = {
                 company_id: companyId,
                 name: formData.get('name'),
+                subdomain: formData.get('subdomain'),
                 legal_name: formData.get('legal_name'),
                 org_number: formData.get('org_number'),
                 industry: formData.get('industry'),
@@ -1309,6 +1310,7 @@ if (!$company) {
                 contact_email: formData.get('contact_email'),
                 contact_phone: formData.get('contact_phone'),
                 website: formData.get('website'),
+                logo_url: formData.get('logo_url'),
                 address_street: formData.get('address_street'),
                 address_zip: formData.get('address_zip'),
                 address_city: formData.get('address_city'),
