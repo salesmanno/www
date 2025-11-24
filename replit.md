@@ -91,7 +91,8 @@ The design prioritizes a clean, compact dashboard with Bootstrap 5 tabs for modu
 - **Storage**: Object storage for contract document uploads.
 
 ## Recent Changes
-- **Download Project Files** (2025-11-23): Added temporary "Last ned" button in SaaS portal header that generates and downloads a ZIP file of all project files (saas_portal/, config/, public/, index.php, etc.)
+- **Fixed Subdomain and Logo URL Fields** (2025-11-24): Fixed bug where subdomain and logo_url changes weren't being saved when editing company data in Firmadata tab
+- **Fixed Logout User Admin ID** (2025-11-24): Fixed logout feature by including admin_id in active sessions API response and updating logout logic to mark sessions as inactive in tenant_admin_sessions table
 - **Logout Feature for Active Users** (2025-11-23): Added logout button for each active user in "All aktivitet" panel with confirmation dialog and instant UI refresh
 - **Editable Subdomain in Firmadata Tab** (2025-11-23): Added fully editable subdomain field in company details Firmadata tab with real-time validation (lowercase, alphanumeric + dash), uniqueness check, and automatic normalization
 - Fixed Firmadata form validation - changed URL fields from type="url" to type="text" to allow empty or non-standard values
