@@ -628,6 +628,11 @@ if (!$company) {
                                 <option value="">Ingen</option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">E-post *</label>
+                            <input type="email" class="form-control" name="email" id="admin_email" required>
+                            <div class="form-text" id="admin_email_help">Skriv inn e-post for innloggingskontoen.</div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -754,15 +759,44 @@ if (!$company) {
             });
         }
         
+        let availableAdminStaff = {};
+
+        function syncAdminEmailField() {
+            const select = document.getElementById('admin_staff_select');
+            const emailInput = document.getElementById('admin_email');
+            const helpText = document.getElementById('admin_email_help');
+            const staff = availableAdminStaff[select.value];
+
+            if (staff) {
+                emailInput.value = staff.email || '';
+                emailInput.readOnly = true;
+                helpText.textContent = staff.email
+                    ? 'E-post hentes fra den valgte ansatte.'
+                    : 'Valgt ansatt mangler e-post. Legg inn e-post på den ansatte før konto opprettes.';
+            } else {
+                emailInput.readOnly = false;
+                helpText.textContent = 'Skriv inn e-post for innloggingskontoen.';
+            }
+        }
+
         function loadStaff() {
             fetch(`/saas_portal/api/get_staff.php?company_id=${companyId}`)
             .then(r => r.json())
             .then(data => {
                 if (!data.success) return;
+
+                availableAdminStaff = Object.fromEntries(
+                    (data.staff || []).map(staff => [staff.id, staff])
+                );
                 
                 const select = document.getElementById('admin_staff_select');
                 select.innerHTML = '<option value="">Ingen</option>' + 
-                    (data.staff || []).map(s => `<option value="${s.id}">${escapeHtml(s.first_name + ' ' + s.last_name)}</option>`).join('');
+                    (data.staff || []).map(s => `
+                        <option value="${s.id}" ${s.has_account == 1 ? 'disabled' : ''}>
+                            ${escapeHtml(s.first_name + ' ' + s.last_name)}${s.has_account == 1 ? ' (har konto)' : ''}
+                        </option>
+                    `).join('');
+                syncAdminEmailField();
                 
                 const list = document.getElementById('staffList');
                 if (!data.staff || data.staff.length === 0) {
@@ -801,6 +835,7 @@ if (!$company) {
         }
         
         function showCreateAdmin() {
+            syncAdminEmailField();
             new bootstrap.Modal(document.getElementById('createAdminModal')).show();
         }
         
@@ -810,6 +845,11 @@ if (!$company) {
         
         function createAdmin() {
             const form = document.getElementById('createAdminForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
             const formData = new FormData(form);
             formData.append('company_id', companyId);
             
@@ -819,6 +859,7 @@ if (!$company) {
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('createAdminModal')).hide();
                     form.reset();
+                    syncAdminEmailField();
                     loadAdmins();
                     alert('Admin opprettet');
                 } else {
@@ -826,6 +867,8 @@ if (!$company) {
                 }
             });
         }
+
+        document.getElementById('admin_staff_select').addEventListener('change', syncAdminEmailField);
         
         function createStaff() {
             const form = document.getElementById('createStaffForm');

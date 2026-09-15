@@ -17,9 +17,20 @@ try {
     $db = getDBConnection();
     
     $stmt = $db->prepare("
-        SELECT id, first_name, last_name, email, phone, job_title
-        FROM tenant_staff
-        WHERE company_id = ?
+        SELECT
+            ts.id,
+            ts.first_name,
+            ts.last_name,
+            ts.email,
+            ts.phone,
+            ts.job_title,
+            EXISTS(
+                SELECT 1
+                FROM tenant_admins ta
+                WHERE ta.tenant_staff_id = ts.id
+            ) AS has_account
+        FROM tenant_staff ts
+        WHERE ts.company_id = ?
         ORDER BY first_name, last_name
     ");
     $stmt->execute([$company_id]);
