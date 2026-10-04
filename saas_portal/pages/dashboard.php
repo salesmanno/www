@@ -709,7 +709,8 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    console.log('Company deleted successfully');
+                    loadCompanies();
+                    alert(data.message || 'Bedriften er slettet');
                 } else {
                     alert('Feil: ' + data.message);
                 }

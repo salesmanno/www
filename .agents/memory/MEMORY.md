@@ -1,0 +1,1 @@
+- [Active-schema drift](active-schema-drift.md) — uploaded SQL dumps are not authoritative for which optional modules exist in the active database.

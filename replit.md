@@ -28,7 +28,7 @@ A comprehensive system administration portal for managing all companies/tenants 
   - Organization number lookup integration with Brønnøysundregistrene API
   - Full CRUD operations for companies, staff, and administrators
   - Module assignment at both company and admin levels
-  - Safe cascade deletion via `SafeDeleteCompany` stored procedure
+   - Transactional company deletion via `CompanyDeletionService`
   - Per-company management of employees, admins, and module privileges
 - **Auto-provisioning**: When creating a new company, automatically:
   - Creates all `tenant_*` table entries (customers, settings, website_config, etc.)
@@ -38,12 +38,12 @@ A comprehensive system administration portal for managing all companies/tenants 
   - Uses `production_server_ip` from `saas_system_config` (194.63.249.219 for www.salesman.no)
   - Falls back to dynamic IP detection for development environments
   - Domain ID: 2167680 for salesman.no
-- **Safe Deletion**: Uses MySQL stored procedure `SafeDeleteCompany` that:
-  - Maintains referential integrity (no orphaned data)
-  - Explicit transaction control with automatic rollback on error
-  - Deletes all related data in correct order (children before parents)
-  - Covers 25+ tenant tables including events, sales, membership, reservations, etc.
-  - Procedure file: `saas_portal/sql/create_safe_delete_procedure.sql`
+- **Safe Deletion**: Uses `saas_portal/services/CompanyDeletionService.php`:
+   - Discovers installed company-owned tables and FK dependants from the active schema
+   - Keeps foreign-key checks enabled and rolls back on unexpected failures
+   - Deletes child rows before parents, including self-referencing hierarchies
+   - Refuses cross-company references and unsupported/nontransactional ownership layouts
+   - Does not require installing or updating a stored procedure
 - **Company Configuration Tabs**:
   - **Administratorer**: Manage admin accounts with module privileges
   - **Ansatte**: Manage employees (tenant_staff)
@@ -56,7 +56,7 @@ A comprehensive system administration portal for managing all companies/tenants 
   - **Live Polling**: Updates every 3 seconds, configurable message visibility (5-120 seconds slider)
   - **Active Sessions Panel**: Shows currently logged-in users per company with idle time indicators
   - **Logging Coverage**: 8 critical APIs (company/admin/staff CRUD, module updates, company deletion)
-  - **Pattern**: Log BEFORE delete operations to capture entity data while it still exists
+   - **Company deletion**: Log only AFTER commit, with null company/admin FKs and the deleted company snapshot in metadata
 - **Module Management**: Company modules (tenant_company_modules) are managed automatically during provisioning; individual admin privileges (tenant_admin_modules) are managed per administrator
 - **Tables Managed**: tenant_companies, tenant_admins, tenant_staff, tenant_admin_modules, tenant_company_modules, tenant_email_config, economy_payment_gateways, and all related tenant tables
 

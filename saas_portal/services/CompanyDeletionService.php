@@ -7,6 +7,7 @@
 class CompanyDeletionService {
     private $db;
     private $ownedTable = 'company_delete_owned_rows';
+    private $referenceTable = 'company_delete_reference_rows';
     private $lookupTables = [];
     private $currentTable = 'tenant_companies';
 
@@ -31,7 +32,11 @@ class CompanyDeletionService {
             throw new RuntimeException('Fremmednøkkelkontroll er allerede deaktivert på databaseforbindelsen');
         }
 
+        if ($this->db->inTransaction()) {
+            throw new RuntimeException('Bedriftssletting må starte i en egen transaksjon');
+        }
         $this->dropTemporaryTables();
+        $this->db->exec('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
         $this->db->beginTransaction();
         try {
             $companyStmt = $this->db->prepare(
@@ -50,20 +55,32 @@ class CompanyDeletionService {
             $this->createLookupTables($edges);
             $this->seedCompanyRows($companyId, $tables);
             $this->collectReferencedRows($companyId, $tables, $edges);
+            $this->assertNoForeignOwnership($companyId, $tables, $edges);
             $this->deleteOwnedRows($tables, $edges);
+            $this->verifyCompanyRemoved($companyId, $tables);
 
             $this->dropTemporaryTables();
             $this->db->commit();
             return $company;
         } catch (Throwable $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
+            $rollbackConfirmed = false;
+            try {
+                if ($this->db->inTransaction()) {
+                    $rollbackConfirmed = $this->db->rollBack();
+                }
+            } catch (Throwable $rollbackError) {
+                error_log('Company deletion rollback could not be confirmed: ' . $rollbackError->getMessage());
             }
             $this->dropTemporaryTables();
             $table = $this->currentTable;
-            error_log("Company deletion rolled back at {$table}: " . $e->getMessage());
+            error_log("Company deletion stopped at {$table}: " . $e->getMessage());
+            $reason = $e instanceof PDOException
+                ? 'En uventet databasefeil stoppet slettingen.'
+                : $e->getMessage();
             throw new RuntimeException(
-                "Slettingen ble rullet tilbake ved tabellen {$table}.",
+                $rollbackConfirmed
+                    ? "Slettingen ble rullet tilbake ved tabellen {$table}. {$reason}"
+                    : 'Resultatet av slettingen kunne ikke bekreftes. Kontroller bedriftslisten før du prøver igjen.',
                 0,
                 $e
             );
@@ -78,9 +95,14 @@ class CompanyDeletionService {
                 PRIMARY KEY (table_name, row_id)
             ) ENGINE=InnoDB
         ");
+        $this->db->exec("
+            CREATE TEMPORARY TABLE `{$this->referenceTable}` LIKE `{$this->ownedTable}`
+        ");
     }
 
-    private function createLookupTables(array $edges) {
+    private function createLookupTables(array &$edges) {
+        // MySQL cannot reference the same temporary table more than once in
+        // one statement. Give each FK blocker its own small snapshot.
         foreach ($edges as $index => &$edge) {
             $tableName = 'company_delete_lookup_' . $index;
             $this->db->exec("
@@ -97,6 +119,7 @@ class CompanyDeletionService {
             foreach (array_reverse($this->lookupTables) as $tableName) {
                 $this->db->exec("DROP TEMPORARY TABLE IF EXISTS `{$tableName}`");
             }
+            $this->db->exec("DROP TEMPORARY TABLE IF EXISTS `{$this->referenceTable}`");
             $this->db->exec("DROP TEMPORARY TABLE IF EXISTS `{$this->ownedTable}`");
             $this->lookupTables = [];
         } catch (Throwable $e) {
@@ -196,11 +219,11 @@ class CompanyDeletionService {
 
         $rootPk = $this->quoteIdentifier($root['primary_key']);
         $stmt = $this->db->prepare("
-            INSERT IGNORE INTO `{$this->ownedTable}` (table_name, row_id)
+            INSERT INTO `{$this->ownedTable}` (table_name, row_id)
             SELECT 'tenant_companies',
-                   CAST(CAST(`{$rootPk}` AS CHAR CHARACTER SET utf8mb4) AS BINARY)
+                   CAST(CAST({$rootPk} AS CHAR CHARACTER SET utf8mb4) AS BINARY)
             FROM tenant_companies
-            WHERE `{$rootPk}` = ?
+            WHERE {$rootPk} = ?
         ");
         $stmt->execute([$companyId]);
 
@@ -211,9 +234,14 @@ class CompanyDeletionService {
 
             $this->currentTable = $tableName;
             $table = $this->quoteIdentifier($tableName);
-            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM {$table} WHERE company_id = ?");
+            $countStmt = $this->db->prepare("SELECT company_id FROM {$table} WHERE company_id = ? FOR UPDATE");
             $countStmt->execute([$companyId]);
-            if ((int)$countStmt->fetchColumn() === 0) {
+            $hasRows = false;
+            while ($countStmt->fetch(PDO::FETCH_ASSOC)) {
+                $hasRows = true;
+            }
+            $countStmt->closeCursor();
+            if (!$hasRows) {
                 continue;
             }
 
@@ -221,10 +249,11 @@ class CompanyDeletionService {
             $pk = $this->requireSinglePrimaryKey($tableName, $metadata);
             $pk = $this->quoteIdentifier($pk);
             $stmt = $this->db->prepare("
-                INSERT IGNORE INTO `{$this->ownedTable}` (table_name, row_id)
+                INSERT INTO `{$this->ownedTable}` (table_name, row_id)
                 SELECT ?, CAST(CAST({$pk} AS CHAR CHARACTER SET utf8mb4) AS BINARY)
                 FROM {$table}
                 WHERE company_id = ?
+                ON DUPLICATE KEY UPDATE row_id = VALUES(row_id)
             ");
             $stmt->execute([$tableName, $companyId]);
         }
@@ -239,6 +268,19 @@ class CompanyDeletionService {
                 if (!isset($tables[$childName], $tables[$parentName])) {
                     continue;
                 }
+                $parentCount = $this->db->prepare(
+                    "SELECT COUNT(*) FROM `{$this->ownedTable}` WHERE table_name = ?"
+                );
+                $parentCount->execute([$parentName]);
+                if ((int)$parentCount->fetchColumn() === 0) {
+                    continue;
+                }
+                $lookupTable = $edge['lookup_table'];
+                $this->db->exec("DELETE FROM `{$lookupTable}`");
+                $this->db->exec("
+                    INSERT INTO `{$lookupTable}` SELECT * FROM `{$this->ownedTable}`
+                    WHERE table_name = " . $this->quoteValue($parentName) . "
+                ");
 
                 $this->currentTable = $childName;
                 $child = $tables[$childName];
@@ -257,10 +299,18 @@ class CompanyDeletionService {
                 $matchSql = "
                     FROM {$childTable} AS child_row
                     INNER JOIN {$parentTable} AS parent_row ON {$join}
-                    INNER JOIN `{$this->ownedTable}` AS owned_parent
+                    INNER JOIN `{$lookupTable}` AS owned_parent
                         ON owned_parent.table_name = " . $this->quoteValue($parentName) . "
                        AND owned_parent.row_id = {$parentIdentity}
                 ";
+
+                // Lock the referenced rows before checking ownership. New
+                // foreign-key references then cannot race the deletion.
+                $lock = $this->db->query("SELECT 1 {$matchSql} FOR UPDATE");
+                while ($lock->fetch(PDO::FETCH_NUM)) {
+                    // Consume the locking read without loading entire records.
+                }
+                $lock->closeCursor();
 
                 if ($child['has_company_id']) {
                     $crossTenant = $this->db->prepare("
@@ -295,9 +345,10 @@ class CompanyDeletionService {
                 $childPkSql = $this->quoteIdentifier($childPk);
                 $childIdentity = $this->rowIdentity('child_row', $childPkSql);
                 $sql = "
-                    INSERT IGNORE INTO `{$this->ownedTable}` (table_name, row_id)
+                    INSERT INTO `{$this->ownedTable}` (table_name, row_id)
                     SELECT " . $this->quoteValue($childName) . ", {$childIdentity}
                     {$matchSql}{$candidateWhere}
+                    ON DUPLICATE KEY UPDATE row_id = VALUES(row_id)
                 ";
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute($child['has_company_id'] ? [$companyId] : []);
@@ -323,11 +374,13 @@ class CompanyDeletionService {
 
         $maxPasses = max(100, count($ownedTables) * 20);
         for ($pass = 0; $pass < $maxPasses; $pass++) {
-            foreach ($this->lookupTables as $lookupTable) {
+            foreach ($edges as $edge) {
+                $lookupTable = $edge['lookup_table'];
                 $this->db->exec("DELETE FROM `{$lookupTable}`");
                 $this->db->exec("
                     INSERT INTO `{$lookupTable}` (table_name, row_id)
                     SELECT table_name, row_id FROM `{$this->ownedTable}`
+                    WHERE table_name = " . $this->quoteValue($edge['child_table']) . "
                 ");
             }
 
@@ -348,6 +401,11 @@ class CompanyDeletionService {
 
                     $childName = $edge['child_table'];
                     if (!isset($tables[$childName])) {
+                        continue;
+                    }
+                    if (!$tables[$childName]['primary_key']) {
+                        // A referenced row without a supported key would have
+                        // stopped the ownership scan before any deletion.
                         continue;
                     }
                     $childTable = $this->quoteIdentifier($childName);
@@ -398,8 +456,7 @@ class CompanyDeletionService {
                     " . implode("\n", $joins) . "
                     WHERE 1 = 1 {$conditionsSql}
                 ";
-                $this->db->exec($sql);
-                $deleted += $this->db->query('SELECT ROW_COUNT()')->fetchColumn();
+                $deleted += $this->db->exec($sql);
             }
 
             $this->pruneDeletedRows($ownedTables, $tables);
@@ -419,6 +476,96 @@ class CompanyDeletionService {
         throw new RuntimeException('Slettingen stoppet etter for mange avhengighetsnivåer.');
     }
 
+    /**
+     * An unscoped child may link both to this tenant and another tenant (for
+     * example an order item linked to B's order and A's product). Its ownership
+     * is ambiguous, so refuse rather than delete another tenant's records.
+     * Follow parent chains too, not only parents with a company_id column.
+     */
+    private function assertNoForeignOwnership($companyId, array $tables, array $edges) {
+        foreach ($tables as $tableName => $metadata) {
+            if ($metadata['has_company_id'] || $tableName === 'tenant_companies') {
+                continue;
+            }
+            $stmt = $this->db->prepare("
+                INSERT INTO `{$this->referenceTable}`
+                SELECT * FROM `{$this->ownedTable}` WHERE table_name = ?
+            ");
+            $stmt->execute([$tableName]);
+        }
+
+        do {
+            $addedRows = 0;
+            foreach ($edges as $edge) {
+                $childName = $edge['child_table'];
+                $parentName = $edge['parent_table'];
+                if (!isset($tables[$childName], $tables[$parentName])) {
+                    continue;
+                }
+                $count = $this->db->prepare(
+                    "SELECT COUNT(*) FROM `{$this->referenceTable}` WHERE table_name = ?"
+                );
+                $count->execute([$childName]);
+                if ((int)$count->fetchColumn() === 0) {
+                    continue;
+                }
+
+                $this->currentTable = $childName;
+                $childPk = $this->quoteIdentifier(
+                    $this->requireSinglePrimaryKey($childName, $tables[$childName])
+                );
+                $lookup = $edge['lookup_table'];
+                $this->db->exec("DELETE FROM `{$lookup}`");
+                $this->db->exec("
+                    INSERT INTO `{$lookup}` SELECT * FROM `{$this->referenceTable}`
+                    WHERE table_name = " . $this->quoteValue($childName)
+                );
+                $child = $this->quoteIdentifier($childName);
+                $parent = $this->quoteIdentifier($parentName);
+                $join = $this->foreignKeyJoin($edge, 'child_row', 'parent_row');
+                $identity = $this->rowIdentity('child_row', $childPk);
+                $match = "
+                    FROM {$child} child_row
+                    JOIN {$parent} parent_row ON {$join}
+                    JOIN `{$lookup}` candidate
+                        ON candidate.table_name = " . $this->quoteValue($childName) . "
+                       AND candidate.row_id = {$identity}
+                ";
+                $parentMetadata = $tables[$parentName];
+                if ($parentMetadata['has_company_id'] || $parentName === 'tenant_companies') {
+                    $ownerColumn = $parentName === 'tenant_companies'
+                        ? $this->quoteIdentifier($parentMetadata['primary_key'])
+                        : '`company_id`';
+                    $foreign = $this->db->prepare("
+                        SELECT COUNT(*) {$match}
+                        WHERE parent_row.{$ownerColumn} IS NOT NULL
+                          AND parent_row.{$ownerColumn} <> ?
+                    ");
+                    $foreign->execute([$companyId]);
+                    if ((int)$foreign->fetchColumn() > 0) {
+                        throw new RuntimeException(
+                            "{$childName} er også knyttet til en annen bedrifts data. Slettingen er stoppet for å beskytte den."
+                        );
+                    }
+                    continue;
+                }
+
+                $parentPk = $this->quoteIdentifier(
+                    $this->requireSinglePrimaryKey($parentName, $parentMetadata)
+                );
+                $parentIdentity = $this->rowIdentity('parent_row', $parentPk);
+                $stmt = $this->db->prepare("
+                    INSERT INTO `{$this->referenceTable}` (table_name, row_id)
+                    SELECT " . $this->quoteValue($parentName) . ", {$parentIdentity}
+                    {$match}
+                    ON DUPLICATE KEY UPDATE row_id = VALUES(row_id)
+                ");
+                $stmt->execute();
+                $addedRows += $stmt->rowCount();
+            }
+        } while ($addedRows > 0);
+    }
+
     private function pruneDeletedRows(array $ownedTables, array $tables) {
         foreach ($ownedTables as $tableName) {
             $table = $this->quoteIdentifier($tableName);
@@ -432,6 +579,26 @@ class CompanyDeletionService {
                 WHERE owned.table_name = ? AND live_row.{$pk} IS NULL
             ");
             $stmt->execute([$tableName, $tableName]);
+        }
+    }
+
+    private function verifyCompanyRemoved($companyId, array $tables) {
+        // A trigger may have inserted new tenant records during the delete.
+        // Do not commit a partial cleanup merely because staged IDs are gone.
+        foreach ($tables as $tableName => $metadata) {
+            if (!$metadata['has_company_id'] && $tableName !== 'tenant_companies') {
+                continue;
+            }
+            $this->currentTable = $tableName;
+            $table = $this->quoteIdentifier($tableName);
+            $column = $tableName === 'tenant_companies'
+                ? $this->quoteIdentifier($metadata['primary_key'])
+                : '`company_id`';
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM {$table} WHERE {$column} = ?");
+            $stmt->execute([$companyId]);
+            if ((int)$stmt->fetchColumn() !== 0) {
+                throw new RuntimeException("{$tableName} har fortsatt data for bedriften. Slettingen kan ikke fullføres.");
+            }
         }
     }
 
