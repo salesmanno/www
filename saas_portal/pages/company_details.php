@@ -657,11 +657,12 @@ if (!$company) {
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Opprett ansatt</h5>
+                    <h5 class="modal-title" id="staffModalTitle">Opprett ansatt</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="createStaffForm">
+                        <input type="hidden" name="staff_id" id="staffId">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Fornavn *</label>
@@ -674,7 +675,8 @@ if (!$company) {
                         </div>
                         <div class="mb-3">
                             <label class="form-label">E-post</label>
-                            <input type="email" class="form-control" name="email">
+                            <input type="email" class="form-control" name="email" id="staffEmail">
+                            <div class="form-text d-none" id="staffEmailAccountNote">E-post kan ikke endres her fordi den også brukes av ansattens admin-konto. Admin-kontoen endres ikke når du redigerer ansatte.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Telefon</label>
@@ -685,10 +687,11 @@ if (!$company) {
                             <input type="text" class="form-control" name="job_title">
                         </div>
                     </form>
+                    <div id="staffFormStatus" class="alert d-none mt-3 mb-0" role="alert"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-                    <button type="button" class="btn btn-primary-custom" onclick="createStaff()">Opprett</button>
+                    <button type="button" class="btn btn-primary-custom" id="saveStaffButton" onclick="saveStaff()">Opprett</button>
                 </div>
             </div>
         </div>
@@ -865,7 +868,10 @@ if (!$company) {
                                     <td>${escapeHtml(s.phone || '-')}</td>
                                     <td>${escapeHtml(s.job_title || '-')}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteStaff('${s.id}')">
+                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditStaff('${escapeHtml(s.id)}')" aria-label="Rediger ${escapeHtml((s.first_name || '') + ' ' + (s.last_name || ''))}">
+                                            <i class="bi bi-pencil"></i> Rediger
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteStaff('${escapeHtml(s.id)}')" aria-label="Slett ${escapeHtml((s.first_name || '') + ' ' + (s.last_name || ''))}">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </td>
@@ -883,6 +889,41 @@ if (!$company) {
         }
         
         function showCreateStaff() {
+            const form = document.getElementById('createStaffForm');
+            form.reset();
+            document.getElementById('staffId').value = '';
+            document.getElementById('staffModalTitle').textContent = 'Opprett ansatt';
+            document.getElementById('saveStaffButton').textContent = 'Opprett';
+            document.getElementById('staffEmail').readOnly = false;
+            document.getElementById('staffEmailAccountNote').classList.add('d-none');
+            clearStaffFormStatus();
+            new bootstrap.Modal(document.getElementById('createStaffModal')).show();
+        }
+
+        function clearStaffFormStatus() {
+            const status = document.getElementById('staffFormStatus');
+            status.textContent = '';
+            status.className = 'alert d-none mt-3 mb-0';
+        }
+
+        function showEditStaff(id) {
+            const staff = availableAdminStaff[id];
+            if (!staff) {
+                alert('Fant ikke den ansatte. Oppdater listen og prøv igjen.');
+                return;
+            }
+            const form = document.getElementById('createStaffForm');
+            form.elements.first_name.value = staff.first_name || '';
+            form.elements.last_name.value = staff.last_name || '';
+            form.elements.email.value = staff.email || '';
+            form.elements.phone.value = staff.phone || '';
+            form.elements.job_title.value = staff.job_title || '';
+            document.getElementById('staffId').value = staff.id;
+            document.getElementById('staffModalTitle').textContent = 'Rediger ansatt';
+            document.getElementById('saveStaffButton').textContent = 'Lagre endringer';
+            document.getElementById('staffEmail').readOnly = staff.has_account == 1;
+            document.getElementById('staffEmailAccountNote').classList.toggle('d-none', staff.has_account != 1);
+            clearStaffFormStatus();
             new bootstrap.Modal(document.getElementById('createStaffModal')).show();
         }
         
@@ -913,23 +954,66 @@ if (!$company) {
 
         document.getElementById('admin_staff_select').addEventListener('change', syncAdminEmailField);
         
-        function createStaff() {
+        async function saveStaff() {
             const form = document.getElementById('createStaffForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            const staffId = document.getElementById('staffId').value;
+            const button = document.getElementById('saveStaffButton');
+            const status = document.getElementById('staffFormStatus');
+            const creating = !staffId;
+            button.disabled = true;
+            status.className = 'alert alert-info mt-3 mb-0';
+            status.textContent = creating ? 'Oppretter ansatt…' : 'Lagrer endringer…';
+
+            try {
+                if (!creating) {
+                    const formData = new FormData(form);
+                    const response = await fetch('/saas_portal/api/update_staff.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                        body: JSON.stringify({
+                            company_id: companyId,
+                            staff_id: staffId,
+                            csrf_token: brregStaffCsrf,
+                            first_name: formData.get('first_name'),
+                            last_name: formData.get('last_name'),
+                            email: formData.get('email'),
+                            phone: formData.get('phone'),
+                            job_title: formData.get('job_title')
+                        })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Kunne ikke lagre endringene.');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('createStaffModal')).hide();
+                    loadStaff();
+                    loadAdmins();
+                    alert('Endringene er lagret');
+                    return;
+                }
+
             const formData = new FormData(form);
             formData.append('company_id', companyId);
             
-            fetch('/saas_portal/api/create_staff.php', {method: 'POST', body: formData})
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('createStaffModal')).hide();
-                    form.reset();
-                    loadStaff();
-                    alert('Ansatt opprettet');
-                } else {
-                    alert('Feil: ' + data.message);
+                const response = await fetch('/saas_portal/api/create_staff.php', {method: 'POST', body: formData});
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Kunne ikke opprette den ansatte.');
                 }
-            });
+                bootstrap.Modal.getInstance(document.getElementById('createStaffModal')).hide();
+                form.reset();
+                loadStaff();
+                alert('Ansatt opprettet');
+            } catch (error) {
+                status.className = 'alert alert-danger mt-3 mb-0';
+                status.textContent = error.message || 'Kunne ikke lagre ansattopplysningene.';
+            } finally {
+                button.disabled = false;
+            }
         }
         
         function manageAdminModules(adminId, username) {

@@ -99,7 +99,7 @@ try {
     foreach (['config', 'sessions', 'saas_portal/api', 'saas_portal/services'] as $dir) {
         mkdir($root . '/' . $dir, 0700, true);
     }
-    foreach (['create_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff'] as $file) {
+    foreach (['create_staff', 'update_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff'] as $file) {
         copy(__DIR__ . '/../api/' . $file . '.php', $root . '/saas_portal/api/' . $file . '.php');
     }
     foreach (['BrregRoleClient', 'BrregStaffImportService', 'ActivityLogger'] as $file) {
@@ -159,6 +159,10 @@ try {
     check($db->query("SELECT COUNT(*) FROM tenant_staff WHERE first_name='forged'")->fetchColumn() == 0, 'Client data trusted');
     check(http($base, 'import_brreg_staff', $confirm)[0] === 409, 'Replayed token allowed');
     check(http($base, 'import_brreg_staff', $payload)[1]['candidates'][0]['status'] === 'existing', 'Repeated HTTP preview creates duplicates');
+
+    $update = ['company_id' => 'A', 'staff_id' => $imported['id'] ?? '', 'csrf_token' => 'test-csrf',
+        'first_name' => 'Oppdatert', 'last_name' => 'Import', 'email' => 'person@example.test',
+        'phone' => '+47 12345678', 'job_title' => 'Daglig leder'];
     file_put_contents($root . '/roles.json', '{"rollegrupper":[]}');
     check(http($base, 'import_brreg_staff', $payload)[1]['candidates'] === [], 'Empty HTTP registry');
     file_put_contents($root . '/roles.json', '{"error":"unavailable"}');
