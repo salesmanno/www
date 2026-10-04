@@ -6,6 +6,10 @@ if (!isset($_SESSION['saas_admin_id'])) {
     exit;
 }
 
+if (empty($_SESSION['brreg_staff_csrf'])) {
+    $_SESSION['brreg_staff_csrf'] = bin2hex(random_bytes(32));
+}
+
 require_once __DIR__ . '/../../config/database.php';
 
 $company_id = $_GET['id'] ?? '';
@@ -160,9 +164,14 @@ if (!$company) {
                 <div class="content-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h3 class="section-title mb-0">Ansatte</h3>
-                        <button class="btn btn-primary-custom btn-sm" onclick="showCreateStaff()">
-                            <i class="bi bi-plus-circle"></i> Ny ansatt
-                        </button>
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <button class="btn btn-outline-danger btn-sm" type="button" id="importBrregStaffButton">
+                                <i class="bi bi-cloud-download" aria-hidden="true"></i> Importer fra Brønnøysund
+                            </button>
+                            <button class="btn btn-primary-custom btn-sm" type="button" onclick="showCreateStaff()">
+                                <i class="bi bi-plus-circle" aria-hidden="true"></i> Ny ansatt
+                            </button>
+                        </div>
                     </div>
                     <div id="staffList"></div>
                 </div>
@@ -684,6 +693,39 @@ if (!$company) {
             </div>
         </div>
     </div>
+
+    <!-- Brønnøysund staff import review -->
+    <div class="modal fade" id="brregStaffImportModal" tabindex="-1" aria-labelledby="brregStaffImportTitle" aria-describedby="brregStaffImportIntro" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="brregStaffImportTitle">Importer rolleinnehavere</h5>
+                        <p class="mb-0 small text-white-50" id="brregStaffImportOrgNumber"></p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="brregStaffImportIntro" class="text-muted">
+                        Dette er registrerte rolleinnehavere fra Brønnøysundregistrene, ikke en fullstendig ansattliste.
+                        Import oppretter kun ansattoppføringer – ingen kontoer. Personlige kontaktopplysninger som ikke er tilgjengelige, vises tomme.
+                    </p>
+                    <div id="brregStaffImportStatus" class="mb-3" role="status" aria-live="polite"></div>
+                    <div id="brregStaffImportCandidates" aria-label="Gjennomgang av rolleinnehavere"></div>
+                    <div id="brregStaffImportResult" class="mt-3" role="status" aria-live="polite"></div>
+                </div>
+                <div class="modal-footer flex-wrap justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary me-auto" id="brregStaffRetryButton">
+                        <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Hent forhåndsvisning på nytt
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
+                    <button type="button" class="btn btn-primary-custom" id="brregStaffConfirmButton" disabled>
+                        <span class="brreg-confirm-label">Importer valgte</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Admin Modules Modal -->
     <div class="modal fade" id="adminModulesModal" tabindex="-1">
@@ -707,7 +749,8 @@ if (!$company) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const companyId = '<?= $company_id ?>';
+        const companyId = <?= json_encode((string)$company_id, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const brregStaffCsrf = <?= json_encode($_SESSION['brreg_staff_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         
         function loadAdmins() {
             fetch(`/saas_portal/api/get_admins.php?company_id=${companyId}`)
@@ -1394,5 +1437,6 @@ if (!$company) {
         loadAdmins();
         loadStaff();
     </script>
+    <script src="/saas_portal/assets/brreg-staff-import.js"></script>
 </body>
 </html>
