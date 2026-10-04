@@ -34,6 +34,7 @@ foreach (['company_id', 'staff_id'] as $idField) {
 }
 
 $fields = ['first_name' => 255, 'last_name' => 255, 'email' => 255, 'phone' => 50, 'job_title' => 100];
+$labels = ['first_name' => 'Fornavn', 'last_name' => 'Etternavn', 'email' => 'E-post', 'phone' => 'Telefon', 'job_title' => 'Stilling'];
 $values = [];
 foreach ($fields as $field => $limit) {
     if (!is_string($data[$field] ?? null)) {
@@ -41,7 +42,7 @@ foreach ($fields as $field => $limit) {
     }
     $value = trim($data[$field]);
     if (mb_strlen($value, 'UTF-8') > $limit) {
-        updateStaffReply(400, ['success' => false, 'message' => ucfirst(str_replace('_', ' ', $field)) . " kan ikke være lengre enn {$limit} tegn."]);
+        updateStaffReply(400, ['success' => false, 'message' => $labels[$field] . " kan ikke være lengre enn {$limit} tegn."]);
     }
     $values[$field] = $value;
 }

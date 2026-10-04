@@ -1,2 +1,3 @@
 - [Active-schema drift](active-schema-drift.md) — uploaded SQL dumps are not authoritative for which optional modules exist in the active database.
 - [Brønnøysund import scope](brreg-import-scope.md) — add missing registered role holders only; preserve manual employees and keep login accounts separate.
+- [Linked employee email](linked-employee-email.md) — require a coordinated account-email flow before unlocking email edits for staff with admin accounts.

@@ -53,10 +53,10 @@ function http(string $base, string $path, $payload = null, bool $authenticated =
 }
 try {
     $db->exec('CREATE TABLE tenant_companies (id CHAR(36) PRIMARY KEY, name VARCHAR(255), org_number VARCHAR(100)) ENGINE=InnoDB');
-    $db->exec('CREATE TABLE tenant_staff (id CHAR(36) PRIMARY KEY, company_id CHAR(36), first_name VARCHAR(255) NOT NULL, last_name VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, phone VARCHAR(50), job_title VARCHAR(100), created_at DATETIME, FOREIGN KEY(company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE) ENGINE=InnoDB');
+    $db->exec('CREATE TABLE tenant_staff (id CHAR(36) PRIMARY KEY, company_id CHAR(36), first_name VARCHAR(255) NOT NULL, last_name VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, phone VARCHAR(50), job_title VARCHAR(100), created_at DATETIME, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE) ENGINE=InnoDB');
     $db->exec('CREATE TABLE tenant_admins (id CHAR(36) PRIMARY KEY, company_id CHAR(36), tenant_staff_id CHAR(36) NULL UNIQUE, email VARCHAR(255), username VARCHAR(255) UNIQUE, password_hash VARCHAR(255), is_active BOOLEAN, created_by CHAR(36), created_at DATETIME, FOREIGN KEY(company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE, FOREIGN KEY(tenant_staff_id) REFERENCES tenant_staff(id) ON DELETE SET NULL) ENGINE=InnoDB');
     $db->exec("INSERT INTO tenant_companies VALUES ('A', 'Test Company', '974760673'), ('B', 'Other Company', '974760673'), ('NOORG', 'No number', '')");
-    $db->exec("INSERT INTO tenant_staff VALUES ('manual', 'A', 'Manuell', 'Ansatt', 'manual@example.test', '12345678', 'Original', NOW())");
+    $db->exec("INSERT INTO tenant_staff (id, company_id, first_name, last_name, email, phone, job_title, created_at) VALUES ('manual', 'A', 'Manuell', 'Ansatt', 'manual@example.test', '12345678', 'Original', NOW())");
     $db->exec("INSERT INTO tenant_admins VALUES ('admin', 'A', 'manual', 'manual@example.test', 'original', 'unchanged-hash', 1, 'system', NOW())");
     $before = snapshot($db);
     $service = new BrregStaffImportService($db);
@@ -88,7 +88,7 @@ try {
     check(snapshot($db) === $after, 'Batch failure did not roll back earlier insert');
     $db->exec('DROP TRIGGER fail_second');
     // Partial stale batch must not insert even the unaffected selection.
-    $stmt = $db->prepare('INSERT INTO tenant_staff VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+    $stmt = $db->prepare('INSERT INTO tenant_staff (id, company_id, first_name, last_name, email, phone, job_title, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
     $stmt->execute(['concurrent', 'A', 'Andre', 'Ny', '', '', 'Manual']);
     $current = snapshot($db);
     rejects(fn() => $service->confirm('A', $freshSnap, ['person-0', 'person-1']), 'Stale batch accepted');
@@ -160,9 +160,35 @@ try {
     check(http($base, 'import_brreg_staff', $confirm)[0] === 409, 'Replayed token allowed');
     check(http($base, 'import_brreg_staff', $payload)[1]['candidates'][0]['status'] === 'existing', 'Repeated HTTP preview creates duplicates');
 
-    $update = ['company_id' => 'A', 'staff_id' => $imported['id'] ?? '', 'csrf_token' => 'test-csrf',
+    $importedId = $db->query("SELECT id FROM tenant_staff WHERE first_name='Http'")->fetchColumn();
+    $update = ['company_id' => 'A', 'staff_id' => $importedId, 'csrf_token' => 'test-csrf',
         'first_name' => 'Oppdatert', 'last_name' => 'Import', 'email' => 'person@example.test',
         'phone' => '+47 12345678', 'job_title' => 'Daglig leder'];
+    $beforeEditing = snapshot($db);
+    check(http($base, 'update_staff', $update, false)[0] === 403, 'Unauthenticated employee editing allowed');
+    check(http($base, 'update_staff')[0] === 405, 'GET employee editing allowed');
+    check(http($base, 'update_staff', array_replace($update, ['csrf_token' => 'bad']))[0] === 403, 'Invalid CSRF employee editing allowed');
+    check(http($base, 'update_staff', array_replace($update, ['company_id' => 'B']))[0] === 404, 'Cross-company employee editing allowed');
+    check(http($base, 'update_staff', array_replace($update, ['staff_id' => 'missing']))[0] === 404, 'Missing employee update succeeds');
+    check(http($base, 'update_staff', array_replace($update, ['first_name' => '']))[0] === 400, 'Empty name update allowed');
+    check(http($base, 'update_staff', array_replace($update, ['email' => 'invalid']))[0] === 400, 'Invalid email update allowed');
+    check(http($base, 'update_staff', array_replace($update, ['job_title' => str_repeat('x', 101)]))[0] === 400, 'Overlong title update allowed');
+    check(snapshot($db) === $beforeEditing, 'Rejected edit changed staff or admins');
+    $result = http($base, 'update_staff', $update + ['password_hash' => 'forged', 'username' => 'forged']);
+    check($result[0] === 200 && $result[1]['success'], 'Employee edit failed');
+    $edited = $db->query('SELECT first_name, last_name, email, phone, job_title FROM tenant_staff WHERE id=' . $db->quote($importedId))->fetch(PDO::FETCH_ASSOC);
+    foreach (array_keys($edited) as $field) {
+        check($edited[$field] === $update[$field], 'Edited employee field not saved: ' . $field);
+    }
+    check(snapshot($db)[1] === $adminsBefore, 'Editing changed admin accounts');
+    check(http($base, 'update_staff', $update)[0] === 200, 'Saving unchanged employee failed');
+    $linkedUpdate = array_replace($update, ['staff_id' => 'manual', 'email' => 'new-admin-email@example.test']);
+    $beforeLinkedEditing = snapshot($db);
+    check(http($base, 'update_staff', $linkedUpdate)[0] === 409, 'Linked account email change allowed');
+    check(snapshot($db) === $beforeLinkedEditing, 'Rejected linked email edit changed data');
+    $linkedUpdate['email'] = 'manual@example.test';
+    check(http($base, 'update_staff', $linkedUpdate)[0] === 200, 'Linked employee name/phone/title editing failed');
+    check(snapshot($db)[1] === $adminsBefore, 'Linked employee editing changed admin accounts');
     file_put_contents($root . '/roles.json', '{"rollegrupper":[]}');
     check(http($base, 'import_brreg_staff', $payload)[1]['candidates'] === [], 'Empty HTTP registry');
     file_put_contents($root . '/roles.json', '{"error":"unavailable"}');
@@ -180,11 +206,10 @@ try {
     check(http($base, 'delete_staff', ['staff_id' => $manual['staff_id']])[1]['success'] === true, 'Employee deletion');
     check($db->query("SELECT tenant_staff_id IS NULL FROM tenant_admins WHERE id=" . $db->quote($linked['admin_id']))->fetchColumn() == 1, 'Staff deletion must preserve admin via FK SET NULL');
     check(http($base, 'delete_admin', ['admin_id' => $linked['admin_id']])[1]['success'] === true, 'Detached admin deletion');
-    $importedId = $db->query("SELECT id FROM tenant_staff WHERE first_name='Http'")->fetchColumn();
     check(http($base, 'delete_staff', ['staff_id' => $importedId])[1]['success'] === true, 'Imported staff deletion');
     $staffList = http($base, 'get_staff', null);
     check($staffList[1]['success'] === true, 'Staff list endpoint still works');
-    echo "MySQL atomic import, HTTP auth/CSRF/preview/confirm and unchanged employee/admin CRUD checks passed.\n";
+    echo "MySQL atomic import, employee editing with auth/CSRF/company checks, linked-account preservation and employee/admin CRUD checks passed.\n";
 } finally {
     if (is_resource($server)) {
         proc_terminate($server);

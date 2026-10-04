@@ -666,25 +666,25 @@ if (!$company) {
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Fornavn *</label>
-                                <input type="text" class="form-control" name="first_name" required>
+                                <input type="text" class="form-control" name="first_name" maxlength="255" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Etternavn *</label>
-                                <input type="text" class="form-control" name="last_name" required>
+                                <input type="text" class="form-control" name="last_name" maxlength="255" required>
                             </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">E-post</label>
-                            <input type="email" class="form-control" name="email" id="staffEmail">
+                            <input type="email" class="form-control" name="email" id="staffEmail" maxlength="255">
                             <div class="form-text d-none" id="staffEmailAccountNote">E-post kan ikke endres her fordi den også brukes av ansattens admin-konto. Admin-kontoen endres ikke når du redigerer ansatte.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Telefon</label>
-                            <input type="text" class="form-control" name="phone">
+                            <input type="text" class="form-control" name="phone" maxlength="50">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Stilling</label>
-                            <input type="text" class="form-control" name="job_title">
+                            <input type="text" class="form-control" name="job_title" maxlength="100">
                         </div>
                     </form>
                     <div id="staffFormStatus" class="alert d-none mt-3 mb-0" role="alert"></div>
@@ -889,6 +889,7 @@ if (!$company) {
         }
         
         function showCreateStaff() {
+            if (document.getElementById('saveStaffButton').disabled) return;
             const form = document.getElementById('createStaffForm');
             form.reset();
             document.getElementById('staffId').value = '';
@@ -907,6 +908,7 @@ if (!$company) {
         }
 
         function showEditStaff(id) {
+            if (document.getElementById('saveStaffButton').disabled) return;
             const staff = availableAdminStaff[id];
             if (!staff) {
                 alert('Fant ikke den ansatte. Oppdater listen og prøv igjen.');
@@ -955,13 +957,14 @@ if (!$company) {
         document.getElementById('admin_staff_select').addEventListener('change', syncAdminEmailField);
         
         async function saveStaff() {
+            const button = document.getElementById('saveStaffButton');
+            if (button.disabled) return;
             const form = document.getElementById('createStaffForm');
             if (!form.checkValidity()) {
                 form.reportValidity();
                 return;
             }
             const staffId = document.getElementById('staffId').value;
-            const button = document.getElementById('saveStaffButton');
             const status = document.getElementById('staffFormStatus');
             const creating = !staffId;
             button.disabled = true;
@@ -996,8 +999,8 @@ if (!$company) {
                     return;
                 }
 
-            const formData = new FormData(form);
-            formData.append('company_id', companyId);
+                const formData = new FormData(form);
+                formData.append('company_id', companyId);
             
                 const response = await fetch('/saas_portal/api/create_staff.php', {method: 'POST', body: formData});
                 const data = await response.json();
