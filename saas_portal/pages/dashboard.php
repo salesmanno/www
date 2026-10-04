@@ -794,20 +794,35 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             const params = new URLSearchParams({
                 limit: 1000  // Hent mange flere aktiviteter
             });
-            
+
+            const feed = document.getElementById('activityFeed');
+            feed.innerHTML = '<div class="text-center text-muted py-3">Laster aktivitetslogg...</div>';
+
             fetch(`/saas_portal/api/get_activity_stream.php?${params}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.activities && data.activities.length > 0) {
-                    // Lagre alle aktiviteter (i omvendt rekkefølge - nyeste først)
-                    allActivities = data.activities.reverse();
-                    lastActivityTimestamp = data.timestamp;
-                    
-                    // Vis alt historikken automatisk når man åpner fanen
-                    showActivityHistory();
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Kunne ikke hente aktivitetsloggen. Prøv igjen.');
                 }
+                return data;
             })
-            .catch(err => console.error('Activity stream error:', err));
+            .then(data => {
+                allActivities = Array.isArray(data.activities) ? data.activities.slice().reverse() : [];
+                lastActivityTimestamp = data.timestamp || null;
+                showActivityHistory();
+            })
+            .catch(err => {
+                console.error('Activity stream error:', err);
+                allActivities = [];
+                feed.innerHTML = `
+                    <div class="alert alert-danger mb-0" role="alert">
+                        <div>${escapeHtml(err.message || 'Kunne ikke hente aktivitetsloggen. Prøv igjen.')}</div>
+                        <button class="btn btn-sm btn-outline-danger mt-2" type="button" onclick="loadActivityStream()">
+                            Prøv igjen
+                        </button>
+                    </div>
+                `;
+            });
         }
         
         // Render aktivitets-element (gjenbrukbar funksjon)

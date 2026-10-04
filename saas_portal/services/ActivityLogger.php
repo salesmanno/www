@@ -2,126 +2,224 @@
 
 class ActivityLogger {
     private $db;
-    
+    private $columns = [];
+
     public function __construct($db) {
         $this->db = $db;
         $this->ensureTableExists();
+        $this->loadTableColumns();
     }
-    
+
     /**
-     * Sikrer at audit_logs-tabellen finnes
+     * Create a new audit table with both the legacy fields (used by existing
+     * database triggers) and the SaaS activity fields. Existing tables are
+     * deliberately left untouched; their layout is detected below.
      */
     private function ensureTableExists() {
         try {
             $stmt = $this->db->query("SHOW TABLES LIKE 'audit_logs'");
-            if ($stmt->rowCount() === 0) {
-                // Tabell finnes ikke, opprett den
+            if (!$stmt->fetchColumn()) {
                 $this->db->exec("
-                    CREATE TABLE IF NOT EXISTS audit_logs (
+                    CREATE TABLE audit_logs (
                         id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-                        company_id CHAR(36) NOT NULL,
+                        company_id CHAR(36) NULL,
+                        user_id CHAR(36) NULL,
+                        user_type VARCHAR(20) NULL,
+                        user_email VARCHAR(255) NULL,
+                        action VARCHAR(255) NOT NULL DEFAULT 'activity',
+                        resource_type VARCHAR(100) NULL,
+                        resource_id CHAR(36) NULL,
+                        resource_name VARCHAR(255) NULL,
+                        old_values TEXT NULL,
+                        new_values TEXT NULL,
+                        ip_address VARCHAR(45) NULL,
+                        user_agent TEXT NULL,
+                        severity VARCHAR(20) DEFAULT 'info',
+                        performed_at DATETIME NULL,
+                        module VARCHAR(100) NULL,
+                        session_id VARCHAR(255) NULL,
+                        location VARCHAR(255) NULL,
+                        device_info TEXT NULL,
                         admin_id CHAR(36) NULL,
-                        actor_display VARCHAR(255) NOT NULL,
-                        action_type VARCHAR(50) NOT NULL,
-                        action_summary TEXT NOT NULL,
+                        actor_display VARCHAR(255) NULL,
+                        action_type VARCHAR(50) NULL,
+                        action_summary TEXT NULL,
                         amount DECIMAL(10,2) NULL,
                         metadata JSON NULL,
                         visibility_seconds INT DEFAULT 30,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        
-                        FOREIGN KEY (company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE,
-                        FOREIGN KEY (admin_id) REFERENCES tenant_admins(id) ON DELETE SET NULL,
-                        
-                        INDEX idx_created_at (created_at DESC),
-                        INDEX idx_company_created (company_id, created_at DESC),
-                        INDEX idx_action_type (action_type)
+                        INDEX idx_audit_logs_created_at (created_at),
+                        INDEX idx_audit_logs_company_created (company_id, created_at),
+                        INDEX idx_audit_logs_performed_at (performed_at)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 ");
-                error_log("ActivityLogger: audit_logs table created successfully");
+                error_log("ActivityLogger: created audit_logs table");
             }
         } catch (Exception $e) {
             error_log("ActivityLogger: Could not ensure table exists: " . $e->getMessage());
-            // Fortsett uansett - logger skal ikke stoppe systemet
+            throw $e;
         }
     }
-    
+
+    private function loadTableColumns() {
+        $stmt = $this->db->query("SHOW COLUMNS FROM audit_logs");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            $this->columns[strtolower($column['Field'])] = true;
+        }
+    }
+
+    private function hasColumn($name) {
+        return isset($this->columns[strtolower($name)]);
+    }
+
+    private function hasColumns(array $names) {
+        foreach ($names as $name) {
+            if (!$this->hasColumn($name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
-     * Logg en aktivitet i systemet
-     * 
-     * @param string $companyId UUID til bedriften
-     * @param string|null $adminId UUID til administrator (null hvis system-handling)
-     * @param string $actorDisplay Visningsnavn (f.eks. "Just Nails: admin magne.k")
-     * @param string $actionType Type handling (company_created, sale, module_changed, etc.)
-     * @param string $actionSummary Beskrivelse av handlingen
-     * @param float|null $amount Beløp hvis relevant (for salg)
-     * @param array|null $metadata Ekstra data som JSON
-     * @param int $visibilitySeconds Hvor lenge meldingen skal vises (5-120)
+     * Insert only columns that exist in the active schema.
+     */
+    private function insertAvailableColumns(array $values) {
+        $values = array_filter(
+            $values,
+            function ($value, $column) {
+                return $this->hasColumn($column);
+            },
+            ARRAY_FILTER_USE_BOTH
+        );
+
+        if (!$values) {
+            throw new RuntimeException('audit_logs har ingen kompatible aktivitetskolonner');
+        }
+
+        $columns = array_keys($values);
+        $columnSql = implode(', ', array_map(function ($column) {
+            return '`' . str_replace('`', '``', $column) . '`';
+        }, $columns));
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $stmt = $this->db->prepare("INSERT INTO audit_logs ({$columnSql}) VALUES ({$placeholders})");
+        $stmt->execute(array_values($values));
+    }
+
+    /**
+     * Log a SaaS activity. Supports both the current normalized layout and
+     * the older audit_logs layout used by existing database triggers.
      */
     public function log(
-        $companyId, 
-        $adminId, 
-        $actorDisplay, 
-        $actionType, 
-        $actionSummary, 
-        $amount = null, 
-        $metadata = null, 
-        $visibilitySeconds = 30
+        $companyId,
+        $adminId,
+        $actorDisplay,
+        $actionType,
+        $actionSummary,
+        $amount = null,
+        $metadata = null,
+        $visibilitySeconds = 30,
+        $createdAt = null
     ) {
         try {
-            // Valider visibilitetstid (5-120 sekunder)
-            $visibilitySeconds = max(5, min(120, $visibilitySeconds));
-            
-            $stmt = $this->db->prepare("
-                INSERT INTO audit_logs (
-                    company_id, admin_id, actor_display, action_type, 
-                    action_summary, amount, metadata, visibility_seconds, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            ");
-            
-            $stmt->execute([
-                $companyId,
-                $adminId,
-                $actorDisplay,
-                $actionType,
-                $actionSummary,
-                $amount,
-                $metadata ? json_encode($metadata) : null,
-                $visibilitySeconds
-            ]);
-            
+            $visibilitySeconds = max(5, min(120, (int)$visibilitySeconds));
+            $payload = json_encode([
+                'actor_display' => (string)$actorDisplay,
+                'action_summary' => (string)$actionSummary,
+                'amount' => $amount,
+                'metadata' => $metadata,
+                'visibility_seconds' => $visibilitySeconds
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            if ($payload === false) {
+                throw new RuntimeException('Kunne ikke serialisere aktivitetsdata');
+            }
+
+            if ($this->hasColumns(['company_id', 'actor_display', 'action_type', 'action_summary', 'created_at'])) {
+                $values = [
+                    'company_id' => $companyId,
+                    'actor_display' => $actorDisplay,
+                    'action_type' => $actionType,
+                    'action_summary' => $actionSummary
+                ];
+
+                if ($createdAt !== null && $this->hasColumn('created_at')) {
+                    $values['created_at'] = $createdAt;
+                }
+                if ($this->hasColumn('admin_id')) {
+                    $values['admin_id'] = $adminId ?: null;
+                }
+                if ($this->hasColumn('amount')) {
+                    $values['amount'] = $amount;
+                }
+                if ($this->hasColumn('metadata')) {
+                    $values['metadata'] = $metadata === null ? null : json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                }
+                if ($this->hasColumn('visibility_seconds')) {
+                    $values['visibility_seconds'] = $visibilitySeconds;
+                }
+
+                $this->insertAvailableColumns($values);
+            } elseif ($this->hasColumns(['company_id', 'action', 'performed_at'])) {
+                // The legacy audit_logs schema is also used by database
+                // triggers, so keep its required fields intact and store the
+                // SaaS-specific display data in its existing JSON text field.
+                $values = [
+                    'company_id' => $companyId,
+                    'action' => (string)$actionType
+                ];
+
+                if ($createdAt !== null && $this->hasColumn('performed_at')) {
+                    $values['performed_at'] = $createdAt;
+                }
+                if ($this->hasColumn('user_id')) {
+                    $values['user_id'] = $adminId ?: null;
+                }
+                if ($this->hasColumn('user_type')) {
+                    $values['user_type'] = $adminId ? 'admin' : 'system';
+                }
+                if ($this->hasColumn('resource_type')) {
+                    $values['resource_type'] = 'saas_activity';
+                }
+                if ($this->hasColumn('resource_name')) {
+                    $values['resource_name'] = mb_substr((string)$actionSummary, 0, 255);
+                }
+                if ($this->hasColumn('new_values')) {
+                    $values['new_values'] = $payload;
+                }
+                if ($this->hasColumn('module')) {
+                    $values['module'] = 'saas_portal';
+                }
+
+                $this->insertAvailableColumns($values);
+            } else {
+                throw new RuntimeException('audit_logs-skjemaet har ikke kjente aktivitetsfelter');
+            }
+
             return true;
         } catch (Exception $e) {
             error_log("ActivityLogger error: " . $e->getMessage());
             return false;
         }
     }
-    
+
     /**
-     * Hjelpe-metode: Logg bedriftshandling
+     * Helper: log a company action.
      */
     public function logCompanyAction($companyId, $companyName, $adminId, $adminName, $action, $details = '') {
         $actorDisplay = "{$companyName}: admin {$adminName}";
         $summary = $action . ($details ? " - {$details}" : '');
-        
-        return $this->log(
-            $companyId,
-            $adminId,
-            $actorDisplay,
-            'company_action',
-            $summary,
-            null,
-            null,
-            30
-        );
+
+        return $this->log($companyId, $adminId, $actorDisplay, 'company_action', $summary);
     }
-    
+
     /**
-     * Hjelpe-metode: Logg salg
+     * Helper: log a sale.
      */
     public function logSale($companyId, $companyName, $adminId, $adminName, $amount, $items) {
         $actorDisplay = "{$companyName}: admin {$adminName}";
         $summary = "solgte {$items} for {$amount} kr";
-        
+
         return $this->log(
             $companyId,
             $adminId,
@@ -130,99 +228,205 @@ class ActivityLogger {
             $summary,
             $amount,
             ['items' => $items],
-            45 // Salg vises litt lengre
+            45
         );
     }
-    
+
     /**
-     * Hjelpe-metode: Logg innlogging
+     * Helper: log a login.
      */
     public function logLogin($companyId, $companyName, $adminId, $adminName) {
         $actorDisplay = "{$companyName}: admin {$adminName}";
-        $summary = "logget inn";
-        
-        return $this->log(
-            $companyId,
-            $adminId,
-            $actorDisplay,
-            'login',
-            $summary,
-            null,
-            null,
-            15 // Innlogging vises kort
-        );
+
+        return $this->log($companyId, $adminId, $actorDisplay, 'login', 'logget inn', null, null, 15);
     }
-    
+
     /**
-     * Hjelpe-metode: Logg ny bedrift opprettet
+     * Helper: log a newly created company.
      */
     public function logCompanyCreated($companyId, $companyName, $saasAdminId = null) {
-        $actorDisplay = "System";
-        $summary = "opprettet ny bedrift: {$companyName}";
-        
         return $this->log(
             $companyId,
             $saasAdminId,
-            $actorDisplay,
+            'System',
             'company_created',
-            $summary,
+            "opprettet ny bedrift: {$companyName}",
             null,
             null,
-            60 // Ny bedrift vises lenger
+            60
         );
     }
-    
+
     /**
-     * Hent aktivitetslogg (nyeste først)
-     * 
-     * @param int $limit Antall logger å hente
-     * @param string|null $since Hent bare logger nyere enn denne timestamp
+     * Read the newest activities and return the common shape expected by the
+     * dashboard regardless of which audit_logs schema version is installed.
      */
     public function getRecentActivity($limit = 50, $since = null) {
         try {
-            $sql = "
-                SELECT 
-                    al.*,
-                    tc.name as company_name,
-                    tc.subdomain,
-                    ta.username as admin_username
+            $limit = max(1, min(1000, (int)$limit));
+            $hasCompany = $this->hasColumn('company_id');
+            $hasAdmin = $this->hasColumn('admin_id');
+            $hasLegacyUser = $this->hasColumn('user_id');
+            $hasNormalized = $this->hasColumns([
+                'action_type',
+                'action_summary',
+                'actor_display',
+                'created_at'
+            ]);
+
+            if (!$hasCompany) {
+                throw new RuntimeException('audit_logs mangler company_id');
+            }
+
+            $selectColumns = ['al.id', 'al.company_id'];
+            $safeActivityColumns = [
+                'actor_display',
+                'action_type',
+                'action_summary',
+                'action',
+                'resource_name',
+                'new_values',
+                'user_email',
+                'user_type',
+                'user_id',
+                'amount',
+                'metadata',
+                'visibility_seconds',
+                'created_at',
+                'performed_at'
+            ];
+            foreach ($safeActivityColumns as $column) {
+                if ($this->hasColumn($column)) {
+                    $selectColumns[] = "al.`{$column}`";
+                }
+            }
+
+            $sql = "SELECT " . implode(', ', $selectColumns) . ",
+                    tc.name AS company_name,
+                    tc.subdomain";
+            if ($hasAdmin || $hasLegacyUser) {
+                $sql .= ", ta.username AS admin_username";
+            } else {
+                $sql .= ", NULL AS admin_username";
+            }
+            $sql .= "
                 FROM audit_logs al
                 LEFT JOIN tenant_companies tc ON al.company_id = tc.id
-                LEFT JOIN tenant_admins ta ON al.admin_id = ta.id
             ";
-            
-            if ($since) {
-                $sql .= " WHERE al.created_at > ?";
+
+            if ($hasAdmin) {
+                $sql .= " LEFT JOIN tenant_admins ta ON al.admin_id = ta.id";
+            } elseif ($hasLegacyUser) {
+                $sql .= " LEFT JOIN tenant_admins ta ON al.user_id = ta.id";
             }
-            
-            $sql .= " ORDER BY al.created_at DESC LIMIT ?";
-            
+
+            $dateColumn = $hasNormalized ? 'created_at' : 'performed_at';
+            if (!$this->hasColumn($dateColumn)) {
+                throw new RuntimeException('audit_logs mangler tidsstempelfelt');
+            }
+
+            if ($since) {
+                $sql .= " WHERE al.`{$dateColumn}` > ?";
+            }
+            $sql .= " ORDER BY al.`{$dateColumn}` DESC LIMIT ?";
+
             $stmt = $this->db->prepare($sql);
-            
             if ($since) {
-                $stmt->execute([$since, $limit]);
+                $stmt->bindValue(1, $since, PDO::PARAM_STR);
+                $stmt->bindValue(2, $limit, PDO::PARAM_INT);
             } else {
-                $stmt->execute([$limit]);
+                $stmt->bindValue(1, $limit, PDO::PARAM_INT);
             }
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->execute();
+            $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($activities as &$activity) {
+                $payload = [];
+                if (!empty($activity['new_values'])) {
+                    $decoded = json_decode($activity['new_values'], true);
+                    if (is_array($decoded)) {
+                        $payload = $decoded;
+                    }
+                }
+
+                if (empty($activity['action_type'])) {
+                    $activity['action_type'] = strtolower((string)($activity['action'] ?? 'activity'));
+                }
+                if (empty($activity['actor_display'])) {
+                    $actorFallback = trim((string)($activity['user_email'] ?? ''));
+                    if ($actorFallback === '') {
+                        if (($activity['user_type'] ?? '') === 'system' || empty($activity['user_id'])) {
+                            $actorFallback = 'System';
+                        } elseif (!empty($activity['admin_username'])) {
+                            $actorFallback = 'Admin ' . $activity['admin_username'];
+                        } else {
+                            $actorFallback = 'Ukjent bruker';
+                        }
+                    }
+                    $activity['actor_display'] = !empty($payload['actor_display'])
+                        ? $payload['actor_display']
+                        : $actorFallback;
+                }
+                if (empty($activity['action_summary'])) {
+                    if (isset($payload['action_summary'])) {
+                        $activity['action_summary'] = $payload['action_summary'];
+                    } else {
+                        $summary = trim((string)($activity['resource_name'] ?? ''));
+                        $actionLabel = str_replace('_', ' ', (string)($activity['action'] ?? 'Aktivitet'));
+                        $activity['action_summary'] = $summary !== ''
+                            ? "{$actionLabel}: {$summary}"
+                            : $actionLabel;
+                    }
+                }
+
+                if (!isset($activity['amount'])) {
+                    $activity['amount'] = $payload['amount'] ?? null;
+                }
+                if (!isset($activity['metadata'])) {
+                    $activity['metadata'] = $payload['metadata'] ?? null;
+                }
+                if (empty($activity['visibility_seconds'])) {
+                    $activity['visibility_seconds'] = $payload['visibility_seconds'] ?? 30;
+                }
+                if (empty($activity['created_at'])) {
+                    $activity['created_at'] = $activity['performed_at'] ?? null;
+                }
+
+                // The legacy schema can contain old/new values, user identifiers,
+                // IP addresses and user agents. They are used for normalization
+                // above where needed, but are not part of the activity API output.
+                unset(
+                    $activity['new_values'],
+                    $activity['user_id'],
+                    $activity['user_type'],
+                    $activity['user_email']
+                );
+            }
+            unset($activity);
+
+            return $activities;
         } catch (Exception $e) {
             error_log("Get activity error: " . $e->getMessage());
-            return [];
+            throw $e;
         }
     }
-    
+
     /**
-     * Rydd opp gamle logger (eldre enn 90 dager)
+     * Remove logs older than the requested retention period.
      */
     public function cleanupOldLogs($daysToKeep = 90) {
         try {
+            $dateColumn = $this->hasColumn('created_at') ? 'created_at' : 'performed_at';
+            if (!$this->hasColumn($dateColumn)) {
+                throw new RuntimeException('audit_logs mangler tidsstempelfelt');
+            }
+            $daysToKeep = max(1, (int)$daysToKeep);
             $stmt = $this->db->prepare("
-                DELETE FROM audit_logs 
-                WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+                DELETE FROM audit_logs
+                WHERE `{$dateColumn}` < DATE_SUB(NOW(), INTERVAL ? DAY)
             ");
             $stmt->execute([$daysToKeep]);
-            
+
             return $stmt->rowCount();
         } catch (Exception $e) {
             error_log("Cleanup logs error: " . $e->getMessage());

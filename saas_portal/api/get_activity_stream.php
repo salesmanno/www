@@ -18,6 +18,7 @@ try {
     
     // Parametere
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+    $limit = max(1, min(1000, $limit));
     $since = $_GET['since'] ?? null; // Timestamp for å hente bare nye logger
     
     // Hent aktivitetslogg
@@ -32,8 +33,12 @@ try {
     
 } catch (Exception $e) {
     error_log("Get activity stream error: " . $e->getMessage());
+    $isDatabaseUnavailable = strpos($e->getMessage(), 'DATABASE TILKOBLINGSFEIL') !== false;
+    http_response_code($isDatabaseUnavailable ? 503 : 500);
     echo json_encode([
         'success' => false,
-        'message' => 'Feil ved henting av aktivitetslogg'
+        'message' => $isDatabaseUnavailable
+            ? 'Databasetilkoblingen er utilgjengelig. Prøv igjen senere.'
+            : 'Kunne ikke hente aktivitetsloggen. Prøv igjen.'
     ]);
 }

@@ -76,19 +76,21 @@ try {
         
         foreach ($timestamps as $timestamp) {
             foreach ($actions as $action) {
-                $stmt = $db->prepare("
-                    INSERT INTO audit_logs 
-                    (id, company_id, admin_id, actor_display, action_type, action_summary, created_at)
-                    VALUES (UUID(), ?, NULL, ?, ?, ?, ?)
-                ");
-                
-                $stmt->execute([
+                $logged = $logger->log(
                     $companyId,
+                    null,
                     $action['display'],
                     $action['type'],
                     $action['summary'],
+                    null,
+                    null,
+                    30,
                     $timestamp
-                ]);
+                );
+
+                if (!$logged) {
+                    throw new RuntimeException('Kunne ikke lagre testaktivitet i audit_logs');
+                }
                 
                 $count++;
             }
