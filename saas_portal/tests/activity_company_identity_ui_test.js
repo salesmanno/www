@@ -10,6 +10,10 @@ const renderer = source.slice(
     source.indexOf('        function safeActivityImageUrl('),
     source.indexOf('        // Last aktive sessions')
 );
+const deleteResponse = source.slice(
+    source.indexOf('        async function parseDeleteCompanyResponse('),
+    source.indexOf('        function deleteCompanyBtn(')
+);
 const filterSetup = source.slice(
     source.indexOf('        const activityTypeLabels = {'),
     source.indexOf('        // Slider for synlighet')
@@ -58,14 +62,14 @@ try {
     expect(optionValues.includes('company_action') && optionValues.includes('login'), 'saved activity types missing from filters');
     expect(!optionValues.includes('staff_deleted'), 'filter offers a type without any events');
     expect(select.options[0].textContent === 'Alle hendelser (5)', 'total event count incorrect');
-    expect(Array.from(select.options).find(option => option.value === 'sale').textContent === 'Salg registrert (1)', 'per-type event count incorrect');
+    expect(Array.from(select.options).find(option => option.value === 'sale').textContent === 'Salg registrert (2)', 'per-type event count incorrect');
     expect(getActivityTypeLabel('custom_action') === 'Custom action', 'unknown type label fallback');
     currentFilter = 'missing_type';
     updateActivityTypeFilter();
     expect(currentFilter === 'all' && select.value === 'all', 'unavailable saved filter was not reset');
     currentFilter = 'sale';
     showActivityHistory();
-    expect(feed.querySelectorAll('.activity-item').length === 1, 'history filter changed');
+    expect(feed.querySelectorAll('.activity-item').length === 2, 'history filter changed');
     currentFilter = 'all';
     const before = feed.querySelectorAll('.activity-item').length;
     activityQueue = [sample];
@@ -77,6 +81,17 @@ try {
     feed.appendChild(createActivityElement({...sample,
         company_name:'VeryLongCompanyName'.repeat(12),subdomain:'longsubdomain'.repeat(12)}));
     expect(document.documentElement.scrollWidth <= window.innerWidth, 'narrow viewport overflows');
+    await parseDeleteCompanyResponse({
+        status:200,ok:true,redirected:false,
+        headers:{get:()=> 'application/json'},
+        text:async()=>'{\"success\":true}'
+    }).then(data => expect(data.success, 'valid deletion JSON rejected'));
+    await parseDeleteCompanyResponse({
+        status:500,ok:false,redirected:false,
+        headers:{get:()=> 'text/html'},
+        text:async()=> '<!DOCTYPE html><html><body>Unexpected page</body></html>'
+    }).then(() => { throw new Error('HTML response was accepted as a deletion result'); },
+        error => expect(/HTTP 500/.test(error.message) && /Oppdater bedriftslisten/.test(error.message), 'non-JSON deletion response unclear'));
     document.body.dataset.result = 'PASS';
 } catch (error) {
     document.body.dataset.result = 'FAIL';
@@ -91,7 +106,8 @@ try {
         </style><select id="eventTypeFilter"><option value="all">Alle hendelser</option></select>
         <button id="activity-tab"></button><div id="activityFeed"></div><script>
         let activityPaused=false,activityQueue=[],visibilitySeconds=30,currentFilter='all',allActivities=[];
-        ${filterSetup}${history}${renderer}${assertions}</script>`);
+        ${filterSetup}${history}${renderer}${deleteResponse}
+        (async () => { ${assertions} })();</script>`);
     for (const width of [390, 1280]) {
         const result = spawnSync('chromium', [
             '--headless', '--no-sandbox', '--disable-gpu', '--no-proxy-server',

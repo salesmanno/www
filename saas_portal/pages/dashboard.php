@@ -723,6 +723,34 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .catch(err => alert('Feil ved oppdatering: ' + err.message));
         }
         
+        async function parseDeleteCompanyResponse(response) {
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                const contentType = response.headers.get('content-type') || 'ukjent innholdstype';
+                console.error('Delete endpoint returned a non-JSON response', {
+                    status: response.status,
+                    contentType,
+                    redirected: response.redirected
+                });
+
+                if (response.status === 401 || response.status === 403 || response.redirected) {
+                    throw new Error('Tilgangen ble avvist eller innloggingen er utløpt. Oppdater siden og logg inn igjen.');
+                }
+                if (response.status === 404) {
+                    throw new Error('Slette-endepunktet ble ikke funnet (HTTP 404). Ingen bekreftelse på sletting ble mottatt.');
+                }
+                throw new Error(`Serveren returnerte ikke et gyldig svar (HTTP ${response.status}). Slettingen kan allerede være utført. Oppdater bedriftslisten før du eventuelt prøver igjen.`);
+            }
+
+            if (!response.ok && data.success !== false) {
+                throw new Error(`Slettekallet feilet (HTTP ${response.status}).`);
+            }
+            return data;
+        }
+
         function deleteCompanyBtn(btn, event) {
             event.stopPropagation();
             const id = btn.getAttribute('data-company-id');
@@ -741,13 +769,13 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({company_id: id})
             })
-            .then(r => r.json())
+            .then(parseDeleteCompanyResponse)
             .then(data => {
                 if (data.success) {
                     loadCompanies();
                     alert(data.message || 'Bedriften er slettet');
                 } else {
-                    alert('Feil: ' + data.message);
+                    throw new Error(data.message || 'Bedriften kunne ikke slettes.');
                 }
             })
             .catch(err => {
