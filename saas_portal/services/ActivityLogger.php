@@ -3,6 +3,7 @@
 class ActivityLogger {
     private $db;
     private $columns = [];
+    private $companyColumns = null;
 
     public function __construct($db) {
         $this->db = $db;
@@ -70,6 +71,14 @@ class ActivityLogger {
 
     private function hasColumn($name) {
         return isset($this->columns[strtolower($name)]);
+    }
+
+    private function hasCompanyLogoColumn() {
+        if ($this->companyColumns === null) {
+            $this->companyColumns = $this->db->query('SHOW COLUMNS FROM tenant_companies')
+                ->fetchAll(PDO::FETCH_COLUMN);
+        }
+        return in_array('logo_url', $this->companyColumns, true);
     }
 
     private function hasColumns(array $names) {
@@ -304,6 +313,9 @@ class ActivityLogger {
             $sql = "SELECT " . implode(', ', $selectColumns) . ",
                     tc.name AS company_name,
                     tc.subdomain";
+            $sql .= $this->hasCompanyLogoColumn()
+                ? ", tc.logo_url AS company_logo_url"
+                : ", NULL AS company_logo_url";
             if ($hasAdmin || $hasLegacyUser) {
                 $sql .= ", ta.username AS admin_username";
             } else {
@@ -385,6 +397,26 @@ class ActivityLogger {
                 if (!isset($activity['metadata'])) {
                     $activity['metadata'] = $payload['metadata'] ?? null;
                 }
+                // PDO returns JSON metadata as text in the normalized layout;
+                // legacy SaaS events keep the same snapshot inside new_values.
+                $snapshot = $activity['metadata'];
+                if (is_string($snapshot)) {
+                    $snapshot = json_decode($snapshot, true);
+                }
+                if (!is_array($snapshot)) {
+                    $snapshot = [];
+                }
+                // Only use deletion snapshots when there is no joined company.
+                // An active company's intentionally cleared logo stays cleared.
+                if ($activity['company_name'] === null) {
+                    foreach (['company_name', 'subdomain', 'company_logo_url'] as $field) {
+                        $value = $snapshot[$field] ?? null;
+                        $activity[$field] = is_string($value) ? $value : null;
+                    }
+                }
+                $activity['company_domain'] = !empty($activity['subdomain'])
+                    ? $activity['subdomain'] . '.salesman.no'
+                    : null;
                 if (empty($activity['visibility_seconds'])) {
                     $activity['visibility_seconds'] = $payload['visibility_seconds'] ?? 30;
                 }

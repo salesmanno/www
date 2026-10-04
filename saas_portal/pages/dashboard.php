@@ -183,12 +183,55 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         .activity-icon {
             width: 40px;
             height: 40px;
+            flex: 0 0 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-right: 1rem;
             font-size: 1.2rem;
+        }
+
+        .activity-company {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            margin-top: 0.45rem;
+            min-width: 0;
+            color: #334155;
+            font-size: 0.875rem;
+        }
+
+        .activity-company-logo {
+            width: 30px;
+            height: 30px;
+            flex: 0 0 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 7px;
+            background: #fff;
+            color: #64748b;
+        }
+
+        .activity-company-logo img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .activity-company-name {
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }
+
+        .activity-company-domain {
+            color: #64748b;
+            overflow-wrap: anywhere;
         }
         
         .session-company {
@@ -300,14 +343,6 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                         <label class="form-label mb-1 small fw-bold" style="color: #1f2937;">Hendelsestype</label>
                                         <select class="form-select form-select-sm" id="eventTypeFilter" onchange="filterActivities()" style="border: 1px solid #d1d5db;">
                                             <option value="all">Alle hendelser</option>
-                                            <option value="company_created">Bedrift opprettet</option>
-                                            <option value="company_updated">Bedrift oppdatert</option>
-                                            <option value="company_deleted">Bedrift slettet</option>
-                                            <option value="admin_created">Administrator opprettet</option>
-                                            <option value="admin_deleted">Administrator slettet</option>
-                                            <option value="admin_modules_updated">Moduler oppdatert</option>
-                                            <option value="staff_created">Ansatt opprettet</option>
-                                            <option value="staff_deleted">Ansatt slettet</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6">
@@ -317,7 +352,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                                 </div>
                             </div>
                             <div class="card-body" style="height: 600px; overflow-y: auto; background: #ffffff;" id="activityFeed">
-                                <div class="text-center text-muted py-3">Laster aktivitetslogg...</div>
+                                <div class="text-center text-muted py-3 activity-loading">Laster aktivitetslogg...</div>
                             </div>
                         </div>
                     </div>
@@ -737,6 +772,65 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         let currentFilter = 'all';
         let allActivities = [];
         
+        const activityTypeLabels = {
+            company_created: 'Bedrift opprettet',
+            company_updated: 'Bedrift oppdatert',
+            company_deleted: 'Bedrift slettet',
+            company_action: 'Bedriftshendelse',
+            admin_created: 'Administrator opprettet',
+            admin_deleted: 'Administrator slettet',
+            admin_modules_updated: 'Administratorens moduler oppdatert',
+            staff_created: 'Ansatt opprettet',
+            staff_deleted: 'Ansatt slettet',
+            sale: 'Salg registrert',
+            login: 'Innlogging',
+            activity: 'Annen aktivitet'
+        };
+
+        function getActivityTypeLabel(type) {
+            if (activityTypeLabels[type]) return activityTypeLabels[type];
+            return String(type || 'activity')
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .replace(/^\p{L}/u, letter => letter.toLocaleUpperCase('no-NO')) || 'Annen aktivitet';
+        }
+
+        function updateActivityTypeFilter() {
+            const select = document.getElementById('eventTypeFilter');
+            const counts = new Map();
+            allActivities.forEach(activity => {
+                const type = String(activity.action_type || 'activity');
+                counts.set(type, (counts.get(type) || 0) + 1);
+            });
+
+            const previousFilter = currentFilter;
+            select.replaceChildren(new Option(`Alle hendelser (${allActivities.length})`, 'all'));
+
+            const knownOrder = Object.keys(activityTypeLabels);
+            const types = Array.from(counts.keys()).sort((a, b) => {
+                const aIndex = knownOrder.indexOf(a);
+                const bIndex = knownOrder.indexOf(b);
+                if (aIndex !== -1 || bIndex !== -1) {
+                    if (aIndex === -1) return 1;
+                    if (bIndex === -1) return -1;
+                    return aIndex - bIndex;
+                }
+                return getActivityTypeLabel(a).localeCompare(getActivityTypeLabel(b), 'no');
+            });
+
+            types.forEach(type => {
+                select.add(new Option(`${getActivityTypeLabel(type)} (${counts.get(type)})`, type));
+            });
+
+            if (previousFilter !== 'all' && counts.has(previousFilter)) {
+                currentFilter = previousFilter;
+            } else {
+                currentFilter = 'all';
+            }
+            select.value = currentFilter;
+        }
+
         // Slider for synlighet
         document.getElementById('visibilitySlider')?.addEventListener('input', function(e) {
             visibilitySeconds = parseInt(e.target.value);
@@ -762,7 +856,26 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 : allActivities.filter(a => a.action_type === currentFilter);
             
             if (filtered.length === 0) {
-                feed.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-info-circle me-2"></i>Ingen aktiviteter av denne typen</div>';
+                const emptyState = document.createElement('div');
+                emptyState.className = 'text-center text-muted py-3';
+                const message = document.createElement('div');
+                message.textContent = currentFilter === 'all'
+                    ? 'Ingen hendelser er registrert ennå.'
+                    : 'Ingen hendelser samsvarer med valgt filter.';
+                emptyState.appendChild(message);
+                if (currentFilter !== 'all') {
+                    const resetButton = document.createElement('button');
+                    resetButton.type = 'button';
+                    resetButton.className = 'btn btn-sm btn-outline-secondary mt-2';
+                    resetButton.textContent = 'Vis alle hendelser';
+                    resetButton.addEventListener('click', function() {
+                        currentFilter = 'all';
+                        document.getElementById('eventTypeFilter').value = 'all';
+                        showActivityHistory();
+                    });
+                    emptyState.appendChild(resetButton);
+                }
+                feed.replaceChildren(emptyState);
                 return;
             }
             
@@ -797,7 +910,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             });
 
             const feed = document.getElementById('activityFeed');
-            feed.innerHTML = '<div class="text-center text-muted py-3">Laster aktivitetslogg...</div>';
+            feed.innerHTML = '<div class="text-center text-muted py-3 activity-loading">Laster aktivitetslogg...</div>';
 
             fetch(`/saas_portal/api/get_activity_stream.php?${params}`)
             .then(async response => {
@@ -810,6 +923,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(data => {
                 allActivities = Array.isArray(data.activities) ? data.activities.slice().reverse() : [];
                 lastActivityTimestamp = data.timestamp || null;
+                updateActivityTypeFilter();
                 showActivityHistory();
             })
             .catch(err => {
@@ -826,77 +940,143 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             });
         }
         
-        // Render aktivitets-element (gjenbrukbar funksjon)
-        function renderActivityItem(activity, container) {
+        function safeActivityImageUrl(value) {
+            if (typeof value !== 'string') return '';
+            const imageUrl = value.trim();
+            if (!imageUrl || /[\u0000-\u001f\u007f\\]/.test(imageUrl)) return '';
+            if (/^[a-z][a-z0-9+.-]*:/i.test(imageUrl) && !/^https?:\/\//i.test(imageUrl)) return '';
+
+            try {
+                const parsedUrl = new URL(imageUrl, document.baseURI);
+                if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') return '';
+                return imageUrl;
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function getActivityIcon(actionType) {
+            const icons = {
+                company_created: ['bi-building-add', '#28a745'],
+                company_updated: ['bi-building-gear', '#17a2b8'],
+                company_deleted: ['bi-building-x', '#dc3545'],
+                admin_created: ['bi-person-plus', '#28a745'],
+                admin_deleted: ['bi-person-x', '#dc3545'],
+                admin_modules_updated: ['bi-gear', '#ffc107'],
+                staff_created: ['bi-person-badge', '#28a745'],
+                staff_deleted: ['bi-person-dash', '#dc3545'],
+                sale: ['bi-cart-check', '#007bff'],
+                login: ['bi-box-arrow-in-right', '#17a2b8']
+            };
+            return icons[actionType] || ['bi-circle', '#6c757d'];
+        }
+
+        function createActivityElement(activity) {
             const activityEl = document.createElement('div');
             activityEl.className = 'alert alert-light border mb-2 activity-item';
-            activityEl.setAttribute('data-action-type', activity.action_type);
-            
-            // Velg ikon basert på type
-            let icon = 'bi-circle';
-            let iconColor = '#6c757d';
-            
-            switch(activity.action_type) {
-                case 'company_created':
-                    icon = 'bi-building-add';
-                    iconColor = '#28a745';
-                    break;
-                case 'company_updated':
-                    icon = 'bi-building-gear';
-                    iconColor = '#17a2b8';
-                    break;
-                case 'company_deleted':
-                    icon = 'bi-building-x';
-                    iconColor = '#dc3545';
-                    break;
-                case 'admin_created':
-                    icon = 'bi-person-plus';
-                    iconColor = '#28a745';
-                    break;
-                case 'admin_deleted':
-                    icon = 'bi-person-x';
-                    iconColor = '#dc3545';
-                    break;
-                case 'admin_modules_updated':
-                    icon = 'bi-gear';
-                    iconColor = '#ffc107';
-                    break;
-                case 'staff_created':
-                    icon = 'bi-person-badge';
-                    iconColor = '#28a745';
-                    break;
-                case 'staff_deleted':
-                    icon = 'bi-person-dash';
-                    iconColor = '#dc3545';
-                    break;
-                case 'sale':
-                    icon = 'bi-cart-check';
-                    iconColor = '#007bff';
-                    break;
-                case 'login':
-                    icon = 'bi-box-arrow-in-right';
-                    iconColor = '#17a2b8';
-                    break;
+            activityEl.setAttribute('data-action-type', String(activity.action_type || ''));
+
+            const [icon, iconColor] = getActivityIcon(activity.action_type);
+            const row = document.createElement('div');
+            row.className = 'd-flex align-items-start';
+
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'activity-icon';
+            iconWrap.style.backgroundColor = `${iconColor}15`;
+            iconWrap.style.color = iconColor;
+            const iconElement = document.createElement('i');
+            iconElement.className = `bi ${icon}`;
+            iconWrap.appendChild(iconElement);
+
+            const content = document.createElement('div');
+            content.className = 'flex-grow-1';
+            content.style.minWidth = '0';
+
+            const actor = document.createElement('div');
+            actor.style.color = '#1f2937';
+            actor.style.fontWeight = '600';
+            actor.textContent = activity.actor_display || '';
+
+            const summary = document.createElement('div');
+            summary.className = 'text-muted';
+            summary.style.fontSize = '0.95rem';
+            summary.appendChild(document.createTextNode(activity.action_summary || ''));
+            if (activity.amount) {
+                summary.appendChild(document.createTextNode(' '));
+                const amount = document.createElement('strong');
+                amount.textContent = `${activity.amount} kr`;
+                summary.appendChild(amount);
             }
-            
-            const amountDisplay = activity.amount ? ` <strong>${activity.amount} kr</strong>` : '';
-            
-            activityEl.innerHTML = `
-                <div class="d-flex align-items-start">
-                    <div class="activity-icon" style="background: ${iconColor}15; color: ${iconColor};">
-                        <i class="bi ${icon}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <div style="color: #1f2937; font-weight: 600;">${escapeHtml(activity.actor_display)}</div>
-                        <div class="text-muted" style="font-size: 0.95rem;">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
-                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.25rem;">
-                            <i class="bi bi-clock"></i> ${new Date(activity.created_at).toLocaleString('no-NO')}
-                        </div>
-                    </div>
-                </div>
-            `;
-            
+
+            const companyName = typeof activity.company_name === 'string' ? activity.company_name.trim() : '';
+            const subdomainValue = typeof activity.subdomain === 'string' ? activity.subdomain.trim() : '';
+            const companyDomain = typeof activity.company_domain === 'string' ? activity.company_domain.trim() : '';
+            const displayedDomain = companyDomain || (subdomainValue ? `${subdomainValue}.salesman.no` : '');
+            const companyLogoUrl = safeActivityImageUrl(activity.company_logo_url);
+            if (companyName || displayedDomain || companyLogoUrl) {
+                const company = document.createElement('div');
+                company.className = 'activity-company';
+
+                const logo = document.createElement('span');
+                logo.className = 'activity-company-logo';
+                const fallbackIcon = document.createElement('i');
+                fallbackIcon.className = 'bi bi-building';
+                fallbackIcon.setAttribute('aria-hidden', 'true');
+                logo.appendChild(fallbackIcon);
+
+                if (companyLogoUrl) {
+                    const image = document.createElement('img');
+                    image.alt = companyName ? `Logo for ${companyName}` : 'Bedriftslogo';
+                    image.loading = 'lazy';
+                    image.referrerPolicy = 'no-referrer';
+                    fallbackIcon.hidden = true;
+                    image.addEventListener('error', function() {
+                        image.remove();
+                        fallbackIcon.hidden = false;
+                    }, { once: true });
+                    image.src = companyLogoUrl;
+                    logo.appendChild(image);
+                }
+
+                company.appendChild(logo);
+                if (companyName) {
+                    const name = document.createElement('span');
+                    name.className = 'activity-company-name';
+                    name.textContent = companyName;
+                    company.appendChild(name);
+                }
+                if (displayedDomain) {
+                    const domain = document.createElement('span');
+                    domain.className = 'activity-company-domain';
+                    domain.textContent = displayedDomain;
+                    company.appendChild(domain);
+                }
+                content.appendChild(company);
+            }
+
+            const timestamp = document.createElement('div');
+            timestamp.className = 'text-muted';
+            timestamp.style.fontSize = '0.8rem';
+            timestamp.style.marginTop = '0.25rem';
+            const clock = document.createElement('i');
+            clock.className = 'bi bi-clock';
+            clock.setAttribute('aria-hidden', 'true');
+            timestamp.appendChild(clock);
+            timestamp.appendChild(document.createTextNode(` ${new Date(activity.created_at).toLocaleString('no-NO')}`));
+
+            content.prepend(actor);
+            content.appendChild(summary);
+            content.appendChild(timestamp);
+            row.append(iconWrap, content);
+            activityEl.appendChild(row);
+            return activityEl;
+        }
+
+        // Historikk og live-kø bruker samme rendereren for lik identitetsvisning.
+        function renderActivityItem(activity, container) {
+            const activityEl = createActivityElement(activity);
             container.appendChild(activityEl);
+            return activityEl;
         }
         
         // Vis neste aktivitet fra køen
@@ -915,81 +1095,13 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             
             const feed = document.getElementById('activityFeed');
             
-            // Fjern "Laster..."-melding ved første aktivitet
-            if (feed.querySelector('.text-muted')) {
-                feed.innerHTML = '';
-            }
-            
-            // Opprett aktivitets-element
-            const activityEl = document.createElement('div');
-            activityEl.className = 'alert alert-light border mb-2 activity-item';
+            // Fjern bare den eksplisitte lasteplassen, ikke dempet tekst i en aktivitetsrad.
+            const loadingPlaceholder = feed.querySelector('.activity-loading');
+            if (loadingPlaceholder) loadingPlaceholder.remove();
+
+            const activityEl = createActivityElement(activity);
             activityEl.style.opacity = '0';
             activityEl.style.transition = 'opacity 0.3s ease';
-            activityEl.setAttribute('data-action-type', activity.action_type);
-            
-            // Velg ikon basert på type
-            let icon = 'bi-circle';
-            let iconColor = '#6c757d';
-            
-            switch(activity.action_type) {
-                case 'company_created':
-                    icon = 'bi-building-add';
-                    iconColor = '#28a745';
-                    break;
-                case 'company_updated':
-                    icon = 'bi-building-gear';
-                    iconColor = '#17a2b8';
-                    break;
-                case 'company_deleted':
-                    icon = 'bi-building-x';
-                    iconColor = '#dc3545';
-                    break;
-                case 'admin_created':
-                    icon = 'bi-person-plus';
-                    iconColor = '#28a745';
-                    break;
-                case 'admin_deleted':
-                    icon = 'bi-person-x';
-                    iconColor = '#dc3545';
-                    break;
-                case 'admin_modules_updated':
-                    icon = 'bi-gear';
-                    iconColor = '#ffc107';
-                    break;
-                case 'staff_created':
-                    icon = 'bi-person-badge';
-                    iconColor = '#28a745';
-                    break;
-                case 'staff_deleted':
-                    icon = 'bi-person-dash';
-                    iconColor = '#dc3545';
-                    break;
-                case 'sale':
-                    icon = 'bi-cart-check';
-                    iconColor = '#007bff';
-                    break;
-                case 'login':
-                    icon = 'bi-box-arrow-in-right';
-                    iconColor = '#17a2b8';
-                    break;
-            }
-            
-            const amountDisplay = activity.amount ? ` <strong>${activity.amount} kr</strong>` : '';
-            
-            activityEl.innerHTML = `
-                <div class="d-flex align-items-start">
-                    <div class="activity-icon" style="background: ${iconColor}15; color: ${iconColor};">
-                        <i class="bi ${icon}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <div style="color: #1f2937; font-weight: 600;">${escapeHtml(activity.actor_display)}</div>
-                        <div class="text-muted" style="font-size: 0.95rem;">${escapeHtml(activity.action_summary)}${amountDisplay}</div>
-                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.25rem;">
-                            <i class="bi bi-clock"></i> ${new Date(activity.created_at).toLocaleString('no-NO')}
-                        </div>
-                    </div>
-                </div>
-            `;
             
             // Legg til øverst
             feed.insertBefore(activityEl, feed.firstChild);

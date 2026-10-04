@@ -16,7 +16,7 @@ class CompanyDeletionService {
     }
 
     /**
-     * Returns the deleted company's former name and subdomain, or null if it
+     * Returns the deleted company's former identity, or null if it
      * did not exist. Any error rolls the whole delete back.
      */
     public function delete($companyId) {
@@ -39,8 +39,14 @@ class CompanyDeletionService {
         $this->db->exec('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
         $this->db->beginTransaction();
         try {
+            // Older installations may not have the optional company logo field.
+            $companyColumns = $this->db->query('SHOW COLUMNS FROM tenant_companies')
+                ->fetchAll(PDO::FETCH_COLUMN);
+            $logoColumn = in_array('logo_url', $companyColumns, true)
+                ? 'logo_url'
+                : 'NULL AS logo_url';
             $companyStmt = $this->db->prepare(
-                'SELECT id, name, subdomain FROM tenant_companies WHERE id = ? FOR UPDATE'
+                "SELECT id, name, subdomain, {$logoColumn} FROM tenant_companies WHERE id = ? FOR UPDATE"
             );
             $companyStmt->execute([$companyId]);
             $company = $companyStmt->fetch(PDO::FETCH_ASSOC);

@@ -58,6 +58,7 @@ try {
                 'deleted_company_id' => $company_id,
                 'company_name' => $companyInfo['name'],
                 'subdomain' => $companyInfo['subdomain'],
+                'company_logo_url' => $companyInfo['logo_url'] ?? null,
                 'saas_admin_id' => $_SESSION['saas_admin_id']
             ],
             60
