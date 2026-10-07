@@ -13,6 +13,12 @@ header('Content-Type: application/json');
 
 try {
     $db = getDBConnection();
+    $companyId = $_GET['company_id'] ?? null;
+    if ($companyId !== null && (!is_string($companyId) || $companyId === '' || strlen($companyId) > 36)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Ugyldig bedrift.']);
+        exit;
+    }
     
     // Hent aktive sessions (aktive siste 30 minutter)
     $stmt = $db->prepare("
@@ -35,10 +41,11 @@ try {
         WHERE tas.is_active = 1 
           AND tas.logout_at IS NULL
           AND tas.last_activity > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+          " . ($companyId !== null ? 'AND ta.company_id = ?' : '') . "
         ORDER BY tas.last_activity DESC
     ");
     
-    $stmt->execute();
+    $stmt->execute($companyId !== null ? [$companyId] : []);
     $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Grupper per bedrift
@@ -57,6 +64,7 @@ try {
         
         $byCompany[$companyId]['active_users']++;
         $byCompany[$companyId]['users'][] = [
+            'session_id' => $session['session_id'],
             'admin_id' => $session['tenant_admin_id'],
             'username' => $session['username'],
             'name' => $session['admin_name'],

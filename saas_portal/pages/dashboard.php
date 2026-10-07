@@ -7,6 +7,9 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+if (empty($_SESSION['portal_csrf'])) {
+    $_SESSION['portal_csrf'] = bin2hex(random_bytes(32));
+}
 
 $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
 ?>
@@ -255,6 +258,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             margin-bottom: 0.3rem;
         }
     </style>
+    <link href="/saas_portal/assets/portal-workspace.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
@@ -263,9 +267,6 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 <i class="bi bi-building-gear me-2"></i>SaaS Admin Portal
             </a>
             <div class="ms-auto d-flex align-items-center gap-2">
-                <a href="/saas_portal/setup.php" class="btn btn-outline-light btn-sm" title="Database Setup">
-                    <i class="bi bi-hammer"></i> Setup
-                </a>
                 <span class="text-white me-2">
                     <i class="bi bi-person-circle me-2"></i><?= htmlspecialchars($admin_name) ?>
                 </span>
@@ -277,87 +278,30 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     </nav>
     
     <div class="container mt-4">
-        <!-- Tab Navigation -->
-        <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="companies-tab" data-bs-toggle="tab" data-bs-target="#companies" type="button" style="color: #1f2937 !important; font-weight: 600;">
-                    <i class="bi bi-building"></i> Bedrifter
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" style="color: #1f2937 !important; font-weight: 600;">
-                    <i class="bi bi-activity"></i> All aktivitet
-                </button>
-            </li>
-        </ul>
-        
-        <div class="tab-content" id="dashboardTabContent">
-            <!-- Bedrifter Tab -->
-            <div class="tab-pane fade show active" id="companies" role="tabpanel">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>Bedriftsadministrasjon</h2>
-                    <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal">
-                        <i class="bi bi-plus-circle me-2"></i>Opprett ny bedrift
-                    </button>
-                </div>
-                
-                <div id="companiesList" class="loading">
-                    <i class="bi bi-hourglass-split"></i> Laster bedrifter...
-                </div>
+        <div class="workspace-heading">
+            <div><div class="workspace-eyebrow">Administrasjon / oversikt</div><h2>Bedrifter</h2></div>
+            <div class="workspace-actions">
+                <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i> Opprett ny bedrift</button>
+                <button type="button" class="btn btn-outline-primary" id="grantModeButton">Tildel moduler</button>
+                <button type="button" class="btn btn-primary-custom" id="grantConfirmButton" hidden disabled>Velg moduler (0)</button>
             </div>
-            
-            <!-- All aktivitet Tab -->
-            <div class="tab-pane fade" id="activity" role="tabpanel">
-                <div class="row">
-                    <!-- Aktive brukere panel -->
-                    <div class="col-md-4 mb-4">
-                        <div class="card">
-                            <div class="card-header bg-light">
-                                <h5 class="mb-0"><i class="bi bi-people"></i> Aktive brukere</h5>
-                            </div>
-                            <div class="card-body" id="activeSessionsPanel" style="max-height: 500px; overflow-y: auto;">
-                                <div class="text-center text-muted py-3">Laster...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Aktivitetslogg panel -->
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header" style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 2px solid #e5e7eb;">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0" style="color: #1f2937; font-weight: 700;">
-                                        <i class="bi bi-clock-history text-danger"></i> Aktivitetslogg
-                                    </h5>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button class="btn btn-sm btn-success" id="showHistoryBtn" onclick="showActivityHistory()">
-                                            <i class="bi bi-list-ul"></i> Vis siste aktivitet
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary" id="pauseBtn" onclick="togglePause()">
-                                            <i class="bi bi-pause"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label class="form-label mb-1 small fw-bold" style="color: #1f2937;">Hendelsestype</label>
-                                        <select class="form-select form-select-sm" id="eventTypeFilter" onchange="filterActivities()" style="border: 1px solid #d1d5db;">
-                                            <option value="all">Alle hendelser</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label mb-1 small fw-bold" style="color: #1f2937;">Visning: <span id="visibilityValue">30</span> sekunder</label>
-                                        <input type="range" class="form-range" id="visibilitySlider" min="5" max="120" value="30">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-body" style="height: 600px; overflow-y: auto; background: #ffffff;" id="activityFeed">
-                                <div class="text-center text-muted py-3 activity-loading">Laster aktivitetslogg...</div>
-                            </div>
-                        </div>
-                    </div>
+        </div>
+        <div id="companyStatus" role="status" aria-live="polite"></div>
+        <div id="companiesList"><div class="portal-skeleton" aria-label="Laster bedrifter"></div></div>
+        <div class="dashboard-bottom">
+            <section class="portal-panel">
+                <div class="portal-panel-title"><h3><i class="bi bi-clock-history me-2"></i>Samlet aktivitet</h3><div class="workspace-actions"><button type="button" id="pauseBtn" class="btn btn-sm btn-outline-secondary" onclick="togglePause()" aria-label="Pause automatisk oppdatering" aria-pressed="false">Pause</button><button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadActivityStream()">Oppdater</button></div></div>
+                <div class="activity-filters">
+                    <div><label for="eventTypeFilter" class="form-label small">Hendelsestype</label><select id="eventTypeFilter" class="form-select form-select-sm" onchange="filterActivities()"><option value="all">Alle hendelser</option></select></div>
+                    <div><label for="activitySearch" class="form-label small">Søk i aktivitet</label><input id="activitySearch" type="search" class="form-control form-control-sm" placeholder="Bedrift, bruker eller hendelse"></div>
                 </div>
-            </div>
+                <div id="activityFeed" class="activity-scroll"><div class="portal-skeleton" aria-label="Laster aktivitet"></div></div>
+            </section>
+            <section class="portal-panel">
+                <div class="portal-panel-title"><h3><i class="bi bi-people me-2"></i>Aktive økter</h3><button type="button" id="sessionRefreshButton" class="btn btn-sm btn-outline-secondary">Oppdater</button></div>
+                <div id="sessionStatus" role="status"></div>
+                <div id="activeSessionsPanel" class="activity-scroll"><div class="portal-skeleton" aria-label="Laster økter"></div></div>
+            </section>
         </div>
     </div>
     
@@ -472,8 +416,18 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         </div>
     </div>
     
+    <div class="modal fade" id="companyGrantModal" tabindex="-1" aria-labelledby="companyGrantTitle">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="companyGrantTitle">Tildel moduler til valgte bedrifter</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
+            <div class="modal-body"><p id="companyGrantSummary" class="text-muted"></p><div id="companyGrantStatus" role="status"></div><div id="companyGrantModules"></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled>Bekreft tildeling</button></div>
+        </div></div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/saas_portal/assets/portal-workspace.js"></script>
+    <script src="/saas_portal/assets/dashboard-workspace.js"></script>
     <script>
+        const portalCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         // Global references for auto-fill functionality
         let emailInput, subdomainInput;
         let lastAutoSubdomain = '';
@@ -481,7 +435,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         
         window.addEventListener('DOMContentLoaded', function() {
             loadCompanies();
-            setInterval(loadCompanies, 3000);
+            setInterval(() => { if (!document.hidden) loadCompanies(); }, 30000);
             
             // Auto-utfylling av epost og subdomain basert på firmanavn
             const nameInput = document.getElementById('create_name');
@@ -547,59 +501,20 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 if (data.success) {
                     renderCompanies(data.companies);
                 } else {
-                    console.error('Failed to load companies:', data.message);
+                    if (!portalCompanies.length) document.getElementById('companiesList').replaceChildren();
+                    portalFailure('companyStatus', data.message || 'Kunne ikke laste bedriftene.', loadCompanies);
                 }
             })
             .catch(err => {
                 console.error('Load companies error:', err);
-                document.getElementById('companiesList').innerHTML = '<div class="alert alert-danger">Feil ved lasting av bedrifter</div>';
+                if (!portalCompanies.length) document.getElementById('companiesList').replaceChildren();
+                portalFailure('companyStatus', 'Feil ved lasting av bedrifter. Prøv igjen.', loadCompanies);
             });
         }
         
         function renderCompanies(companies) {
-            const container = document.getElementById('companiesList');
-            
-            if (!companies || companies.length === 0) {
-                container.innerHTML = '<div class="text-center text-muted py-5">Ingen bedrifter registrert</div>';
-                return;
-            }
-            
-            container.innerHTML = companies.map(company => {
-                const companyNameEscaped = escapeHtml(company.name);
-                
-                return `
-                <div class="company-card" onclick="viewCompany('${company.id}')">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h4>${companyNameEscaped}</h4>
-                            <div class="subdomain">${escapeHtml(company.subdomain)}</div>
-                            <div class="company-stats">
-                                <span class="stat-item">
-                                    <i class="bi bi-people"></i>${company.admin_count || 0} admins
-                                </span>
-                                <span class="stat-item">
-                                    <i class="bi bi-person-badge"></i>${company.staff_count || 0} ansatte
-                                </span>
-                                <span class="stat-item">
-                                    <i class="bi bi-grid"></i>${company.module_count || 0} moduler
-                                </span>
-                            </div>
-                        </div>
-                        <span class="status-badge ${company.is_active == 1 ? 'status-active' : 'status-inactive'}">
-                            ${company.is_active == 1 ? 'Aktiv' : 'Inaktiv'}
-                        </span>
-                    </div>
-                    <div class="company-actions" onclick="event.stopPropagation()">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editCompany('${company.id}', event)">
-                            <i class="bi bi-pencil"></i> Rediger
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" data-company-id="${company.id}" data-company-name="${companyNameEscaped}" onclick="deleteCompanyBtn(this, event)">
-                            <i class="bi bi-trash"></i> Slett
-                        </button>
-                    </div>
-                </div>
-                `;
-            }).join('');
+            document.getElementById('companyStatus').replaceChildren();
+            portalRenderCompanies(companies || []);
         }
         
         function escapeHtml(text) {
@@ -618,7 +533,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             
             const btn = document.getElementById('fetchOrgBtn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Henter...';
+            btn.textContent = 'Henter…';
             
             fetch('/saas_portal/api/fetch_orgdata.php?org_number=' + encodeURIComponent(orgNumber))
             .then(r => r.json())
@@ -665,6 +580,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         
         function createCompany() {
             const form = document.getElementById('createCompanyForm');
+            if (!form.reportValidity()) return;
             const formData = new FormData(form);
             
             fetch('/saas_portal/api/create_company.php', {
@@ -676,6 +592,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('createCompanyModal')).hide();
                     form.reset();
+                    loadCompanies();
                     console.log('Company created successfully');
                 } else {
                     alert('Feil: ' + data.message);
@@ -715,6 +632,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             .then(data => {
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('editCompanyModal')).hide();
+                    loadCompanies();
                     console.log('Company updated successfully');
                 } else {
                     alert('Feil: ' + data.message);
@@ -767,7 +685,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             fetch('/saas_portal/api/delete_company.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({company_id: id})
+                body: JSON.stringify({company_id: id, csrf_token: portalCsrf})
             })
             .then(parseDeleteCompanyResponse)
             .then(data => {
@@ -785,7 +703,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         }
         
         function viewCompany(id) {
-            window.location.href = '/saas_portal/pages/company_details.php?id=' + id;
+            window.location.href = '/saas_portal/pages/company_details.php?id=' + encodeURIComponent(id);
         }
         
         // ============================================
@@ -836,6 +754,8 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             select.replaceChildren(new Option(`Alle hendelser (${allActivities.length})`, 'all'));
 
             const knownOrder = Object.keys(activityTypeLabels);
+            const persistedTypes = typeof portalActivityTypes === 'undefined' ? [] : portalActivityTypes;
+            persistedTypes.forEach(type => { if (!counts.has(type)) counts.set(type, 0); });
             const types = Array.from(counts.keys()).sort((a, b) => {
                 const aIndex = knownOrder.indexOf(a);
                 const bIndex = knownOrder.indexOf(b);
@@ -868,7 +788,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         // Filter aktiviteter
         function filterActivities() {
             currentFilter = document.getElementById('eventTypeFilter').value;
-            showActivityHistory(); // Vis historikk når filter endres
+            loadActivityStream();
         }
         
         // Vis siste aktivitet (historikk)
@@ -879,9 +799,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             feed.innerHTML = '';
             
             // Filtrer aktiviteter
-            const filtered = currentFilter === 'all' 
+            const typeFiltered = currentFilter === 'all'
                 ? allActivities 
                 : allActivities.filter(a => a.action_type === currentFilter);
+            const searchInput = document.getElementById('activitySearch');
+            const query = searchInput ? searchInput.value.trim().toLocaleLowerCase('no') : '';
+            const filtered = typeFiltered.filter(a => !query || [a.actor_display, a.action_summary, a.company_name, a.action_type].join(' ').toLocaleLowerCase('no').includes(query));
             
             if (filtered.length === 0) {
                 const emptyState = document.createElement('div');
@@ -913,22 +836,14 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             });
         }
         
-        // Last aktivitetshistorikk når "All aktivitet"-fanen åpnes
-        document.getElementById('activity-tab').addEventListener('shown.bs.tab', function () {
-            loadActivityStream();
-        });
+        // Last aktivitetshistorikk: activity and sessions are always visible; no tab-driven pollers.
         
         // Toggle pause
         function togglePause() {
             activityPaused = !activityPaused;
             const btn = document.getElementById('pauseBtn');
-            if (activityPaused) {
-                btn.innerHTML = '<i class="bi bi-play"></i>';
-                btn.classList.add('btn-success');
-            } else {
-                btn.innerHTML = '<i class="bi bi-pause"></i>';
-                btn.classList.remove('btn-success');
-            }
+            btn.textContent = activityPaused ? 'Fortsett' : 'Pause';
+            btn.setAttribute('aria-pressed', String(activityPaused));
         }
         
         // Last all aktivitetslogg fra starten
@@ -936,9 +851,11 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             const params = new URLSearchParams({
                 limit: 1000  // Hent mange flere aktiviteter
             });
+            if (currentFilter !== 'all') params.set('action_type', currentFilter);
 
             const feed = document.getElementById('activityFeed');
-            feed.innerHTML = '<div class="text-center text-muted py-3 activity-loading">Laster aktivitetslogg...</div>';
+            const requestId = ++portalActivityRequest;
+            feed.setAttribute('aria-busy', 'true');
 
             fetch(`/saas_portal/api/get_activity_stream.php?${params}`)
             .then(async response => {
@@ -949,12 +866,15 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 return data;
             })
             .then(data => {
-                allActivities = Array.isArray(data.activities) ? data.activities.slice().reverse() : [];
+                if (requestId !== portalActivityRequest) return;
+                portalActivityTypes = Array.isArray(data.action_types) ? data.action_types : [];
+                allActivities = Array.isArray(data.activities) ? data.activities.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
                 lastActivityTimestamp = data.timestamp || null;
                 updateActivityTypeFilter();
                 showActivityHistory();
             })
             .catch(err => {
+                if (requestId !== portalActivityRequest) return;
                 console.error('Activity stream error:', err);
                 allActivities = [];
                 feed.innerHTML = `
@@ -965,7 +885,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                         </button>
                     </div>
                 `;
-            });
+            }).finally(() => { if (requestId === portalActivityRequest) feed.setAttribute('aria-busy', 'false'); });
         }
         
         function safeActivityImageUrl(value) {
@@ -1152,120 +1072,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         
         // Last aktive sessions
         function loadActiveSessions() {
-            fetch('/saas_portal/api/get_active_sessions.php')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    renderActiveSessions(data);
-                }
-            })
-            .catch(err => console.error('Active sessions error:', err));
+            return portalLoadSessions();
         }
         
-        // Render aktive sessions
-        function renderActiveSessions(data) {
-            const panel = document.getElementById('activeSessionsPanel');
-            
-            if (!data.by_company || data.by_company.length === 0) {
-                panel.innerHTML = '<div class="text-center text-muted py-3">Ingen aktive brukere</div>';
-                return;
-            }
-            
-            let html = `
-                <div class="mb-3">
-                    <div class="text-center">
-                        <h4 class="text-primary">${data.total_active_sessions}</h4>
-                        <small class="text-muted">Aktive sessions</small>
-                    </div>
-                    <div class="text-center mt-2">
-                        <small class="text-muted">${data.total_companies_active} bedrifter aktive</small>
-                    </div>
-                </div>
-                <hr>
-            `;
-            
-            data.by_company.forEach(company => {
-                html += `
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <strong>${escapeHtml(company.company_name)}</strong>
-                            <span class="badge bg-success">${company.active_users}</span>
-                        </div>
-                        <div class="mt-1">
-                `;
-                
-                company.users.forEach(user => {
-                    const idleTime = user.minutes_idle;
-                    const statusColor = idleTime < 5 ? 'success' : (idleTime < 15 ? 'warning' : 'secondary');
-                    
-                    html += `
-                        <div class="d-flex justify-content-between align-items-center text-sm mb-1">
-                            <span class="small">
-                                <i class="bi bi-circle-fill text-${statusColor}" style="font-size: 0.5rem;"></i>
-                                ${escapeHtml(user.username)}
-                            </span>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="text-muted small">${idleTime}m idle</span>
-                                <button class="btn btn-sm btn-outline-danger" onclick="logoutUser('${escapeHtml(user.admin_id)}', '${escapeHtml(user.username)}')">
-                                    <i class="bi bi-box-arrow-right"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                html += `
-                        </div>
-                    </div>
-                    <hr>
-                `;
-            });
-            
-            panel.innerHTML = html;
-        }
-        
-        // Last all historikk når "All aktivitet"-tab åpnes (overrider tidligere listener)
-        // (Den tidligere listeneren på linje 775-777 lar lastActivityStream laste all historikk når tab åpnes)
-        
-        // Last aktive sessions når tab åpnes
-        document.getElementById('activity-tab')?.addEventListener('shown.bs.tab', function () {
-            loadActiveSessions();
-            
-            // Poll sessions hvert 10. sekund
-            if (window.sessionPollInterval) clearInterval(window.sessionPollInterval);
-            window.sessionPollInterval = setInterval(loadActiveSessions, 10000);
-        });
-        
-        // Stopp polling når tab lukkes
-        document.getElementById('activity-tab')?.addEventListener('hidden.bs.tab', function () {
-            if (window.sessionPollInterval) clearInterval(window.sessionPollInterval);
-        });
-        
-        // Logg ut bruker
-        function logoutUser(adminId, username) {
-            if (!confirm(`Er du sikker på at du vil logge ut ${username}?`)) {
-                return;
-            }
-            
-            fetch('/saas_portal/api/logout_user.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: adminId})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Reload sessions list
-                    loadActiveSessions();
-                } else {
-                    alert('Feil: ' + data.message);
-                }
-            })
-            .catch(err => {
-                console.error('Logout error:', err);
-                alert('Feil ved utlogging: ' + err.message);
-            });
-        }
     </script>
 </body>
 </html>

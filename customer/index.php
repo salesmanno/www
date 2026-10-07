@@ -18,6 +18,9 @@ if (empty($subdomain) || $subdomain === 'www') {
 // Hent bedriftsdata fra database
 try {
     $db = getDBConnection();
+    $websiteColumns = $db->query('SHOW COLUMNS FROM tenant_website_general')->fetchAll(PDO::FETCH_COLUMN);
+    $showLogo = in_array('show_logo', $websiteColumns, true) ? 'twg.show_logo' : '1 AS show_logo';
+    $showContact = in_array('show_contact_info', $websiteColumns, true) ? 'twg.show_contact_info' : '1 AS show_contact_info';
     
     $stmt = $db->prepare("
         SELECT 
@@ -29,8 +32,8 @@ try {
             twg.header_bg_color,
             twg.body_bg_color,
             twg.font_family,
-            twg.show_logo,
-            twg.show_contact_info,
+            {$showLogo},
+            {$showContact},
             twg.footer_text
         FROM tenant_companies tc
         LEFT JOIN tenant_website_general twg ON twg.company_id = tc.id
@@ -88,6 +91,19 @@ $bodyBgColor = $company['body_bg_color'] ?? '#f8f9fa';
 $fontFamily = $company['font_family'] ?? 'Arial, sans-serif';
 $siteTitle = $company['site_title'] ?? $company['name'];
 $siteDescription = $company['site_description'] ?? '';
+// SEO overrides share the existing website settings used by tenant administrators.
+// Older installations without this optional module retain their original metadata.
+try {
+    require_once __DIR__ . '/../saas_portal/services/PortalCompanyService.php';
+    $seoTable = PortalCompanyService::seoTable($db);
+    $seoStmt = $db->prepare("SELECT seo_title, seo_description FROM `{$seoTable}` WHERE company_id = ?");
+    $seoStmt->execute([$company['id']]);
+    $seo = $seoStmt->fetch(PDO::FETCH_ASSOC);
+    if (trim($seo['seo_title'] ?? '') !== '') $siteTitle = $seo['seo_title'];
+    if (trim($seo['seo_description'] ?? '') !== '') $siteDescription = $seo['seo_description'];
+} catch (Throwable $e) {
+    error_log('Customer website: optional SEO settings unavailable.');
+}
 ?>
 <!DOCTYPE html>
 <html lang="no">

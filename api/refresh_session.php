@@ -3,6 +3,7 @@ session_start();
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/TenantSessionGuard.php';
 
 header('Content-Type: application/json');
 
@@ -18,6 +19,13 @@ try {
         exit;
     }
     
+    if (!tenantSessionIsActive($db, $_SESSION['session_id'] ?? session_id(), (string)$_SESSION['tenant_admin_id'])) {
+        clearTenantSessionData();
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Sesjonen er avsluttet.', 'session_ended' => true]);
+        exit;
+    }
+    updateSessionActivity($_SESSION['session_id'] ?? session_id());
     $stmt = $db->prepare("
         SELECT ta.id, ta.company_id, ta.email,
                tc.name as company_name, tc.subdomain,

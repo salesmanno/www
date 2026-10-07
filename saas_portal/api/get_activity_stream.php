@@ -22,11 +22,21 @@ try {
     $since = $_GET['since'] ?? null; // Timestamp for å hente bare nye logger
     
     // Hent aktivitetslogg
-    $activities = $logger->getRecentActivity($limit, $since);
+    $companyId = $_GET['company_id'] ?? null;
+    $actionType = $_GET['action_type'] ?? null;
+    if (($companyId !== null && (!is_string($companyId) || $companyId === '' || strlen($companyId) > 36)) ||
+        ($actionType !== null && (!is_string($actionType) || strlen($actionType) > 255))) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Ugyldig aktivitetsfilter.']);
+        exit;
+    }
+    if ($actionType === '' || $actionType === 'all') $actionType = null;
+    $activities = $logger->getRecentActivity($limit, $since, $companyId, $actionType);
     
     echo json_encode([
         'success' => true,
         'activities' => $activities,
+        'action_types' => $logger->getActivityTypes($companyId),
         'count' => count($activities),
         'timestamp' => date('Y-m-d H:i:s')
     ]);

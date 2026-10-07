@@ -19,6 +19,8 @@ try {
     $stmt = $db->prepare("
         SELECT 
             ta.id as admin_id,
+            ta.tenant_staff_id,
+            ta.email AS account_email,
             ta.username,
             ta.is_active,
             ta.last_login,

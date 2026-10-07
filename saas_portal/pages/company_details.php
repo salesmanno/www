@@ -9,6 +9,9 @@ if (!isset($_SESSION['saas_admin_id'])) {
 if (empty($_SESSION['brreg_staff_csrf'])) {
     $_SESSION['brreg_staff_csrf'] = bin2hex(random_bytes(32));
 }
+if (empty($_SESSION['portal_csrf'])) {
+    $_SESSION['portal_csrf'] = bin2hex(random_bytes(32));
+}
 
 require_once __DIR__ . '/../../config/database.php';
 
@@ -19,10 +22,18 @@ if (empty($company_id)) {
     exit;
 }
 
-$db = getDBConnection();
-$stmt = $db->prepare("SELECT * FROM tenant_companies WHERE id = ?");
-$stmt->execute([$company_id]);
-$company = $stmt->fetch();
+$company_load_error = null;
+try {
+    $db = getDBConnection();
+    if (!$db) throw new RuntimeException('Database unavailable');
+    $stmt = $db->prepare("SELECT * FROM tenant_companies WHERE id = ?");
+    $stmt->execute([$company_id]);
+    $company = $stmt->fetch();
+} catch (Throwable $error) {
+    error_log('Company detail load failed: ' . $error->getMessage());
+    $company_load_error = 'Kunne ikke laste bedriften. Databasen er utilgjengelig. Prøv igjen senere.';
+    $company = ['name' => 'Bedrift utilgjengelig', 'subdomain' => ''];
+}
 
 if (!$company) {
     header('Location: /saas_portal/pages/dashboard.php');
@@ -104,6 +115,7 @@ if (!$company) {
             margin: 0.5rem 0;
         }
     </style>
+    <link href="/saas_portal/assets/portal-workspace.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
@@ -115,18 +127,28 @@ if (!$company) {
     </nav>
     
     <div class="container mt-4">
-        <h2><?= htmlspecialchars($company['name']) ?></h2>
-        <p class="text-muted">Subdomain: <?= htmlspecialchars($company['subdomain']) ?></p>
-        
+        <?php if ($company_load_error): ?>
+        <div class="alert alert-danger" role="alert"><?= htmlspecialchars($company_load_error) ?> <a href="<?= htmlspecialchars('/saas_portal/pages/company_details.php?id=' . rawurlencode((string)$company_id)) ?>" class="btn btn-sm btn-outline-danger">Prøv igjen</a></div>
+        </div></body></html>
+        <?php exit; ?>
+        <?php endif; ?>
+        <div class="workspace-heading"><div><div class="workspace-eyebrow">Administrasjon / bedrift</div><h2><?= htmlspecialchars($company['name']) ?></h2><p class="text-muted mb-0 mt-1"><?= htmlspecialchars($company['subdomain']) ?>.salesman.no</p></div></div>
+        <div class="detail-grid">
+        <div class="detail-main">
+        <section class="portal-panel company-activity-panel">
+            <img id="companyActivityWatermark" class="activity-watermark" alt="" aria-hidden="true" hidden>
+            <div class="portal-panel-title"><h3><i class="bi bi-clock-history me-2"></i>Siste aktivitet</h3><button type="button" class="btn btn-sm btn-outline-secondary" id="companyActivityRefresh">Oppdater</button></div>
+            <div class="activity-filters">
+                <div><label for="companyActivityType" class="form-label small">Hendelsestype</label><select id="companyActivityType" class="form-select form-select-sm"><option value="">Alle hendelser</option></select></div>
+                <div><label for="companyActivitySearch" class="form-label small">Søk i aktivitet</label><input type="search" id="companyActivitySearch" class="form-control form-control-sm" placeholder="Bruker eller hendelse"></div>
+            </div>
+            <div id="companyActivityStatus" role="status"></div>
+            <div id="companyActivityFeed" class="activity-scroll"><div class="portal-skeleton" aria-label="Laster aktivitet"></div></div>
+        </section>
+        <h3 class="section-title">Bedriftsinnstillinger</h3>
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <a class="nav-link active" id="admins-tab" data-bs-toggle="tab" href="#admins">Administratorer</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="staff-tab" data-bs-toggle="tab" href="#staff">Ansatte</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="email-tab" data-bs-toggle="tab" href="#email">
+                <a class="nav-link active" id="email-tab" data-bs-toggle="tab" href="#email">
                     <i class="bi bi-envelope"></i> Epost
                 </a>
             </li>
@@ -145,39 +167,11 @@ if (!$company) {
                     <i class="bi bi-building"></i> Firmadata
                 </a>
             </li>
+            <li class="nav-item"><a class="nav-link" id="seo-tab" data-bs-toggle="tab" href="#seo">SEO</a></li>
         </ul>
         
         <div class="tab-content">
-            <div class="tab-pane fade show active" id="admins">
-                <div class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="section-title mb-0">Administratorer</h3>
-                        <button class="btn btn-primary-custom btn-sm" onclick="showCreateAdmin()">
-                            <i class="bi bi-plus-circle"></i> Ny admin
-                        </button>
-                    </div>
-                    <div id="adminsList"></div>
-                </div>
-            </div>
-            
-            <div class="tab-pane fade" id="staff">
-                <div class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="section-title mb-0">Ansatte</h3>
-                        <div class="d-flex flex-wrap gap-2 justify-content-end">
-                            <button class="btn btn-outline-danger btn-sm" type="button" id="importBrregStaffButton">
-                                <i class="bi bi-cloud-download" aria-hidden="true"></i> Importer fra Brønnøysund
-                            </button>
-                            <button class="btn btn-primary-custom btn-sm" type="button" onclick="showCreateStaff()">
-                                <i class="bi bi-plus-circle" aria-hidden="true"></i> Ny ansatt
-                            </button>
-                        </div>
-                    </div>
-                    <div id="staffList"></div>
-                </div>
-            </div>
-            
-            <div class="tab-pane fade" id="email">
+            <div class="tab-pane fade show active" id="email">
                 <div class="content-section">
                     <h3 class="section-title">
                         <i class="bi bi-envelope"></i> Epost-konfigurasjon
@@ -610,15 +604,41 @@ if (!$company) {
                     <div id="companyDataMessage" class="mt-3"></div>
                 </div>
             </div>
+            <div class="tab-pane fade" id="seo">
+                <section class="content-section">
+                    <h3 class="section-title">Synlighet i søk</h3>
+                    <p class="text-muted small">Tittel og beskrivelse som brukes av søkemotorer.</p>
+                    <form id="companySeoForm">
+                        <div class="mb-3"><label for="seoTitle" class="form-label">SEO-tittel</label><input type="text" id="seoTitle" name="seo_title" class="form-control" maxlength="255"></div>
+                        <div class="mb-3"><label for="seoDescription" class="form-label">SEO-beskrivelse</label><textarea id="seoDescription" name="seo_description" class="form-control" rows="4" maxlength="1000"></textarea></div>
+                        <button type="submit" id="seoSaveButton" class="btn btn-primary-custom" disabled>Lagre SEO</button>
+                    </form>
+                    <div id="companySeoStatus" class="mt-3" role="status" aria-live="polite"></div>
+                </section>
+            </div>
+        </div>
+        </div>
+        <aside class="portal-panel staff-panel">
+            <div class="portal-panel-title"><h3>Ansatte og brukerkontoer</h3><button type="button" class="btn btn-primary-custom btn-sm" onclick="showCreateStaff()">Ny ansatt</button></div>
+            <button class="btn btn-outline-primary btn-sm mb-3" type="button" id="importBrregStaffButton"><i class="bi bi-cloud-download me-1" aria-hidden="true"></i> Importer fra Brønnøysund</button>
+            <div id="staffLoadStatus" role="status"></div>
+            <div id="staffList"><div class="portal-skeleton" aria-label="Laster ansatte"></div></div>
+            <div class="legacy-accounts">
+                <h4>Administratorer uten koblet ansatt</h4>
+                <p class="small text-muted">Eldre og foreldreløse kontoer. Sletting her fjerner bare brukerkontoen.</p>
+                <div id="adminLoadStatus" role="status"></div>
+                <div id="adminsList"><div class="portal-skeleton" aria-label="Laster kontoer"></div></div>
+            </div>
+        </aside>
         </div>
     </div>
-    
+
     <!-- Create Admin Modal -->
     <div class="modal fade" id="createAdminModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Opprett administrator</h5>
+                    <h5 class="modal-title">Opprett SuperUser for ansatt</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -632,9 +652,9 @@ if (!$company) {
                             <input type="password" class="form-control" name="password" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Koble til ansatt (valgfritt)</label>
-                            <select class="form-select" name="tenant_staff_id" id="admin_staff_select">
-                                <option value="">Ingen</option>
+                            <label class="form-label">Koblet ansatt *</label>
+                            <select class="form-select" name="tenant_staff_id" id="admin_staff_select" required disabled>
+                                <option value="">Velg en ansatt fra listen</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -643,10 +663,11 @@ if (!$company) {
                             <div class="form-text" id="admin_email_help">Skriv inn e-post for innloggingskontoen.</div>
                         </div>
                     </form>
+                    <div id="createAccountStatus" role="status" class="mt-3"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-                    <button type="button" class="btn btn-primary-custom" onclick="createAdmin()">Opprett</button>
+                    <button type="button" class="btn btn-primary-custom" id="createAccountButton" onclick="createAdmin()">Opprett</button>
                 </div>
             </div>
         </div>
@@ -744,65 +765,23 @@ if (!$company) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-                    <button type="button" class="btn btn-primary-custom" onclick="saveAdminModules()">Lagre</button>
+                    <button type="button" class="btn btn-primary-custom" id="saveAdminModulesButton" onclick="saveAdminModules()">Lagre</button>
                 </div>
             </div>
         </div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/saas_portal/assets/portal-workspace.js"></script>
+    <script src="/saas_portal/assets/company-workspace.js"></script>
     <script>
         const companyId = <?= json_encode((string)$company_id, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const portalCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const companyLogoUrl = <?= json_encode($company['logo_url'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         const brregStaffCsrf = <?= json_encode($_SESSION['brreg_staff_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         
         function loadAdmins() {
-            fetch(`/saas_portal/api/get_admins.php?company_id=${companyId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-                const list = document.getElementById('adminsList');
-                if (!data.admins || data.admins.length === 0) {
-                    list.innerHTML = '<p class="text-muted">Ingen administratorer</p>';
-                    return;
-                }
-                list.innerHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Brukernavn</th>
-                                <th>Navn</th>
-                                <th>E-post</th>
-                                <th>Stilling</th>
-                                <th>Siste pålogging</th>
-                                <th>Status</th>
-                                <th>Handlinger</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.admins.map(a => {
-                                const lastLogin = a.last_login ? new Date(a.last_login).toLocaleString('no-NO') : 'Aldri';
-                                return `
-                                <tr>
-                                    <td><strong>${escapeHtml(a.username)}</strong></td>
-                                    <td>${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</td>
-                                    <td>${escapeHtml(a.email || '-')}</td>
-                                    <td>${escapeHtml(a.job_title || '-')}</td>
-                                    <td><small>${lastLogin}</small></td>
-                                    <td>${a.is_active == 1 ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-secondary">Inaktiv</span>'}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="manageAdminModules('${a.admin_id}', '${escapeHtml(a.username)}')">
-                                            <i class="bi bi-grid"></i> Moduler
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteAdmin('${a.admin_id}')">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `}).join('')}
-                        </tbody>
-                    </table>
-                `;
-            });
+            return portalRefreshAdmins();
         }
         
         let availableAdminStaff = {};
@@ -826,64 +805,20 @@ if (!$company) {
         }
 
         function loadStaff() {
-            fetch(`/saas_portal/api/get_staff.php?company_id=${companyId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-
-                availableAdminStaff = Object.fromEntries(
-                    (data.staff || []).map(staff => [staff.id, staff])
-                );
-                
-                const select = document.getElementById('admin_staff_select');
-                select.innerHTML = '<option value="">Ingen</option>' + 
-                    (data.staff || []).map(s => `
-                        <option value="${s.id}" ${s.has_account == 1 ? 'disabled' : ''}>
-                            ${escapeHtml(s.first_name + ' ' + s.last_name)}${s.has_account == 1 ? ' (har konto)' : ''}
-                        </option>
-                    `).join('');
-                syncAdminEmailField();
-                
-                const list = document.getElementById('staffList');
-                if (!data.staff || data.staff.length === 0) {
-                    list.innerHTML = '<p class="text-muted">Ingen ansatte</p>';
-                    return;
-                }
-                list.innerHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Navn</th>
-                                <th>E-post</th>
-                                <th>Telefon</th>
-                                <th>Stilling</th>
-                                <th>Handlinger</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.staff.map(s => `
-                                <tr>
-                                    <td>${escapeHtml((s.first_name || '') + ' ' + (s.last_name || ''))}</td>
-                                    <td>${escapeHtml(s.email || '-')}</td>
-                                    <td>${escapeHtml(s.phone || '-')}</td>
-                                    <td>${escapeHtml(s.job_title || '-')}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditStaff('${escapeHtml(s.id)}')" aria-label="Rediger ${escapeHtml((s.first_name || '') + ' ' + (s.last_name || ''))}">
-                                            <i class="bi bi-pencil"></i> Rediger
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteStaff('${escapeHtml(s.id)}')" aria-label="Slett ${escapeHtml((s.first_name || '') + ' ' + (s.last_name || ''))}">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
-            });
+            // Replaces the old onclick="showEditStaff(...)" markup with safe DOM listeners.
+            return portalRefreshStaff();
         }
         
-        function showCreateAdmin() {
+        function showCreateAdmin(staffId) {
+            const staff = availableAdminStaff[staffId];
+            if (!staff || staff.has_account == 1) return;
+            document.getElementById('createAdminForm').reset();
+            const select = document.getElementById('admin_staff_select');
+            select.replaceChildren(new Option(`${staff.first_name || ''} ${staff.last_name || ''}`, String(staff.id)));
+            select.value = String(staff.id);
+            select.disabled = true;
+            portalLinkedAccountStaffId = String(staff.id);
+            document.getElementById('createAccountStatus').replaceChildren();
             syncAdminEmailField();
             new bootstrap.Modal(document.getElementById('createAdminModal')).show();
         }
@@ -931,6 +866,13 @@ if (!$company) {
         
         function createAdmin() {
             const form = document.getElementById('createAdminForm');
+            const staff = availableAdminStaff[portalLinkedAccountStaffId];
+            if (!staff || staff.has_account == 1 || !staff.email || document.getElementById('admin_staff_select').value !== String(staff.id)) {
+                portalFailure('createAccountStatus', 'Velg en ansatt uten konto med gyldig e-post. Kontoen må være koblet til denne ansatte.');
+                return;
+            }
+            const button = document.getElementById('createAccountButton');
+            if (button.disabled) return;
             if (!form.checkValidity()) {
                 form.reportValidity();
                 return;
@@ -938,6 +880,10 @@ if (!$company) {
 
             const formData = new FormData(form);
             formData.append('company_id', companyId);
+            formData.set('tenant_staff_id', String(staff.id));
+            formData.set('email', staff.email);
+            formData.set('csrf_token', portalCsrf);
+            button.disabled = true;
             
             fetch('/saas_portal/api/create_admin.php', {method: 'POST', body: formData})
             .then(r => r.json())
@@ -947,11 +893,13 @@ if (!$company) {
                     form.reset();
                     syncAdminEmailField();
                     loadAdmins();
+                    loadStaff();
                     alert('Admin opprettet');
                 } else {
-                    alert('Feil: ' + data.message);
+                    portalFailure('createAccountStatus', data.message || 'Kunne ikke opprette konto.');
                 }
-            });
+            }).catch(error => portalFailure('createAccountStatus', error.message))
+            .finally(() => { button.disabled = false; });
         }
 
         document.getElementById('admin_staff_select').addEventListener('change', syncAdminEmailField);
@@ -1022,23 +970,29 @@ if (!$company) {
         function manageAdminModules(adminId, username) {
             document.getElementById('selected_admin_id').value = adminId;
             document.querySelector('#adminModulesModal .modal-title').textContent = `Moduler for ${username}`;
-            
-            fetch(`/saas_portal/api/get_admin_modules.php?admin_id=${adminId}&company_id=${companyId}`)
-            .then(r => r.json())
+            const container = document.getElementById('adminModulesCheckboxes');
+            container.replaceChildren();
+            portalText(container, 'div', '', 'portal-skeleton');
+            const saveButton = document.getElementById('saveAdminModulesButton');
+            saveButton.disabled = true;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('adminModulesModal')).show();
+            portalRequest(`/saas_portal/api/get_admin_modules.php?admin_id=${encodeURIComponent(adminId)}&company_id=${encodeURIComponent(companyId)}`)
             .then(data => {
-                if (!data.success) return;
-                const container = document.getElementById('adminModulesCheckboxes');
-                container.innerHTML = (data.modules || []).map(m => `
-                    <div class="form-check module-checkbox">
-                        <input class="form-check-input" type="checkbox" id="adm_${m.id}" ${m.has_access ? 'checked' : ''}>
-                        <label class="form-check-label" for="adm_${m.id}">
-                            ${escapeHtml(m.name)}
-                        </label>
-                    </div>
-                `).join('');
-                
-                new bootstrap.Modal(document.getElementById('adminModulesModal')).show();
-            });
+                if (document.getElementById('selected_admin_id').value !== String(adminId)) return;
+                container.replaceChildren();
+                (data.modules || []).forEach(m => {
+                    const label = portalText(container, 'label', '', 'form-check module-checkbox d-block');
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.value = String(m.id);
+                    input.checked = m.has_access == 1;
+                    input.className = 'form-check-input';
+                    label.appendChild(input);
+                    portalText(label, 'span', m.name, 'form-check-label');
+                });
+                if (!data.modules || !data.modules.length) portalText(container, 'p', 'Ingen moduler tilgjengelig for bedriften.', 'text-muted');
+                saveButton.disabled = false;
+            }).catch(error => portalFailure('adminModulesCheckboxes', error.message, () => manageAdminModules(adminId, username)));
         }
         
         function saveAdminModules() {
@@ -1046,12 +1000,15 @@ if (!$company) {
             const checkboxes = document.querySelectorAll('#adminModulesCheckboxes input[type="checkbox"]');
             const moduleIds = Array.from(checkboxes)
                 .filter(cb => cb.checked)
-                .map(cb => cb.id.replace('adm_', ''));
+                .map(cb => cb.value);
+            const button = document.getElementById('saveAdminModulesButton');
+            if (button.disabled) return;
+            button.disabled = true;
             
             fetch('/saas_portal/api/update_admin_modules.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: adminId, module_ids: moduleIds})
+                body: JSON.stringify({admin_id: adminId, module_ids: moduleIds, csrf_token: portalCsrf})
             })
             .then(r => r.json())
             .then(data => {
@@ -1066,25 +1023,26 @@ if (!$company) {
             .catch(err => {
                 console.error('Save admin modules error:', err);
                 alert('Feil ved lagring av moduler');
-            });
+            }).finally(() => { button.disabled = false; });
         }
         
         function deleteAdmin(id) {
-            if (!confirm('Slett denne administratoren?')) return;
+            if (!confirm('Slett denne BRUKERKONTOEN? Den ansatte beholdes.')) return;
             fetch('/saas_portal/api/delete_admin.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: id})
+                body: JSON.stringify({admin_id: id, csrf_token: portalCsrf})
             })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
                     loadAdmins();
+                    loadStaff();
                     alert('Admin slettet');
                 } else {
                     alert('Feil: ' + data.message);
                 }
-            });
+            }).catch(error => alert('Kunne ikke slette brukerkonto: ' + error.message));
         }
         
         function deleteStaff(id) {
@@ -1092,7 +1050,7 @@ if (!$company) {
             fetch('/saas_portal/api/delete_staff.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({staff_id: id})
+                body: JSON.stringify({staff_id: id, csrf_token: brregStaffCsrf})
             })
             .then(r => r.json())
             .then(data => {
@@ -1103,7 +1061,7 @@ if (!$company) {
                 } else {
                     alert('Feil: ' + data.message);
                 }
-            });
+            }).catch(error => alert('Kunne ikke slette ansatt: ' + error.message));
         }
         
         function escapeHtml(text) {
@@ -1116,6 +1074,7 @@ if (!$company) {
             fetch(`/saas_portal/api/get_email_config.php?company_id=${companyId}`)
             .then(r => r.json())
             .then(data => {
+                if (!data.success) throw new Error(data.message || 'Kunne ikke hente epost-konfigurasjonen.');
                 if (data.success && data.config) {
                     const config = data.config;
                     document.getElementById('smtp_host').value = config.smtp_host || '';
@@ -1131,7 +1090,7 @@ if (!$company) {
                     document.getElementById('imap_username').value = config.imap_username || '';
                 }
             })
-            .catch(err => console.error('Load email config error:', err));
+            .catch(err => portalFailure('emailConfigStatus', err.message, loadEmailConfig));
         }
         
         function saveEmailConfig() {
@@ -1153,7 +1112,7 @@ if (!$company) {
                     status.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Epost-konfigurasjon lagret!</div>';
                     setTimeout(() => status.innerHTML = '', 3000);
                 } else {
-                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
                 }
             })
             .catch(err => {
@@ -1183,15 +1142,15 @@ if (!$company) {
                     status.innerHTML = `
                         <div class="alert alert-success">
                             <i class="bi bi-check-circle"></i> <strong>Test vellykket!</strong><br>
-                            ${data.smtp_test ? '✓ SMTP tilkobling OK<br>' : ''}
-                            ${data.imap_test ? '✓ IMAP tilkobling OK' : ''}
+                            ${data.smtp_test ? 'SMTP tilkobling OK<br>' : ''}
+                            ${data.imap_test ? 'IMAP tilkobling OK' : ''}
                         </div>`;
                 } else {
                     status.innerHTML = `
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle"></i> <strong>Test delvis vellykket</strong><br>
-                            ${data.smtp_test ? '✓ SMTP: OK<br>' : '✗ SMTP: ' + (data.smtp_error || 'Feil') + '<br>'}
-                            ${data.imap_test ? '✓ IMAP: OK' : '✗ IMAP: ' + (data.imap_error || 'Feil')}
+                            ${data.smtp_test ? 'SMTP: OK<br>' : 'SMTP: ' + escapeHtml(data.smtp_error || 'Feil') + '<br>'}
+                            ${data.imap_test ? 'IMAP: OK' : 'IMAP: ' + escapeHtml(data.imap_error || 'Feil')}
                         </div>`;
                 }
             })
@@ -1221,14 +1180,14 @@ if (!$company) {
                     statusDiv.className = 'mt-3 alert alert-success';
                     statusDiv.innerHTML = `
                         <i class="bi bi-check-circle-fill"></i> <strong>Email koblet opp!</strong><br>
-                        <small>${data.message}</small>
+                        <small>${escapeHtml(data.message)}</small>
                     `;
                     setTimeout(() => {
                         statusDiv.style.display = 'none';
                     }, 5000);
                 } else {
                     statusDiv.className = 'mt-3 alert alert-danger';
-                    statusDiv.innerHTML = `<i class="bi bi-x-circle-fill"></i> ${data.message}`;
+                    statusDiv.innerHTML = `<i class="bi bi-x-circle-fill"></i> ${escapeHtml(data.message)}`;
                 }
             })
             .catch(err => {
@@ -1248,6 +1207,7 @@ if (!$company) {
             fetch(`/saas_portal/api/get_payment_gateways.php?company_id=${companyId}`)
             .then(r => r.json())
             .then(data => {
+                if (!data.success) throw new Error(data.message || 'Kunne ikke hente betalingskonfigurasjonen.');
                 if (data.success && data.gateways) {
                     data.gateways.forEach(gw => {
                         if (gw.gateway_name === 'vipps') {
@@ -1270,7 +1230,7 @@ if (!$company) {
                     });
                 }
             })
-            .catch(err => console.error('Load payment gateways error:', err));
+            .catch(err => portalFailure('paymentConfigStatus', err.message, loadPaymentGateways));
         }
         
         function savePaymentGateway(gateway) {
@@ -1305,7 +1265,7 @@ if (!$company) {
                     status.innerHTML = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> ${displayName}-konfigurasjon lagret!</div>`;
                     setTimeout(() => status.innerHTML = '', 3000);
                 } else {
-                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
                 }
             })
             .catch(err => {
@@ -1337,12 +1297,12 @@ if (!$company) {
                         
                         infoEl.innerHTML = `
                             <table class="table table-sm">
-                                <tr><th>Subdomain:</th><td>${data.subdomain}.salesman.no</td></tr>
-                                <tr><th>DNS Record ID:</th><td>${data.record_id || 'N/A'}</td></tr>
-                                <tr><th>IP-adresse:</th><td>${data.ip_address || 'N/A'}</td></tr>
-                                <tr><th>TTL:</th><td>${data.ttl || 'N/A'}</td></tr>
-                                <tr><th>DNS opprettet:</th><td>${data.dns_created || 'Ukjent'}</td></tr>
-                                <tr><th>Siste sjekk:</th><td>${data.last_check || 'Aldri'}</td></tr>
+                                <tr><th>Subdomain:</th><td>${escapeHtml(data.subdomain)}.salesman.no</td></tr>
+                                <tr><th>DNS Record ID:</th><td>${escapeHtml(data.record_id || 'N/A')}</td></tr>
+                                <tr><th>IP-adresse:</th><td>${escapeHtml(data.ip_address || 'N/A')}</td></tr>
+                                <tr><th>TTL:</th><td>${escapeHtml(data.ttl || 'N/A')}</td></tr>
+                                <tr><th>DNS opprettet:</th><td>${escapeHtml(data.dns_created || 'Ukjent')}</td></tr>
+                                <tr><th>Siste sjekk:</th><td>${escapeHtml(data.last_check || 'Aldri')}</td></tr>
                             </table>
                         `;
                     } else {
@@ -1354,13 +1314,13 @@ if (!$company) {
                     }
                 } else {
                     statusEl.innerHTML = '<span class="badge bg-danger">Feil</span>';
-                    infoEl.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                    portalFailure('dnsInfo', data.message || 'Kunne ikke hente DNS-informasjon.', loadDNSInfo);
                 }
             })
             .catch(err => {
                 console.error('DNS info error:', err);
                 document.getElementById('dnsStatus').innerHTML = '<span class="badge bg-danger">Feil</span>';
-                document.getElementById('dnsInfo').innerHTML = '<div class="alert alert-danger">Kunne ikke laste DNS-informasjon</div>';
+                portalFailure('dnsInfo', 'Kunne ikke laste DNS-informasjon.', loadDNSInfo);
             });
         }
         
@@ -1373,7 +1333,7 @@ if (!$company) {
             }
             
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Oppretter...';
+            btn.textContent = 'Oppretter…';
             msgEl.innerHTML = '';
             
             fetch('/saas_portal/api/create_subdomain.php', {
@@ -1392,7 +1352,7 @@ if (!$company) {
                         loadDNSInfo();
                     }, 2000);
                 } else {
-                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
                     btn.disabled = false;
                 }
             })
@@ -1413,7 +1373,7 @@ if (!$company) {
             }
             
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sletter...';
+            btn.textContent = 'Sletter…';
             msgEl.innerHTML = '';
             
             fetch('/saas_portal/api/delete_subdomain.php', {
@@ -1432,7 +1392,7 @@ if (!$company) {
                         loadDNSInfo();
                     }, 2000);
                 } else {
-                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
                     btn.disabled = false;
                 }
             })
@@ -1511,7 +1471,7 @@ if (!$company) {
                         location.reload(); // Oppdater siden for å vise nye data
                     }, 1500);
                 } else {
-                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${data.message}</div>`;
+                    msgEl.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
                 }
             })
             .catch(err => {
@@ -1521,8 +1481,7 @@ if (!$company) {
             });
         });
         
-        loadAdmins();
-        loadStaff();
+        // Initial loading is coordinated by company-workspace.js.
     </script>
     <script src="/saas_portal/assets/brreg-staff-import.js"></script>
 </body>

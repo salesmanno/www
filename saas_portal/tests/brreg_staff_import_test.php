@@ -21,7 +21,8 @@ $db = new PDO('mysql:unix_socket=' . $socket . ';charset=utf8mb4', 'root', '', [
 $database = 'brreg_import_test_' . bin2hex(random_bytes(6));
 $root = sys_get_temp_dir() . '/' . $database;
 $server = null;
-$db->exec("CREATE DATABASE `{$database}` CHARACTER SET utf8mb4");
+// Match the application's existing audit-table collation in this HTTP fixture.
+$db->exec("CREATE DATABASE `{$database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 $db->exec("USE `{$database}`");
 function snapshot(PDO $db): array {
     return [
@@ -96,15 +97,16 @@ try {
     $db->exec("DELETE FROM tenant_staff WHERE id='concurrent'");
 
     // Exercise original endpoints unchanged, with a temporary test-only connection.
-    foreach (['config', 'sessions', 'saas_portal/api', 'saas_portal/services'] as $dir) {
+    foreach (['config', 'sessions', 'includes', 'saas_portal/api', 'saas_portal/services'] as $dir) {
         mkdir($root . '/' . $dir, 0700, true);
     }
-    foreach (['create_staff', 'update_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff'] as $file) {
+    foreach (['create_staff', 'update_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff', 'portal_request', 'update_admin_modules', 'grant_company_modules', 'company_seo', 'logout_user', 'get_active_sessions', 'get_activity_stream', 'get_admins'] as $file) {
         copy(__DIR__ . '/../api/' . $file . '.php', $root . '/saas_portal/api/' . $file . '.php');
     }
-    foreach (['BrregRoleClient', 'BrregStaffImportService', 'ActivityLogger'] as $file) {
+    foreach (['BrregRoleClient', 'BrregStaffImportService', 'ActivityLogger', 'PortalCompanyService'] as $file) {
         copy(__DIR__ . '/../services/' . $file . '.php', $root . '/saas_portal/services/' . $file . '.php');
     }
+    copy(__DIR__ . '/../../includes/TenantSessionGuard.php', $root . '/includes/TenantSessionGuard.php');
     $connection = "<?php\nfunction getDBConnection() { static \$db; return \$db ??= new PDO(" .
         var_export('mysql:unix_socket=' . $socket . ';dbname=' . $database . ';charset=utf8mb4', true) .
         ", 'root', '', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]); }\nfunction dbBool(\$v) { return \$v ? '1' : '0'; }\n";
@@ -119,7 +121,7 @@ try {
     ini_set('session.save_path', $root . '/sessions');
     session_id('brregtestsession');
     session_start();
-    $_SESSION = ['saas_admin_id' => 'system', 'brreg_staff_csrf' => 'test-csrf'];
+    $_SESSION = ['saas_admin_id' => 'system', 'brreg_staff_csrf' => 'test-csrf', 'portal_csrf' => 'test-portal'];
     session_write_close();
     $listener = stream_socket_server('tcp://127.0.0.1:0');
     $address = stream_socket_get_name($listener, false);
@@ -209,7 +211,47 @@ try {
     check(http($base, 'delete_staff', ['staff_id' => $importedId])[1]['success'] === true, 'Imported staff deletion');
     $staffList = http($base, 'get_staff', null);
     check($staffList[1]['success'] === true, 'Staff list endpoint still works');
-    echo "MySQL atomic import, employee editing with auth/CSRF/company checks, linked-account preservation and employee/admin CRUD checks passed.\n";
+    $db->exec('CREATE TABLE system_modules (id CHAR(36) PRIMARY KEY, is_active BOOLEAN) ENGINE=InnoDB');
+    $db->exec("INSERT INTO system_modules VALUES ('sales',1),('off',0)");
+    $db->exec('CREATE TABLE tenant_company_modules (id CHAR(36) PRIMARY KEY, company_id CHAR(36), module_id CHAR(36), is_active BOOLEAN, activated_at DATETIME, assigned_by CHAR(36), UNIQUE(company_id,module_id)) ENGINE=InnoDB');
+    $grant = ['company_ids'=>['A','B'], 'module_ids'=>['sales'], 'csrf_token'=>'test-portal'];
+    check(http($base, 'grant_company_modules', $grant, false)[0] === 403, 'Anonymous grant permitted');
+    check(http($base, 'grant_company_modules', array_merge($grant,['csrf_token'=>'bad']))[0] === 403, 'CSRF grant permitted');
+    check(http($base, 'grant_company_modules')[0] === 405, 'GET grant permitted');
+    check(http($base, 'grant_company_modules', $grant)[1]['success'] === true, 'HTTP bulk grant failed');
+    $db->exec('CREATE TABLE tenant_admin_modules (id CHAR(36) PRIMARY KEY, tenant_admin_id CHAR(36), module_id CHAR(36), granted_by CHAR(36) NULL, granted_at DATETIME, FOREIGN KEY(granted_by) REFERENCES tenant_admins(id)) ENGINE=InnoDB');
+    $userGrant = ['admin_id'=>'admin','module_ids'=>['sales'],'csrf_token'=>'test-portal'];
+    check(http($base,'update_admin_modules',$userGrant)[1]['success'] === true, 'Tenant user module grant failed with real grantor FK');
+    check($db->query("SELECT granted_by FROM tenant_admin_modules WHERE tenant_admin_id='admin'")->fetchColumn() === null, 'SaaS identity incorrectly used as tenant grantor');
+    check(http($base,'update_admin_modules',array_merge($userGrant,['module_ids'=>['off']]))[1]['success'] === false, 'Disabled module permitted');
+    check($db->query("SELECT module_id FROM tenant_admin_modules WHERE tenant_admin_id='admin'")->fetchColumn() === 'sales', 'Failed assignment lost existing permissions');
+    check(http($base,'update_admin_modules',array_merge($userGrant,['module_ids'=>[]]))[1]['success'] === true, 'Cannot remove account modules');
+    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) UNIQUE, seo_title VARCHAR(255), seo_description TEXT, is_published BOOLEAN, is_enabled BOOLEAN) ENGINE=InnoDB');
+    $seo = ['company_id'=>'A','seo_title'=>'Test title','seo_description'=>'Test description','csrf_token'=>'test-portal'];
+    check(http($base,'company_seo',array_merge($seo,['csrf_token'=>'bad']))[0] === 403, 'SEO CSRF permitted');
+    check(http($base,'company_seo',$seo)[1]['success'] === true, 'SEO HTTP save failed');
+    check($db->query("SELECT seo_title FROM tenant_website_config WHERE company_id='A'")->fetchColumn() === 'Test title', 'SEO save not persisted');
+    $db->exec('ALTER TABLE tenant_companies ADD subdomain VARCHAR(100)');
+    $db->exec('ALTER TABLE tenant_admins ADD last_login DATETIME');
+    $db->exec('CREATE TABLE tenant_admin_sessions (id CHAR(36) PRIMARY KEY, tenant_admin_id CHAR(36), session_id VARCHAR(128), is_active BOOLEAN, login_at DATETIME, logout_at DATETIME, last_activity DATETIME, ip_address VARCHAR(45)) ENGINE=InnoDB');
+    $db->exec("INSERT INTO tenant_admin_sessions VALUES ('1','admin','targetsession',1,NOW(),NULL,NOW(),NULL),('two','admin','othersession',1,NOW(),NULL,NOW(),NULL)");
+    file_put_contents($root.'/sessions/sess_targetsession', 'tenant_admin_id|s:5:"admin";company_id|s:1:"A";');
+    file_put_contents($root.'/sessions/sess_othersession', 'tenant_admin_id|s:5:"admin";company_id|s:1:"A";');
+    check(count(http($base,'get_active_sessions')[1]['sessions']) === 2, 'Session list failed');
+    $logout = ['admin_id'=>'admin','session_id'=>1,'csrf_token'=>'test-portal'];
+    check(http($base,'logout_user',array_merge($logout,['csrf_token'=>'bad']))[0] === 403, 'Session termination missing CSRF protection');
+    check(http($base,'logout_user',$logout)[1]['terminated'] === 1, 'Exact session termination failed');
+    check(count(http($base,'get_active_sessions')[1]['sessions']) === 1, 'Another session was terminated');
+    check(!str_contains(file_get_contents($root.'/sessions/sess_targetsession'),'tenant_admin_id'), 'PHP session retained authorization');
+    check(str_contains(file_get_contents($root.'/sessions/sess_othersession'),'tenant_admin_id'), 'Other PHP session affected');
+    check(http($base,'get_activity_stream')[1]['success'] === true, 'Activity HTTP response failed: ' . substr(file_get_contents($root.'/server.log'), -2200));
+    // Query-string helper is not used for endpoint names; validate linkage via a
+    // direct request while retaining the same authenticated test cookie.
+    $ch = curl_init($base.'/saas_portal/api/get_admins.php?company_id=A');
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Cookie: PHPSESSID=brregtestsession']]);
+    $adminsResponse = json_decode(curl_exec($ch),true); curl_close($ch);
+    check($adminsResponse['success'] === true && array_key_exists('tenant_staff_id',$adminsResponse['admins'][0]), 'Account-to-employee mapping missing');
+    echo "MySQL import, employee/account CRUD, bulk/user modules, SEO, activity, exact-session termination and auth/CSRF checks passed.\n";
 } finally {
     if (is_resource($server)) {
         proc_terminate($server);

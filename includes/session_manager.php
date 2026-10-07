@@ -5,6 +5,7 @@ if (!isset($_SESSION)) {
 }
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/TenantSessionGuard.php';
 
 if (isset($_SESSION['session_id']) && isset($_SESSION['tenant_admin_id'])) {
     // Check if database type has changed (UUID vs INTEGER mismatch)
@@ -18,6 +19,11 @@ if (isset($_SESSION['session_id']) && isset($_SESSION['tenant_admin_id'])) {
         exit;
     }
     
+    if (!tenantSessionIsActive(getDBConnection(), $_SESSION['session_id'], (string)$_SESSION['tenant_admin_id'])) {
+        clearTenantSessionData();
+        header('Location: /admin.php?msg=session_ended');
+        exit;
+    }
     updateSessionActivity($_SESSION['session_id']);
     
     endInactiveSessions(30);

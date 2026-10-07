@@ -14,11 +14,14 @@ require_once __DIR__ . '/../../config/database.php';
 function getCompaniesData() {
     try {
         $db = getDBConnection();
+        $logoColumn = $db->query("SHOW COLUMNS FROM tenant_companies LIKE 'logo_url'")->fetch()
+            ? 'tc.logo_url' : 'NULL AS logo_url';
         
         $stmt = $db->query("
             SELECT 
                 tc.id,
                 tc.name,
+                {$logoColumn},
                 tc.subdomain,
                 tc.contact_email,
                 tc.contact_phone,

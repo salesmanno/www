@@ -1073,6 +1073,24 @@ try {
                     alert('En feil oppstod ved refresh av session');
                 });
         }
+
+        // A portal administrator can terminate a tenant session remotely.
+        // Do not leave the signed-in interface visible until the next navigation.
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/refresh_session.php', {headers: {'Accept': 'application/json'}});
+                if (response.status === 401) {
+                    window.location.replace('/admin.php?msg=session_ended');
+                } else if (response.ok) {
+                    const result = await response.json();
+                    if (result.session_ended || result.error === 'Not logged in') {
+                        window.location.replace('/admin.php?msg=session_ended');
+                    }
+                }
+            } catch (error) {
+                // A temporary network outage is not proof of a terminated session.
+            }
+        }, 15000);
         
         function savePermissions() {
             const form = document.getElementById('permissionsForm');

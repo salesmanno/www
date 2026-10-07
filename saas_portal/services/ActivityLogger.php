@@ -270,7 +270,32 @@ class ActivityLogger {
      * Read the newest activities and return the common shape expected by the
      * dashboard regardless of which audit_logs schema version is installed.
      */
-    public function getRecentActivity($limit = 50, $since = null) {
+    private function activityTypeExpression() {
+        $parts = [];
+        if ($this->hasColumn('action_type')) {
+            $parts[] = "NULLIF(al.action_type, '')";
+        }
+        if ($this->hasColumn('action')) {
+            $parts[] = "NULLIF(LOWER(al.action), '')";
+        }
+        $parts[] = "'activity'";
+        return count($parts) > 1 ? 'COALESCE(' . implode(', ', $parts) . ')' : "'activity'";
+    }
+
+    public function getActivityTypes($companyId = null) {
+        $sql = 'SELECT DISTINCT ' . $this->activityTypeExpression() . ' AS activity_type FROM audit_logs al';
+        $params = [];
+        if ($companyId !== null) {
+            $sql .= ' WHERE al.company_id = ?';
+            $params[] = $companyId;
+        }
+        $sql .= ' ORDER BY activity_type';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    public function getRecentActivity($limit = 50, $since = null, $companyId = null, $actionType = null) {
         try {
             $limit = max(1, min(1000, (int)$limit));
             $hasCompany = $this->hasColumn('company_id');
@@ -337,18 +362,30 @@ class ActivityLogger {
                 throw new RuntimeException('audit_logs mangler tidsstempelfelt');
             }
 
+            $conditions = [];
+            $parameters = [];
             if ($since) {
-                $sql .= " WHERE al.`{$dateColumn}` > ?";
+                $conditions[] = "al.`{$dateColumn}` > ?";
+                $parameters[] = $since;
+            }
+            if ($companyId !== null) {
+                $conditions[] = 'al.company_id = ?';
+                $parameters[] = $companyId;
+            }
+            if ($actionType !== null) {
+                $conditions[] = $this->activityTypeExpression() . ' = ?';
+                $parameters[] = $actionType;
+            }
+            if ($conditions) {
+                $sql .= ' WHERE ' . implode(' AND ', $conditions);
             }
             $sql .= " ORDER BY al.`{$dateColumn}` DESC LIMIT ?";
 
             $stmt = $this->db->prepare($sql);
-            if ($since) {
-                $stmt->bindValue(1, $since, PDO::PARAM_STR);
-                $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-            } else {
-                $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+            foreach ($parameters as $index => $parameter) {
+                $stmt->bindValue($index + 1, $parameter, PDO::PARAM_STR);
             }
+            $stmt->bindValue(count($parameters) + 1, $limit, PDO::PARAM_INT);
             $stmt->execute();
             $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -362,7 +399,7 @@ class ActivityLogger {
                 }
 
                 if (empty($activity['action_type'])) {
-                    $activity['action_type'] = strtolower((string)($activity['action'] ?? 'activity'));
+                    $activity['action_type'] = strtolower((string)(($activity['action'] ?? '') ?: 'activity'));
                 }
                 if (empty($activity['actor_display'])) {
                     $actorFallback = trim((string)($activity['user_email'] ?? ''));
