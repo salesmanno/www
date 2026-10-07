@@ -21,3 +21,9 @@ Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; Su
 
 **How to apply:** Bruk bedriftens abonnementstilknytning til å finne features. Brukeren valgte individuell modultilgang per bedrift: endringer i en bedrifts features skal ikke endre andre bedrifters tilgang, selv om de tidligere delte plan.
 
+Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet og skal ikke ha firmaets modulrestriksjoner.
+
+**Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.
+
+**How to apply:** Planlegg en eksplisitt, serverkontrollert global rolle. Sletting eller frakobling av en ansatt må ikke automatisk oppgradere en tidligere firmakonto til global tilgang. Omfanget av tilgang til andre bedrifters data må avklares separat.
+
