@@ -19,5 +19,5 @@ Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; Su
 
 **Why:** Brukeren presiserte at dette er den tiltenkte tilgangsmodellen, ikke bedriftens separate modulrader som autoritativ kilde.
 
-**How to apply:** Bruk bedriftens abonnementstilknytning til å finne features. Avklar om en plan er delt eller bedriftsspesifikk før en bedrifts moduler endrer features på planen.
+**How to apply:** Bruk bedriftens abonnementstilknytning til å finne features. Brukeren valgte individuell modultilgang per bedrift: endringer i en bedrifts features skal ikke endre andre bedrifters tilgang, selv om de tidligere delte plan.
 
