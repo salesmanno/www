@@ -14,3 +14,10 @@ Bulk company-module assignment adds permissions without removing existing grants
 **Why:** The requested operation was to give selected companies module access, not to replace all their existing permissions.
 
 **How to apply:** Any future bulk revoke/replace operation must be separately labelled and explicitly confirmed.
+
+Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; SuperUsers skal bare kunne tildeles moduler fra disse features.
+
+**Why:** Brukeren presiserte at dette er den tiltenkte tilgangsmodellen, ikke bedriftens separate modulrader som autoritativ kilde.
+
+**How to apply:** Bruk bedriftens abonnementstilknytning til å finne features. Avklar om en plan er delt eller bedriftsspesifikk før en bedrifts moduler endrer features på planen.
+
