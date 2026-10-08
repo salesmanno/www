@@ -10,6 +10,8 @@ if (!isset($_SESSION['saas_admin_id'])) {
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
+require_once __DIR__.'/../../includes/CompanyModuleAccess.php';
 require_once __DIR__ . '/../services/PortalDatabase.php';
 
 try {
@@ -29,12 +31,14 @@ try {
             tc.created_at,
             (SELECT COUNT(*) FROM tenant_admins WHERE company_id = tc.id) as admin_count,
             (SELECT COUNT(*) FROM tenant_staff WHERE company_id = tc.id) as staff_count,
-            (SELECT COUNT(*) FROM tenant_company_modules WHERE company_id = tc.id AND is_active = " . dbBool(true) . ") as module_count
+            0 as module_count
         FROM tenant_companies tc
         ORDER BY tc.created_at DESC
     ");
     
     $companies = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($companies as &$company) $company['module_count']=count(CompanyModuleAccess::modules($db,(string)$company['id']));
+    unset($company);
     
     echo json_encode(['success' => true, 'companies' => $companies]);
     

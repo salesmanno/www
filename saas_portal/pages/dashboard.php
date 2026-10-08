@@ -7,6 +7,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 if (empty($_SESSION['portal_csrf'])) {
     $_SESSION['portal_csrf'] = bin2hex(random_bytes(32));
 }
@@ -289,6 +290,20 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         </div>
         <div id="companyStatus" role="status" aria-live="polite"></div>
         <div id="companiesList"><div class="portal-skeleton" aria-label="Laster bedrifter"></div></div>
+        <section class="portal-panel global-users-panel" aria-labelledby="globalUsersTitle">
+            <div class="portal-panel-title">
+                <div><div class="workspace-eyebrow">SaaS-identiteter</div><h3 id="globalUsersTitle">Globale brukere</h3></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="globalUsersRefresh">Oppdater</button>
+            </div>
+            <p class="small text-muted global-users-intro">Globale kontoer logger inn på SaaS-nivå og ligger utenfor bedriftenes ansattlister. Eksisterende bedriftskontoer blir aldri oppgradert uten en eksplisitt forhåndsvisning og bekreftelse.</p>
+            <div id="globalUsersStatus" role="status" aria-live="polite"></div>
+            <div id="globalUsersSchemaNotice"></div>
+            <div class="global-users-grid">
+                <section aria-labelledby="globalAccountsTitle"><div class="global-users-section-heading"><h4 id="globalAccountsTitle">Eksisterende globale kontoer</h4><span class="small text-muted">SaaS-innlogging</span></div><div id="globalUsersList" aria-busy="true"><div class="portal-skeleton" aria-label="Laster globale brukere"></div></div></section>
+                <section aria-labelledby="globalCandidatesTitle"><div class="global-users-section-heading"><h4 id="globalCandidatesTitle">Kandidater fra bedrifter</h4><span class="small text-muted">Ingen automatisk oppgradering</span></div><div id="globalUsersCandidates" aria-busy="true"><div class="portal-skeleton" aria-label="Laster kandidater"></div></div></section>
+            </div>
+            <div id="globalUserPreview" class="global-user-preview" hidden aria-live="polite"></div>
+        </section>
         <div class="dashboard-bottom">
             <section class="portal-panel">
                 <div class="portal-panel-title"><h3><i class="bi bi-clock-history me-2"></i>Samlet aktivitet</h3><div class="workspace-actions"><button type="button" id="pauseBtn" class="btn btn-sm btn-outline-secondary" onclick="togglePause()" aria-label="Pause automatisk oppdatering" aria-pressed="false">Pause</button><button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadActivityStream()">Oppdater</button></div></div>
@@ -421,15 +436,28 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
             <div class="modal-header"><div><h2 class="modal-title h5 mb-1" id="companyGrantTitle">Moduler og abonnement</h2><p class="small mb-0 text-white-50">Gjennomgå prisene og bekreft før abonnementene lagres.</p></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
             <div class="modal-body">
-                <div class="alert alert-info py-2" role="note">Eksisterende tilganger og avtalepriser beholdes. Nye modulers månedspris legges til avtalen. Engangsetablering registreres separat; ingen betaling trekkes automatisk.</div>
+                <div class="alert alert-info py-2" role="note">Tilganger settes nøyaktig slik de vises per bedrift. Fjerner du en aktiv modul, fjernes tilgangen. Den nye månedsprisen erstatter gjeldende avtalepris; etablering vises separat, og ingen betaling trekkes automatisk.</div>
                 <p id="companyGrantSummary" class="text-muted mb-3"></p>
                 <div id="companyGrantStatus" role="status" aria-live="polite"></div>
                 <div class="row g-3 align-items-start">
-                    <section class="col-12 col-lg-7" aria-labelledby="companyGrantModulesTitle">
-                        <div class="d-flex justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantModulesTitle" class="h6 mb-0">Modulkatalog</h3><span class="small text-muted">Velg eventuelle moduler å inkludere i estimatet</span></div>
-                        <div id="companyGrantModules" aria-busy="false"></div>
+                    <section class="col-12 col-lg-8" aria-labelledby="companyGrantModulesTitle">
+                        <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantModulesTitle" class="h6 mb-0">Tilganger per bedrift</h3><label class="small text-muted" for="companyGrantCompanySwitcher">Rediger bedrift</label><select id="companyGrantCompanySwitcher" class="form-select form-select-sm grant-company-switcher" aria-label="Velg bedrift å redigere"></select></div>
+                        <h4 id="companyGrantEditorName" class="h6 mb-2"></h4>
+                        <div class="row g-3 module-transfer" aria-describedby="companyGrantMoveHelp">
+                            <section class="col-12 col-md-6" aria-labelledby="companyGrantAvailableTitle"><div class="module-transfer-heading"><h5 id="companyGrantAvailableTitle">Tilgjengelige</h5><span>Ikke valgt</span></div><div id="companyGrantAvailable" class="module-transfer-list" tabindex="-1" aria-live="polite" aria-busy="false"></div></section>
+                            <section class="col-12 col-md-6" aria-labelledby="companyGrantSelectedTitle"><div class="module-transfer-heading"><h5 id="companyGrantSelectedTitle">Valgt for bedriften</h5><span>Eksakt tilgang</span></div><div id="companyGrantSelected" class="module-transfer-list" tabindex="-1" aria-live="polite" aria-busy="false"></div></section>
+                        </div>
+                        <p id="companyGrantMoveHelp" class="small text-muted mt-2 mb-3">Velg en modul med mus, Enter eller mellomrom for å flytte den mellom listene. Tomt utvalg fjerner alle modultilganger.</p>
+                        <div class="company-contract-controls">
+                            <div class="user-limit-control"><div><label for="companyGrantMaxUsers" class="form-label fw-semibold mb-1">Maks brukere</label><div id="companyGrantActiveUsers" class="small text-muted">Aktive brukere lastes …</div></div><input id="companyGrantMaxUsers" class="form-control" type="number" min="0" step="1" inputmode="numeric" aria-describedby="companyGrantActiveUsers"></div>
+                            <div class="discount-controls">
+                                <div><label for="companyGrantMonthlyDiscount" class="form-label fw-semibold mb-1">Månedsrabatt</label><div class="input-group input-group-sm"><input id="companyGrantMonthlyDiscount" class="form-control" type="text" inputmode="decimal" maxlength="6" autocomplete="off" aria-describedby="companyGrantDiscountHelp"><span class="input-group-text">%</span></div></div>
+                                <div><label for="companyGrantSetupDiscount" class="form-label fw-semibold mb-1">Etableringsrabatt</label><div class="input-group input-group-sm"><input id="companyGrantSetupDiscount" class="form-control" type="text" inputmode="decimal" maxlength="6" autocomplete="off" aria-describedby="companyGrantDiscountHelp"><span class="input-group-text">%</span></div></div>
+                            </div>
+                            <p id="companyGrantDiscountHelp" class="small text-muted mb-0">Rabatten gjelder denne bedriften. Angi 0–100 prosent med maks to desimaler.</p>
+                        </div>
                     </section>
-                    <section class="col-12 col-lg-5" aria-labelledby="companyGrantSetupTitle">
+                    <section class="col-12 col-lg-4" aria-labelledby="companyGrantSetupTitle">
                         <div class="rounded border p-3 h-100" style="background:#f5f8f3">
                             <div class="small text-uppercase fw-semibold text-muted mb-1">Oppsett</div>
                             <h3 id="companyGrantSetupTitle" class="h6">Fakturautsteder</h3>
@@ -439,13 +467,13 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     </section>
                 </div>
                 <section class="mt-4" aria-labelledby="companyGrantCompaniesTitle">
-                    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantCompaniesTitle" class="h6 mb-0">Pris per bedrift</h3><span class="small text-muted">Beregnet fra katalogen; gjeldende avtale vises separat</span></div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantCompaniesTitle" class="h6 mb-0">Pris per bedrift</h3><span class="small text-muted">Full pakke, etablering og avtalt pris er oppdelt</span></div>
                     <div id="companyGrantCompanyQuotes"></div>
                 </section>
                 <div id="companyGrantWarnings" class="mt-3"></div>
                 <div class="form-check mt-3">
                     <input class="form-check-input" type="checkbox" id="companyGrantAcknowledgement" disabled>
-                    <label class="form-check-label" for="companyGrantAcknowledgement">Jeg bekrefter prisene og vil lagre abonnement og modultilgang for de valgte bedriftene.</label>
+                    <label class="form-check-label" for="companyGrantAcknowledgement">Jeg bekrefter at månedsprisen erstatter avtalt pris, rabattene og etableringsbeløpet vises korrekt, og tilgangene settes nøyaktig som vist.</label>
                 </div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled aria-describedby="companyGrantSubmitNote">Bekreft og lagre</button><span id="companyGrantSubmitNote" class="small text-muted w-100 text-end">Alle priser og tilganger kontrolleres på nytt ved lagring.</span></div>
@@ -465,6 +493,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     </div>
     <script src="/saas_portal/assets/portal-workspace.js"></script>
     <script src="/saas_portal/assets/dashboard-workspace.js"></script>
+    <script src="/saas_portal/assets/global-users.js"></script>
     <script src="/saas_portal/assets/module-transition-preview.js"></script>
     <script>
         const portalCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

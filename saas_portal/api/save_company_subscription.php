@@ -8,9 +8,10 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../services/PortalDatabase.php';
 require_once __DIR__ . '/../services/PortalSubscriptionService.php';
 try {
+    if (array_key_exists('selections', $data) && !is_array($data['selections'])) throw new InvalidArgumentException('Ugyldig bedriftsoppsett.');
     $db = PortalDatabase::connect();
     $result = (new PortalSubscriptionService($db))->save(
-        $data['company_ids'] ?? null,$data['module_ids'] ?? null,$data['quote_hash'] ?? null,$_SESSION['saas_admin_id']
+        $data['company_ids'] ?? null,$data['module_ids'] ?? null,$data['quote_hash'] ?? null,$_SESSION['saas_admin_id'],$data['selections'] ?? null
     );
     if (!$result['replayed']) {
         try {

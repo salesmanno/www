@@ -128,8 +128,8 @@ try {
 
     // The real endpoint, in a disposable app copy with isolated PHP sessions.
     $directory = '/tmp/' . $schema;
-    foreach (['config','sessions','saas_portal/api','saas_portal/services'] as $relative) mkdir($directory . '/' . $relative, 0700, true);
-    foreach (['api/portal_request.php','api/preview_module_transition.php','services/PortalDatabase.php','services/PortalModuleTransitionPreview.php'] as $file) {
+    foreach (['config','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $relative) mkdir($directory . '/' . $relative, 0700, true);
+    foreach (['api/portal_request.php','api/preview_module_transition.php','services/PortalDatabase.php','services/PortalModuleTransitionPreview.php','services/PortalSaasIdentity.php','auth/require_active.php'] as $file) {
         copy(__DIR__ . '/../' . $file, $directory . '/saas_portal/' . $file);
     }
     $dsn = var_export("mysql:unix_socket={$socket};dbname={$schema};charset=utf8mb4", true);

@@ -51,11 +51,14 @@ try {
     rejectSettings(fn()=>$service->getPayments('A'));
     $db->exec("UPDATE economy_payment_gateways SET configuration_id='ca' WHERE id='ga'");
     // Real protected HTTP endpoints, with configuration and sessions isolated in /tmp.
-    foreach (['config','sessions','saas_portal/api','saas_portal/services'] as $sub) mkdir($dir.'/'.$sub,0700,true);
+    $db->exec("CREATE TABLE saas_admins(id CHAR(36) PRIMARY KEY,email VARCHAR(255),role VARCHAR(50),is_active INT) ENGINE=InnoDB");
+    $db->exec("INSERT INTO saas_admins VALUES ('actor','operator@example.test','admin',1)");
+    foreach (['config','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
     foreach (['portal_request','company_settings_request','get_email_config','get_payment_gateways','save_email_config','save_payment_gateway','connect_email'] as $file) {
         copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
     }
-    foreach (['PortalCompanySettings','PortalDatabase'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
+    foreach (['PortalCompanySettings','PortalDatabase','PortalSaasIdentity'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
+    copy(__DIR__.'/../auth/require_active.php',$dir.'/saas_portal/auth/require_active.php');
     file_put_contents($dir.'/config/database.php',"<?php function getDBConnection(){if(file_exists(__DIR__.'/outage'))throw new RuntimeException('fixture-unavailable');return new PDO(".var_export("mysql:unix_socket={$socket};dbname={$schema};charset=utf8mb4",true).",'root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);}");
     file_put_contents($dir.'/sessions/sess_settingstest','saas_admin_id|s:5:"actor";portal_csrf|s:4:"csrf";');
     $listener = stream_socket_server('tcp://127.0.0.1:0',$errno,$error);

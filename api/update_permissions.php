@@ -9,6 +9,7 @@ if (!isset($_SESSION['tenant_admin_id'])) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__.'/../includes/CompanyModuleAccess.php';
 
 $input = json_decode(file_get_contents('php://input'), true);
 $moduleIds = $input['modules'] ?? [];
@@ -23,14 +24,10 @@ try {
     
     $adminId = $_SESSION['tenant_admin_id'];
     $companyId = $_SESSION['company_id'];
+    if (!is_array($moduleIds)||!array_is_list($moduleIds)||count($moduleIds)>200||
+        array_filter($moduleIds,static fn($id)=>!is_string($id)||$id===''||strlen($id)>36)) throw new InvalidArgumentException('Ugyldige moduler valgt.');
     
-    $stmt = $db->prepare("
-        SELECT module_id 
-        FROM tenant_company_modules 
-        WHERE company_id = ? AND is_active = TRUE
-    ");
-    $stmt->execute([$companyId]);
-    $allowedModules = array_column($stmt->fetchAll(), 'module_id');
+    $allowedModules = array_column(CompanyModuleAccess::modules($db,(string)$companyId),'id');
     
     $validModuleIds = array_intersect($moduleIds, $allowedModules);
     
@@ -41,6 +38,13 @@ try {
     }
     
     $db->beginTransaction();
+    $companyLock=$db->prepare('SELECT id FROM tenant_companies WHERE id=? FOR UPDATE');
+    $companyLock->execute([$companyId]);
+    $actor=$db->prepare('SELECT id FROM tenant_admins WHERE id=? AND company_id=? AND is_active=TRUE');
+    $actor->execute([$adminId,$companyId]);
+    if (!$actor->fetchColumn()) throw new InvalidArgumentException('Firmasesjonen er avsluttet. Logg inn på nytt.');
+    $allowedModules=array_column(CompanyModuleAccess::modules($db,(string)$companyId),'id');
+    if (array_diff($moduleIds,$allowedModules)) throw new InvalidArgumentException('Bedriftens modultilgang er endret. Last siden på nytt.');
     
     // Hent system saas_admin ID (for granted_by kolonnen)
     $stmt = $db->query("SELECT id FROM saas_admins LIMIT 1");

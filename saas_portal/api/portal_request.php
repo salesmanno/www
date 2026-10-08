@@ -31,3 +31,5 @@ function portalPostData(): array {
     }
     return $data;
 }
+require_once __DIR__.'/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';

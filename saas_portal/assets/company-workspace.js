@@ -3,6 +3,7 @@ let portalStaff = [];
 let portalAdmins = [];
 let portalStaffReady = false;
 let portalAccountsReady = false;
+let portalAccountQuota = null;
 let portalLinkedAccountStaffId = '';
 const portalExpandedStaff = new Set();
 const portalExpandedAccounts = new Set();
@@ -29,6 +30,7 @@ async function portalRefreshAdmins() {
     try {
         const data = await portalRequest('/saas_portal/api/get_admins.php?company_id=' + encodeURIComponent(companyId));
         portalAdmins = Array.isArray(data.admins) ? data.admins : [];
+        portalAccountQuota = data.quota || null;
         portalAccountsReady = true;
         document.getElementById('adminLoadStatus').replaceChildren();
         portalRenderPeople();
@@ -66,6 +68,10 @@ function portalRenderPeople() {
     if (!portalStaffReady) return;
     const list = document.getElementById('staffList');
     list.replaceChildren();
+    if (portalAccountQuota) {
+        const limit = portalAccountQuota.max_users;
+        portalText(list, 'p', `${portalAccountQuota.active_users} aktive SuperUsers / ${limit === null ? 'brukergrense ikke satt' : 'maks ' + limit}`, 'small text-muted');
+    }
     if (!portalStaff.length) portalText(list, 'p', 'Ingen ansatte registrert. Legg til en ansatt eller importer rolleinnehavere.', 'portal-empty');
     portalStaff.forEach(staff => {
         const id = String(staff.id);
@@ -102,7 +108,9 @@ function portalRenderPeople() {
             portalText(detail, 'p', 'Ansatt er registrert med konto, men koblingen kunne ikke leses. Kontroller eldre kontoer nedenfor.', 'small text-muted');
         } else {
             const create = portalButton(detail, 'Opprett SuperUser', () => showCreateAdmin(id), 'btn btn-sm btn-primary-custom');
-            create.disabled = !staff.email;
+            create.disabled = !staff.email || !portalAccountQuota || portalAccountQuota.max_users === null ||
+                portalAccountQuota.active_users >= portalAccountQuota.max_users;
+            if (staff.email && create.disabled) create.title = 'Sett eller øk brukergrensen i bedriftens abonnementsoppsett.';
             if (!staff.email) portalText(detail, 'p', 'Legg til e-post på den ansatte først.', 'small text-muted mt-2');
         }
     });

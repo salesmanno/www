@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/CompanyModuleAccess.php';
 
 function getTenantAdminByUsername($username) {
     $db = getDBConnection();
@@ -50,16 +51,7 @@ function getTenantAdminModules($adminId) {
     if (!$db) {
         return [];
     }
-    $activeValue = dbBool(true);
-    $stmt = $db->prepare("
-        SELECT sm.id, sm.name, sm.module_key, sm.description, sm.icon, sm.is_active, sm.created_at
-        FROM system_modules sm
-        INNER JOIN tenant_admin_modules tam ON sm.id = tam.module_id
-        WHERE tam.tenant_admin_id = ? AND sm.is_active = $activeValue
-        ORDER BY sm.name
-    ");
-    $stmt->execute([$adminId]);
-    return $stmt->fetchAll();
+    return CompanyModuleAccess::adminModules($db, (string)$adminId);
 }
 
 function getCompanyModules($companyId) {
@@ -67,16 +59,7 @@ function getCompanyModules($companyId) {
     if (!$db) {
         return [];
     }
-    $activeValue = dbBool(true);
-    $stmt = $db->prepare("
-        SELECT sm.id, sm.name, sm.module_key, sm.description, sm.icon, sm.is_active, sm.created_at
-        FROM system_modules sm
-        INNER JOIN tenant_company_modules tcm ON sm.id = tcm.module_id
-        WHERE tcm.company_id = ? AND tcm.is_active = $activeValue AND sm.is_active = $activeValue
-        ORDER BY sm.name
-    ");
-    $stmt->execute([$companyId]);
-    return $stmt->fetchAll();
+    return CompanyModuleAccess::modules($db, (string)$companyId);
 }
 
 function getLatestNews($limit = 5) {

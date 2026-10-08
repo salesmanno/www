@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 require_once __DIR__ . '/../includes/DomeneshopService.php';
 
 header('Content-Type: application/json');

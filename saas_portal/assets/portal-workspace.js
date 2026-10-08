@@ -79,6 +79,7 @@ async function portalLoadSessions(company) {
                     await portalPost('/saas_portal/api/logout_user.php', {
                         admin_id: session.tenant_admin_id || session.admin_id,
                         session_id: session.session_id,
+                        identity_kind: session.identity_kind || 'tenant',
                         csrf_token: portalCsrf
                     });
                     await portalLoadSessions(company);

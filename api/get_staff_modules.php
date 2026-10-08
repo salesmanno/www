@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__.'/../includes/CompanyModuleAccess.php';
 
 header('Content-Type: application/json');
 
@@ -34,13 +35,7 @@ try {
     $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get all available modules
-    $stmt = $db->query("
-        SELECT id, name, module_key, icon, description
-        FROM system_modules
-        WHERE is_active = TRUE
-        ORDER BY name
-    ");
-    $modules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $modules = CompanyModuleAccess::modules($db,(string)$company_id);
     
     // For each admin, get their module access
     foreach ($admins as &$admin) {

@@ -8,6 +8,8 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
+require_once __DIR__.'/../../includes/CompanyModuleAccess.php';
 
 header('Content-Type: application/json');
 
@@ -19,9 +21,7 @@ try {
     $stmt = $db->query("SELECT id, name, description, module_key FROM system_modules WHERE is_active = " . dbBool(true));
     $allModules = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $stmt = $db->prepare("SELECT module_id FROM tenant_company_modules WHERE company_id = ? AND is_active = " . dbBool(true));
-    $stmt->execute([$company_id]);
-    $grantedIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $grantedIds = array_column(CompanyModuleAccess::modules($db,(string)$company_id),'id');
     
     foreach ($allModules as &$module) {
         $module['granted'] = in_array($module['id'], $grantedIds);
@@ -30,6 +30,6 @@ try {
     echo json_encode(['success' => true, 'modules' => $allModules]);
     
 } catch (Exception $e) {
-    error_log("Get company modules error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    error_log('Get company modules failed.');
+    echo json_encode(['success' => false, 'message' => 'Kunne ikke hente bedriftens modultilgang.']);
 }

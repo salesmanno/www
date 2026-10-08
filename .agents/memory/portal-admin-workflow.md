@@ -57,6 +57,12 @@ Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet o
 
 **How to apply:** Brukeren valgte tilgang til alle bedrifter. Bruk en eksplisitt, serverkontrollert global rolle gjennom eksisterende SaaS-innlogging, uten ny SuperUser-innlogging i portalen. Sletting eller frakobling av en ansatt må ikke automatisk oppgradere en tidligere firmakonto til global tilgang.
 
+Eksisterende SaaS-innlogging og eldre SaaS-roller skal fortsette å fungere uten at den nye globale kontomigreringen er kjørt.
+
+**Why:** Nye rollebegrensninger og krav om globale sesjonstabeller kunne blokkere den etablerte SaaS-innloggingen. Brukeren presiserte at det var SaaS-innloggingen i dette prosjektet som måtte bevares.
+
+**How to apply:** Ikke legg nye migrerings- eller tilgangskrav på gamle SaaS-operatører som del av kontoflyttingen. Obligatorisk ny sesjonssporing og løpende global rollekontroll gjelder uttrykkelig konverterte identiteter; nye kontoflyttinger skal fortsatt verifisere operatøren på serveren.
+
 Aktivitetsfeeder skal vise lesbare setninger om aktør, handling og arrangement eller betaling, med detaljer ved hover og gamle/nye verdier ved endringer. Alle feeder og øktbokser skal oppdateres løpende; aktive økter skal ha sanntidsnedtelling, og påloggede ansatte skal ha grønt lys på bedriftssiden.
 
 **Why:** Brukeren beskrev feeden som uleselig og ønsket å se hva kunder og SuperUsers faktisk gjør, uten manuell oppdatering.

@@ -14,6 +14,7 @@ if (empty($_SESSION['portal_csrf'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 
 $company_id = $_GET['id'] ?? '';
 
@@ -29,6 +30,8 @@ try {
     $stmt = $db->prepare("SELECT * FROM tenant_companies WHERE id = ?");
     $stmt->execute([$company_id]);
     $company = $stmt->fetch();
+    $globalModules=($_SESSION['saas_admin_role'] ?? '')==='global_admin'
+        ? PortalSaasIdentity::companyModules($db,(string)$_SESSION['saas_admin_id'],(string)$company_id) : [];
 } catch (Throwable $error) {
     error_log('Company detail load failed: ' . $error->getMessage());
     $company_load_error = 'Kunne ikke laste bedriften. Databasen er utilgjengelig. Prøv igjen senere.';
@@ -133,6 +136,13 @@ if (!$company) {
         <?php exit; ?>
         <?php endif; ?>
         <div class="workspace-heading"><div><div class="workspace-eyebrow">Administrasjon / bedrift</div><h2><?= htmlspecialchars($company['name']) ?></h2><p class="text-muted mb-0 mt-1"><?= htmlspecialchars($company['subdomain']) ?>.salesman.no</p></div></div>
+        <?php if (($_SESSION['saas_admin_role'] ?? '')==='global_admin'): ?>
+        <section class="portal-panel mb-3" aria-label="Global SaaS-tilgang">
+            <h3 class="h6">Global SaaS-tilgang</h3>
+            <p class="small text-muted">Denne innloggingen kan administrere alle bedrifter og har tilgang til alle aktive moduler. Bedriftens features begrenser bare firmakontoene.</p>
+            <div class="d-flex flex-wrap gap-2"><?php foreach ($globalModules as $module): ?><span class="badge text-bg-light"><?= htmlspecialchars($module['name']) ?></span><?php endforeach; ?></div>
+        </section>
+        <?php endif; ?>
         <div class="detail-grid">
         <div class="detail-main">
         <section class="portal-panel company-activity-panel">

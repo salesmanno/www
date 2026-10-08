@@ -27,18 +27,33 @@ final class PortalSubscriptionService {
         $this->db->prepare("UPDATE `{$table}` SET {$assignments} WHERE id=?")->execute([...array_values($values),$id]);
     }
 
-    public function save($companyIds, $moduleIds, $quoteHash, string $actor): array {
+    public function save($companyIds, $moduleIds, $quoteHash, string $actor, ?array $selections = null): array {
         $companyIds = PortalCompanyService::ids($companyIds);
-        $moduleIds = PortalCompanyService::ids($moduleIds);
+        if ($selections === null && $moduleIds === null) throw new InvalidArgumentException('Et fullstendig modulvalg er påkrevd.');
+        if ($moduleIds !== null && (!is_array($moduleIds) || !array_is_list($moduleIds))) throw new InvalidArgumentException('Ugyldig modulvalg.');
+        $moduleIds = $moduleIds === null ? null : ($moduleIds ? PortalCompanyService::ids($moduleIds) : []);
+        if ($selections !== null) {
+            if (count($selections) !== count($companyIds) || array_diff(array_keys($selections), $companyIds)) throw new InvalidArgumentException('Ufullstendig bedriftsoppsett.');
+            foreach ($companyIds as $id) {
+                if (!isset($selections[$id]['module_ids']) || !is_array($selections[$id]['module_ids']) || !array_is_list($selections[$id]['module_ids']) || !array_key_exists('max_users', $selections[$id])) throw new InvalidArgumentException('Ufullstendig bedriftsoppsett.');
+                $selections[$id]['module_ids'] = $selections[$id]['module_ids'] ? PortalCompanyService::ids($selections[$id]['module_ids']) : [];
+                $selections[$id]['max_users'] = PortalSuperUserQuota::limit($selections[$id]['max_users']);
+                foreach (['plan_setup_discount','plan_monthly_discount'] as $field) {
+                    if (array_key_exists($field,$selections[$id])) $selections[$id][$field]=PortalSubscriptionPricing::discount($selections[$id][$field]);
+                }
+                if ($selections[$id]['max_users'] === null) throw new InvalidArgumentException('Sett maksimalt antall SuperUsers.');
+            }
+            ksort($selections, SORT_STRING);
+        }
         if (!is_string($quoteHash) || !preg_match('/^[a-f0-9]{64}$/D', $quoteHash)) {
             throw new InvalidArgumentException('Hent et oppdatert prisoppsett før lagring.');
         }
-        if (count($companyIds)*count($moduleIds) > 5000) throw new InvalidArgumentException('For mange tildelinger samtidig.');
+        if (count($companyIds)*count($moduleIds ?? []) > 5000) throw new InvalidArgumentException('For mange tildelinger samtidig.');
         if ($this->db->inTransaction()) throw new RuntimeException('Lagring krever en egen transaksjon.');
-        $operation = hash('sha256', json_encode([$actor,$companyIds,$moduleIds,$quoteHash], JSON_THROW_ON_ERROR));
+        $operation = hash('sha256', json_encode([$actor,$companyIds,$moduleIds,$selections,$quoteHash], JSON_THROW_ON_ERROR));
         // No DDL here: both pricing tables must have been installed explicitly.
         $engine = $this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
-        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','saas_subscription_plan_modules','saas_subscription_changes'] as $table) {
+        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules','saas_subscription_plan_modules','saas_subscription_changes'] as $table) {
             $engine->execute([$table]);
             if (strcasecmp((string)$engine->fetchColumn(), 'InnoDB') !== 0) throw new InvalidArgumentException('Abonnementsmigreringen må installeres før lagring.');
         }
@@ -57,7 +72,7 @@ final class PortalSubscriptionService {
             $auth = $this->db->prepare('SELECT id FROM saas_admins WHERE id=? AND is_active=1 FOR UPDATE');
             $auth->execute([$actor]);
             if (!$auth->fetchColumn()) throw new PortalPreviewAuthorizationException('Ikke autorisert.');
-            $prior = $this->db->prepare('SELECT company_id,plan_id,price_monthly,setup_total,price_currency FROM saas_subscription_changes WHERE operation_key=? ORDER BY company_id FOR UPDATE');
+            $prior = $this->db->prepare('SELECT company_id,plan_id,price_monthly,setup_total,price_currency,max_users FROM saas_subscription_changes WHERE operation_key=? ORDER BY company_id FOR UPDATE');
             $prior->execute([$operation]);
             $saved = $prior->fetchAll(PDO::FETCH_ASSOC);
             if ($saved) {
@@ -65,7 +80,7 @@ final class PortalSubscriptionService {
                 $this->db->commit();
                 return ['success'=>true,'replayed'=>true,'companies'=>$saved,'message'=>'Abonnementsoppsettet var allerede lagret. Ingen ny etablering er registrert.'];
             }
-            $report = (new PortalSubscriptionPreview($this->db))->preview($companyIds,$moduleIds,$actor,true);
+            $report = (new PortalSubscriptionPreview($this->db))->preview($companyIds,$moduleIds,$actor,true,$selections);
             if (!$report['apply_available'] || !$report['price_schema_ready']) throw new InvalidArgumentException('Prisoppsettet er ikke klart for lagring.');
             if (!hash_equals($report['quote_hash'], $quoteHash)) {
                 throw new PortalSubscriptionConflictException('Pris eller tilgang har endret seg siden forhåndsvisningen. Oppdater oppsettet og bekreft på nytt.');
@@ -108,6 +123,8 @@ final class PortalSubscriptionService {
                     $plan['name'] = mb_substr($company['name'].' – abonnement',0,100);
                     $plan['features'] = $company['features'];
                     $plan['price_monthly'] = $company['proposed_monthly'];
+                    $plan['max_users'] = $company['max_users'];
+                    foreach (['plan_setup_discount','plan_monthly_discount'] as $field) if (in_array($field,$planColumns,true)) $plan[$field]=$company[$field];
                     if (!$source) $plan['is_active'] = 1;
                     foreach (['created_at','updated_at'] as $column) if (in_array($column,$planColumns,true)) $plan[$column] = $now;
                     if (in_array('created_by',$planColumns,true)) $plan['created_by'] = $actor;
@@ -115,13 +132,15 @@ final class PortalSubscriptionService {
                     $planId = $plan['id'];
                 } else {
                     $planId = $source['id'];
-                    $updates = ['features'=>$company['features'],'price_monthly'=>$company['proposed_monthly']];
+                    $updates = ['features'=>$company['features'],'price_monthly'=>$company['proposed_monthly'],'max_users'=>$company['max_users']];
+                    foreach (['plan_setup_discount','plan_monthly_discount'] as $field) if (in_array($field,$planColumns,true)) $updates[$field]=$company[$field];
                     if (in_array('updated_at',$planColumns,true)) $updates['updated_at'] = $now;
                     $this->update('saas_subscription_plans',$updates,$planId);
                 }
+                $this->db->prepare('DELETE FROM saas_subscription_plan_modules WHERE plan_id=?')->execute([$planId]);
                 foreach ($company['module_ids'] as $moduleId) {
-                    $price = $oldSnapshots[$moduleId] ?? $catalog[$moduleId];
-                    if (!$source || $shared || !isset($oldSnapshots[$moduleId])) {
+                    $price = $catalog[$moduleId];
+                    {
                         $this->insert('saas_subscription_plan_modules',[
                             'plan_id'=>$planId,'module_id'=>$moduleId,'price_monthly'=>$price['price_monthly'],
                             'price_setup'=>$price['price_setup'],'price_currency'=>$price['price_currency']
@@ -145,8 +164,19 @@ final class PortalSubscriptionService {
                     }
                     $this->insert('tenant_subscriptions',$link);
                 }
-                // Compatibility mirror: no existing grant is removed or silently upgraded.
-                foreach ($moduleIds as $moduleId) {
+                // Mirror the complete confirmed selection, including removals; no account/data deletion.
+                foreach ($company['removed_module_ids'] as $moduleId) {
+                    $grantQuery->execute([$company['company_id'],$moduleId]);
+                    $grant = $grantQuery->fetch(PDO::FETCH_ASSOC);
+                    if ($grant) {
+                        $values = ['is_active'=>0];
+                        if (in_array('deactivated_at',$grantColumns,true)) $values['deactivated_at'] = $now;
+                        $this->update('tenant_company_modules',$values,$grant['id']);
+                    }
+                    // Revoke obsolete per-account grants too, so legacy direct checks cannot retain access.
+                    $this->db->prepare('DELETE tam FROM tenant_admin_modules tam JOIN tenant_admins a ON a.id=tam.tenant_admin_id WHERE a.company_id=? AND tam.module_id=?')->execute([$company['company_id'],$moduleId]);
+                }
+                foreach ($company['module_ids'] as $moduleId) {
                     $grantQuery->execute([$company['company_id'],$moduleId]);
                     $grant = $grantQuery->fetch(PDO::FETCH_ASSOC);
                     if ($grant && (int)$grant['is_active']) continue;
@@ -160,12 +190,16 @@ final class PortalSubscriptionService {
                 $this->insert('saas_subscription_changes',[
                     'id'=>self::uuid(),'operation_key'=>$operation,'company_id'=>$company['company_id'],
                     'subscription_id'=>$subscriptionId,'plan_id'=>$planId,'created_by'=>$actor,
-                    'requested_module_ids'=>json_encode($moduleIds,JSON_THROW_ON_ERROR),'features'=>$company['features'],
+                    'requested_module_ids'=>json_encode($company['module_ids'],JSON_THROW_ON_ERROR),'features'=>$company['features'],
                     'old_monthly'=>$company['subscription']['agreed_monthly'] ?? null,
                     'price_monthly'=>$company['proposed_monthly'],'setup_total'=>$company['setup_total'],
+                    'old_max_users'=>$company['subscription']['max_users'] ?? null,'max_users'=>$company['max_users'],
+                    'old_setup_discount'=>$company['subscription']['plan_setup_discount'] ?? null,
+                    'old_monthly_discount'=>$company['subscription']['plan_monthly_discount'] ?? null,
+                    'plan_setup_discount'=>$company['plan_setup_discount'],'plan_monthly_discount'=>$company['plan_monthly_discount'],
                     'price_currency'=>$company['currency']
                 ]);
-                $results[] = ['company_id'=>$company['company_id'],'plan_id'=>$planId,'price_monthly'=>$company['proposed_monthly'],'setup_total'=>$company['setup_total'],'price_currency'=>$company['currency']];
+                $results[] = ['company_id'=>$company['company_id'],'plan_id'=>$planId,'price_monthly'=>$company['proposed_monthly'],'setup_total'=>$company['setup_total'],'price_currency'=>$company['currency'],'max_users'=>$company['max_users']];
             }
             $this->db->commit();
             return ['success'=>true,'replayed'=>false,'companies'=>$results,'message'=>count($results).' bedrifter har fått lagret abonnement og modultilgang. Ingen betaling er trukket.'];

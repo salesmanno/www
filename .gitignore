@@ -35,6 +35,7 @@ uploads/
 # Database exports
 *.sql
 !docs/*.sql
+!saas_portal/migrations/subscription_pricing.sql
 
 # Composer
 composer.phar

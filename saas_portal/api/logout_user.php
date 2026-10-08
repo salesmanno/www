@@ -12,6 +12,17 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/TenantSessionGuard.php';
 try {
     $db = getDBConnection();
+    if (($data['identity_kind'] ?? 'tenant')==='saas_global') {
+        if (!isset($data['session_id'])) portalReply(400,['success'=>false,'message'=>'Velg én global sesjon.']);
+        $stmt=$db->prepare('UPDATE saas_global_sessions SET revoked_at=NOW() WHERE id=? AND saas_admin_id=? AND revoked_at IS NULL');
+        $stmt->execute([$data['session_id'],$data['admin_id']]);
+        try {
+            require_once __DIR__.'/../services/ActivityLogger.php';
+            (new ActivityLogger($db))->log(null,$_SESSION['saas_admin_id'],'System','session_terminated','avsluttet global SaaS-sesjon',null,['saas_admin_id'=>$data['admin_id']],30);
+        } catch(Throwable $e){error_log('Global session termination: logging unavailable.');}
+        portalReply(200,['success'=>true,'message'=>'Global sesjon er avsluttet.','terminated'=>$stmt->rowCount()]);
+    }
+    if (($data['identity_kind'] ?? 'tenant')!=='tenant') portalReply(400,['success'=>false,'message'=>'Ugyldig identitetstype.']);
     $db->beginTransaction();
     $sql = 'SELECT tas.id, tas.session_id, ta.company_id FROM tenant_admin_sessions tas
         INNER JOIN tenant_admins ta ON ta.id = tas.tenant_admin_id

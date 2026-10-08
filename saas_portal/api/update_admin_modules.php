@@ -4,6 +4,7 @@ $requestData = portalPostData();
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../services/ActivityLogger.php';
+require_once __DIR__ . '/../../includes/CompanyModuleAccess.php';
 
 header('Content-Type: application/json');
 
@@ -37,7 +38,7 @@ try {
     $db->beginTransaction();
     
     // Valider at admin tilhører et firma
-    $stmt = $db->prepare("SELECT company_id FROM tenant_admins WHERE id = ? FOR UPDATE");
+    $stmt = $db->prepare("SELECT company_id FROM tenant_admins WHERE id = ?");
     $stmt->execute([$admin_id]);
     $company_id = $stmt->fetchColumn();
     
@@ -46,17 +47,16 @@ try {
         echo json_encode(['success' => false, 'message' => 'Admin ikke funnet']);
         exit;
     }
+    $companyLock=$db->prepare('SELECT id FROM tenant_companies WHERE id=? FOR UPDATE');
+    $companyLock->execute([$company_id]);
+    $stmt=$db->prepare('SELECT company_id FROM tenant_admins WHERE id=? FOR UPDATE');
+    $stmt->execute([$admin_id]);
+    if ($stmt->fetchColumn()!==$company_id) throw new InvalidArgumentException('Brukeren er endret. Last siden på nytt.');
     
     // Valider at alle modul-IDer tilhører firmaet
     if (!empty($module_ids)) {
-        $placeholders = str_repeat('?,', count($module_ids) - 1) . '?';
-        $stmt = $db->prepare("
-            SELECT COUNT(*) FROM tenant_company_modules 
-            WHERE company_id = ? AND module_id IN ($placeholders) AND is_active = " . dbBool(true) . "
-              AND module_id IN (SELECT id FROM system_modules WHERE is_active = " . dbBool(true) . ")"
-        );
-        $stmt->execute(array_merge([$company_id], $module_ids));
-        $validCount = $stmt->fetchColumn();
+        $allowedIds = array_column(CompanyModuleAccess::modules($db, $company_id), 'id');
+        $validCount = count(array_intersect($module_ids, $allowedIds));
         
         if ($validCount != count($module_ids)) {
             $db->rollBack();

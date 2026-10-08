@@ -4,6 +4,11 @@
 final class SubscriptionPricingSchema {
     public static function install(PDO $db): void {
         if ($db->inTransaction()) throw new RuntimeException('DDL kan ikke kjøres inne i en datatransaksjon.');
+        $planColumns = $db->query('SHOW COLUMNS FROM saas_subscription_plans')->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('max_users', $planColumns, true)) $db->exec('ALTER TABLE saas_subscription_plans ADD max_users INT UNSIGNED NULL');
+        foreach (['plan_setup_discount','plan_monthly_discount'] as $name) {
+            if (!in_array($name,$planColumns,true)) $db->exec("ALTER TABLE saas_subscription_plans ADD `{$name}` DECIMAL(5,2) DEFAULT 0");
+        }
         $column = $db->prepare('SELECT COLUMN_TYPE,CHARACTER_SET_NAME,COLLATION_NAME FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
         $types = [];
@@ -45,6 +50,12 @@ final class SubscriptionPricingSchema {
             old_monthly DECIMAL(10,2) NULL,
             price_monthly DECIMAL(10,2) NOT NULL,
             setup_total DECIMAL(10,2) NOT NULL,
+            old_max_users INT NULL,
+            max_users INT NULL,
+            old_setup_discount DECIMAL(5,2) NULL,
+            old_monthly_discount DECIMAL(5,2) NULL,
+            plan_setup_discount DECIMAL(5,2) NULL,
+            plan_monthly_discount DECIMAL(5,2) NULL,
             price_currency CHAR(3) NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY subscription_change_operation(company_id,operation_key),
@@ -53,5 +64,12 @@ final class SubscriptionPricingSchema {
             CONSTRAINT fk_subscription_change_plan FOREIGN KEY(plan_id) REFERENCES saas_subscription_plans(id),
             CONSTRAINT fk_subscription_change_actor FOREIGN KEY(created_by) REFERENCES saas_admins(id)
         ) ENGINE=InnoDB");
+        $historyColumns = $db->query('SHOW COLUMNS FROM saas_subscription_changes')->fetchAll(PDO::FETCH_COLUMN);
+        foreach (['old_max_users','max_users'] as $name) {
+            if (!in_array($name, $historyColumns, true)) $db->exec("ALTER TABLE saas_subscription_changes ADD `{$name}` INT NULL");
+        }
+        foreach (['old_setup_discount','old_monthly_discount','plan_setup_discount','plan_monthly_discount'] as $name) {
+            if (!in_array($name,$historyColumns,true)) $db->exec("ALTER TABLE saas_subscription_changes ADD `{$name}` DECIMAL(5,2) NULL");
+        }
     }
 }

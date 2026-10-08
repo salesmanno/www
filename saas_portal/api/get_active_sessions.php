@@ -8,6 +8,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 require_once __DIR__ . '/../services/PortalDatabase.php';
 
 header('Content-Type: application/json');
@@ -49,6 +50,18 @@ try {
     
     $stmt->execute($companyId !== null ? [$companyId] : []);
     $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($sessions as &$session) $session['identity_kind']='tenant';
+    unset($session);
+    if ($companyId===null && $db->query("SHOW TABLES LIKE 'saas_global_sessions'")->fetchColumn()) {
+        $global=$db->query("SELECT gs.id AS session_id,gs.saas_admin_id AS admin_id,gs.login_at,gs.last_activity,
+            NULL AS company_id,'Global SaaS-bruker' AS company_name,NULL AS subdomain,
+            sa.email AS username,sa.email AS admin_name,NULL AS ip_address,
+            TIMESTAMPDIFF(MINUTE,gs.last_activity,NOW()) AS minutes_idle,'saas_global' AS identity_kind
+            FROM saas_global_sessions gs JOIN saas_admins sa ON sa.id=gs.saas_admin_id
+            WHERE gs.revoked_at IS NULL AND gs.last_activity>DATE_SUB(NOW(),INTERVAL 30 MINUTE)
+            AND sa.is_active=1 AND sa.role='global_admin' ORDER BY gs.last_activity DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $sessions=array_merge($sessions,$global);
+    }
     
     // Grupper per bedrift
     $byCompany = [];
@@ -67,7 +80,7 @@ try {
         $byCompany[$companyId]['active_users']++;
         $byCompany[$companyId]['users'][] = [
             'session_id' => $session['session_id'],
-            'admin_id' => $session['tenant_admin_id'],
+            'admin_id' => $session['tenant_admin_id'] ?? $session['admin_id'],
             'username' => $session['username'],
             'name' => $session['admin_name'],
             'last_activity' => $session['last_activity'],

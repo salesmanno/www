@@ -8,6 +8,8 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
+require_once __DIR__ . '/../../includes/CompanyModuleAccess.php';
 
 header('Content-Type: application/json');
 
@@ -17,14 +19,10 @@ $company_id = $_GET['company_id'] ?? '';
 try {
     $db = getDBConnection();
     
-    $stmt = $db->prepare("
-        SELECT sm.id, sm.name
-        FROM system_modules sm
-        INNER JOIN tenant_company_modules tcm ON sm.id = tcm.module_id
-        WHERE tcm.company_id = ? AND tcm.is_active = " . dbBool(true) . "
-    ");
-    $stmt->execute([$company_id]);
-    $companyModules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $owner = $db->prepare('SELECT id FROM tenant_admins WHERE id=? AND company_id=?');
+    $owner->execute([$admin_id,$company_id]);
+    if (!$owner->fetchColumn()) throw new InvalidArgumentException('Brukeren tilhører ikke bedriften.');
+    $companyModules = CompanyModuleAccess::modules($db, (string)$company_id);
     
     $stmt = $db->prepare("SELECT module_id FROM tenant_admin_modules WHERE tenant_admin_id = ?");
     $stmt->execute([$admin_id]);
@@ -36,7 +34,10 @@ try {
     
     echo json_encode(['success' => true, 'modules' => $companyModules]);
     
-} catch (Exception $e) {
-    error_log("Get admin modules error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    echo json_encode(['success'=>false,'message'=>$e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('Get admin modules failed.');
+    echo json_encode(['success' => false, 'message' => 'Kunne ikke hente brukerens modultilgang.']);
 }

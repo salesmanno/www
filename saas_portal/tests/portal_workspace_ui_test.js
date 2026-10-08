@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {spawnSync} = require('node:child_process');
+const runChromium = require('./run_chromium_fixture');
 const root = path.resolve(__dirname, '..');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-workspace-ui-'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -64,7 +65,7 @@ window.fetch = async (input, options = {}) => {
  else if (url.pathname.endsWith('/get_staff.php')) {
   if (fixtureFailStaff) { data={success:false,message:'Ansattdata utilgjengelig'}; status=503; }
   else data.staff=fixtureStaff;
- } else if (url.pathname.endsWith('/get_admins.php')) data.admins=fixtureAdmins;
+ } else if (url.pathname.endsWith('/get_admins.php')) {data.admins=fixtureAdmins;data.quota={max_users:10,active_users:fixtureAdmins.filter(account=>account.is_active==1).length};}
  else if (url.pathname.endsWith('/get_company_modules.php') || url.pathname.endsWith('/get_admin_modules.php')) data.modules=fixtureModules;
  else if (url.pathname.endsWith('/get_active_sessions.php')) data.sessions=fixtureSessions;
  else if (url.pathname.endsWith('/get_activity_stream.php')) { data.activities=[{action_type:'login',actor_display:'Ingrid Lunde',action_summary:'Logget inn',company_name:'Nordhavn & Sønner',subdomain:'nordhavn',created_at:'2026-10-07T12:10:00'}]; data.action_types=['login','company_seo_updated']; }
@@ -72,8 +73,11 @@ window.fetch = async (input, options = {}) => {
   if (fixtureFailGrant) {data={success:false,message:'Forhåndsvisning utilgjengelig'};status=503;}
   else data={success:true,read_only:true,apply_available:false,price_schema_ready:true,issuer:{id:'issuer',name:'Salesman'},warnings:[],
    modules:fixtureModules.map(module=>({...module,module_key:module.id==='module-existing'?'customers':'quotes',price_monthly:'10.00',price_setup:'20.00',price_currency:'NOK'})),
-   companies:body.company_ids.map(id=>({company_id:id,name:id,module_ids:body.module_ids,new_module_ids:body.module_ids,
-    monthly_total:'20.00',setup_total:'20.00',currency:'NOK',missing_prices:[],blockers:[],subscription:null}))};
+   companies:body.company_ids.map(id=>({company_id:id,name:id,existing_module_ids:['module-existing'],module_ids:body.selections?.[id]?.module_ids||['module-existing'],
+    new_module_ids:body.selections?.[id]?.module_ids?.filter(module=>module!=='module-existing')||[],removed_module_ids:[],
+    monthly_total:'20.00',proposed_monthly:'20.00',setup_total:'20.00',selected_setup_total:'40.00',selected_setup_net_total:'40.00',setup_gross_total:'20.00',
+    monthly_discount_amount:'0.00',setup_discount_amount:'0.00',plan_setup_discount:'0.00',plan_monthly_discount:'0.00',
+    max_users:10,active_users:1,currency:'NOK',missing_prices:[],blockers:[],subscription:null}))};
  }
  else if (url.pathname.endsWith('/delete_admin.php')) {
   fixtureAdmins=fixtureAdmins.filter(account => account.admin_id !== body.admin_id);
@@ -107,7 +111,9 @@ window.fetch = async (input, options = {}) => {
  return {ok:status===200,status,json:async()=>data,text:async()=>JSON.stringify(data),headers:{get:()=> 'application/json'}};
 };
 // A real Bootstrap modal opens its backdrop (150ms), then dialog (300ms).
-const settle = () => new Promise(resolve => setTimeout(resolve, 600));
+// Preview changes debounce at 280ms; settle just beyond that rather than
+// spending most of Chromium's virtual-time budget sleeping between actions.
+const settle = () => new Promise(resolve => setTimeout(resolve, 320));
 function expect(value, message) { if (!value) throw new Error(message); }
 function same(actual, expected, message) { expect(JSON.stringify(actual)===JSON.stringify(expected), message+'; received '+JSON.stringify(actual)); }
 function lastRequest(endpoint) { return fixtureRequests.filter(request=>request.path.endsWith('/'+endpoint)).at(-1); }
@@ -135,15 +141,19 @@ expect(document.querySelectorAll('.company-card.selected').length===2,'Polling e
 document.getElementById('grantConfirmButton').click(); await settle();
 expect(document.getElementById('companyGrantModal').classList.contains('show'),'Grant confirmation modal did not open');
 expect(document.getElementById('companyGrantSubmit').disabled,'Grant enabled without a module selection');
-change(document.querySelector('#companyGrantModules input[value="module-new"]'),true);
+document.querySelector('#companyGrantAvailable button').click();
 fixtureFailGrant=true;
 await settle();
 expect(document.getElementById('companyGrantStatus').textContent.includes('Forhåndsvisning utilgjengelig'),'Preview failure not visible');
 expect(portalSelectedCompanies.size===2,'Failed preview erased company selection');
-expect(document.querySelector('#companyGrantModules input[value="module-new"]').checked,'Failed preview erased module selection');
+expect(document.querySelectorAll('#companyGrantSelected button').length===2,'Failed preview erased module selection');
 fixtureFailGrant=false;
 document.querySelector('#companyGrantStatus button').click(); await settle();
-same(lastRequest('preview_company_subscription.php').payload,{company_ids:['company-a','company-b'],module_ids:['module-new'],csrf_token:'fixture-csrf'},'Preview payload incorrect');
+same(lastRequest('preview_company_subscription.php').payload,{
+ company_ids:['company-a','company-b'],selections:{
+ 'company-a':{module_ids:['module-existing','module-new'],max_users:10,plan_setup_discount:'0.00',plan_monthly_discount:'0.00'},
+ 'company-b':{module_ids:['module-existing'],max_users:10,plan_setup_discount:'0.00',plan_monthly_discount:'0.00'}
+ },csrf_token:'fixture-csrf'},'Preview payload incorrect');
 expect(!lastRequest('grant_company_modules.php'),'Preview granted real access');
 expect(document.getElementById('companyGrantSubmit').disabled,'Preview enabled actual saving');
 bootstrap.Modal.getInstance(document.getElementById('companyGrantModal')).hide();await settle();
@@ -373,6 +383,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return source;
 }
 
+(async () => {
 try {
     const bootstrapCss = bootstrapAsset('css');
     const bootstrapJs = bootstrapAsset('js');
@@ -380,21 +391,24 @@ try {
         const file = path.join(directory, `${page}.html`);
         fs.writeFileSync(file, fixture(page, bootstrapCss, bootstrapJs));
         for (const width of [390, 1280]) {
-            const screenshot = path.join(os.tmpdir(), `portal-workspace-${page}-${width}.png`);
-            const result = spawnSync('chromium', [
+            const result = await runChromium([
                 '--headless', '--no-sandbox', '--disable-gpu', '--no-proxy-server',
-                '--disable-background-networking', '--run-all-compositor-stages-before-draw',
-                '--dump-dom', '--virtual-time-budget=30000', `--window-size=${width},1000`,
-                `--screenshot=${screenshot}`, `file://${file}`
-            ], {encoding: 'utf8', timeout: 65000, maxBuffer: 4 * 1024 * 1024});
+                '--disable-background-networking', '--disable-extensions', '--disable-default-apps',
+                '--no-first-run', `--user-data-dir=${path.join(directory, `profile-${page}-${width}`)}`,
+                '--timeout=20000', '--dump-dom', '--virtual-time-budget=30000', `--window-size=${width},1000`,
+                `file://${file}`
+            ], {timeoutMs:35000,maxBuffer:4*1024*1024});
             const failure = result.stdout?.match(/<pre id="fixture-failure">([\s\S]*?)<\/pre>/)?.[1];
             assert(!result.error && result.status === 0 && result.stdout.includes('data-result="PASS"'),
                 `${page} at ${width}: ${result.error || failure || result.stderr || 'Missing PASS marker'}`);
             const checks = result.stdout.match(/data-checks="([^"]+)"/)?.[1] || '';
             console.log(`PASS ${page} ${width}px: ${checks}`);
-            console.log(`Screenshot: ${screenshot}`);
         }
     }
 } finally {
     fs.rmSync(directory, {recursive: true, force: true});
 }
+})().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});

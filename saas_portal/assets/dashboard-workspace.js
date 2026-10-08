@@ -64,7 +64,15 @@ function portalRenderCompanies(companies) {
 document.addEventListener('DOMContentLoaded', () => {
     const modalRoot = document.getElementById('companyGrantModal');
     const modal = bootstrap.Modal.getOrCreateInstance(modalRoot);
-    const list = document.getElementById('companyGrantModules');
+    const availableList = document.getElementById('companyGrantAvailable');
+    const selectedList = document.getElementById('companyGrantSelected');
+    const companySwitcher = document.getElementById('companyGrantCompanySwitcher');
+    const userLimit = document.getElementById('companyGrantMaxUsers');
+    const monthlyDiscountInput = document.getElementById('companyGrantMonthlyDiscount');
+    const setupDiscountInput = document.getElementById('companyGrantSetupDiscount');
+    const discountHelp = document.getElementById('companyGrantDiscountHelp');
+    const discountHelpText = 'Rabatten gjelder denne bedriften. Angi 0–100 prosent med maks to desimaler.';
+    const activeUsers = document.getElementById('companyGrantActiveUsers');
     const submit = document.getElementById('companyGrantSubmit');
     const status = document.getElementById('companyGrantStatus');
     const quotes = document.getElementById('companyGrantCompanyQuotes');
@@ -76,14 +84,54 @@ document.addEventListener('DOMContentLoaded', () => {
     let previewQuote = null;
     let savingSubscription = false;
     let subscriptionSaved = false;
+    let hasInitializedSelection = false;
+    let hasNormalizedSelectionQuote = false;
+    let editingCompanyId = null;
+    const moduleSelections = new Map();
+    const userLimits = new Map();
+    const planDiscounts = new Map();
+    const companyMetadata = new Map();
+    let catalogModules = [];
+    let focusAfterPreview = null;
 
+    function parseUserLimit(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    }
+    function discountValue(value) {
+        if (value === null || value === undefined || value === '') return '0.00';
+        const normalized = String(value).trim().replace(',', '.');
+        if (!/^\d{1,3}(?:\.\d{1,2})?$/.test(normalized)) return '0.00';
+        const amount = Number(normalized);
+        return Number.isFinite(amount) && amount >= 0 && amount <= 100 ? amount.toFixed(2) : '0.00';
+    }
+    function discountsFor(id) {
+        return planDiscounts.get(String(id)) || {monthly: '0.00', setup: '0.00'};
+    }
+    function quotePricingIsConsistent(company) {
+        if (!company.currency) return false;
+        const selected = moduleSelections.get(String(company.company_id)) || new Set();
+        return Array.from(selected).every(id => {
+            const module = catalogModules.find(item => String(item.id) === String(id));
+            return module && module.price_monthly !== null && module.price_monthly !== undefined && module.price_monthly !== '' &&
+                module.price_setup !== null && module.price_setup !== undefined && module.price_setup !== '' &&
+                module.price_currency && String(module.price_currency).toUpperCase() === String(company.currency).toUpperCase();
+        });
+    }
     function updateSaveControls() {
         const ready = previewQuote && previewQuote.apply_available === true && previewQuote.price_schema_ready === true &&
+            hasNormalizedSelectionQuote &&
             /^[a-f0-9]{64}$/.test(previewQuote.quote_hash || '') &&
             previewQuote.companies.length === portalSelectedCompanies.size &&
-            list.querySelector('input:checked') &&
             previewQuote.companies.every(company => !company.blockers.length && !company.missing_prices.length &&
-                company.proposed_monthly !== null && company.setup_total !== null && company.currency);
+                company.proposed_monthly !== null && company.monthly_discount_amount !== null &&
+                company.setup_total !== null && company.setup_gross_total !== null &&
+                company.setup_discount_amount !== null && company.selected_setup_total !== null &&
+                company.selected_setup_net_total !== null && quotePricingIsConsistent(company) &&
+                Number.isInteger(userLimits.get(String(company.company_id))) &&
+                userLimits.get(String(company.company_id)) >= Math.max(0, Number(company.active_users) || 0)) &&
+            monthlyDiscountInput.validity.valid && setupDiscountInput.validity.valid;
         acknowledgement.disabled = !ready || savingSubscription || subscriptionSaved;
         submit.disabled = acknowledgement.disabled || !acknowledgement.checked;
     }
@@ -112,34 +160,92 @@ document.addEventListener('DOMContentLoaded', () => {
         const company = portalCompanies.find(item => String(item.id) === String(id));
         return company && company.is_active == 0 ? 'Inaktiv' : '';
     }
-    function renderModules(modules, selectedIds) {
-        list.replaceChildren();
+    function selectedForEditing() {
+        return moduleSelections.get(String(editingCompanyId)) || new Set();
+    }
+    function renderModulePane(target, modules, moveToSelected) {
+        target.replaceChildren();
         if (!modules.length) {
-            portalText(list, 'div', 'Ingen moduler tilgjengelig i katalogen.', 'portal-empty');
+            portalText(target, 'div', moveToSelected ? 'Alle moduler er valgt for denne bedriften.' : 'Ingen moduler valgt ennå.', 'portal-empty');
             return;
         }
         modules.forEach(module => {
-            const moduleId = String(module.id);
-            const label = portalText(list, 'label', '', 'form-check module-checkbox d-block border rounded p-3 mb-2');
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.value = moduleId;
-            input.className = 'form-check-input me-2';
-            input.checked = selectedIds.includes(moduleId);
-            input.disabled = savingSubscription || subscriptionSaved;
-            input.addEventListener('change', queueSubscriptionPreview);
-            label.appendChild(input);
-            const content = portalText(label, 'span', '', 'd-inline-block align-top');
-            portalText(content, 'span', module.name || 'Uten navn', 'form-check-label fw-semibold d-block');
-            if (module.description) portalText(content, 'span', module.description, 'small text-muted d-block mt-1');
-            const prices = portalText(content, 'span', '', 'd-flex flex-wrap gap-3 small mt-2');
-            const monthly = portalText(prices, 'span', 'Månedlig: ' + decimalText(module.price_monthly));
-            const setup = portalText(prices, 'span', 'Oppstart: ' + decimalText(module.price_setup));
-            if (module.price_currency) {
-                monthly.appendChild(document.createTextNode(' ' + String(module.price_currency)));
-                setup.appendChild(document.createTextNode(' ' + String(module.price_currency)));
-            }
+            const id = String(module.id);
+            const button = portalText(target, 'button', '', 'module-choice');
+            button.type = 'button';
+            button.disabled = savingSubscription || subscriptionSaved;
+            button.dataset.moduleId = id;
+            button.setAttribute('aria-label', `${moveToSelected ? 'Legg til' : 'Fjern'} ${module.name || 'modul'}${moveToSelected ? '' : ' fra bedriften'}`);
+            const text = portalText(button, 'span', '', 'module-choice-copy');
+            portalText(text, 'strong', module.name || 'Uten navn');
+            if (module.description) portalText(text, 'span', module.description, 'module-description');
+            const price = portalText(text, 'span', `${decimalText(module.price_monthly)} ${module.price_currency || ''} / mnd`, 'module-price');
+            price.title = 'Katalogpris per måned';
+            portalText(button, 'span', moveToSelected ? 'Legg til' : 'Fjern', 'module-choice-action');
+            button.addEventListener('click', () => {
+                const selection = selectedForEditing();
+                if (moveToSelected) selection.add(id); else selection.delete(id);
+                focusAfterPreview = {id, target: moveToSelected ? 'selected' : 'available'};
+                renderModuleEditor(id, moveToSelected ? 'selected' : 'available');
+                queueSubscriptionPreview();
+            });
+            target.appendChild(button);
         });
+    }
+    function renderModuleEditor(focusModuleId = null, focusTarget = null) {
+        const selection = selectedForEditing();
+        const available = catalogModules.filter(module => !selection.has(String(module.id)));
+        const selected = catalogModules.filter(module => selection.has(String(module.id)));
+        renderModulePane(availableList, available, true);
+        renderModulePane(selectedList, selected, false);
+        const activeQuote = companyMetadata.get(String(editingCompanyId)) ||
+            (previewQuote?.companies || []).find(company => String(company.company_id) === String(editingCompanyId));
+        const active = Number(activeQuote?.active_users) || 0;
+        activeUsers.textContent = activeQuote?.active_users === null || activeQuote?.active_users === undefined
+            ? 'Aktive brukere ikke oppgitt' : `${active} aktive brukere`;
+        const limit = userLimits.has(String(editingCompanyId)) ? userLimits.get(String(editingCompanyId)) : activeQuote?.max_users;
+        userLimit.value = limit === null || limit === undefined ? '' : String(limit);
+        userLimit.min = String(Math.max(0, active));
+        userLimit.disabled = savingSubscription || subscriptionSaved || !editingCompanyId;
+        const discounts = discountsFor(editingCompanyId);
+        monthlyDiscountInput.value = discounts.monthly;
+        setupDiscountInput.value = discounts.setup;
+        monthlyDiscountInput.setCustomValidity('');
+        setupDiscountInput.setCustomValidity('');
+        discountHelp.textContent = discountHelpText;
+        discountHelp.className = 'small text-muted mb-0';
+        monthlyDiscountInput.disabled = savingSubscription || subscriptionSaved || !editingCompanyId;
+        setupDiscountInput.disabled = savingSubscription || subscriptionSaved || !editingCompanyId;
+        document.getElementById('companyGrantEditorName').textContent =
+            portalCompanies.find(company => String(company.id) === String(editingCompanyId))?.name ||
+            activeQuote?.name || 'Bedrift';
+        if (focusModuleId !== null) {
+            const pane = focusTarget === 'available' ? availableList : selectedList;
+            const movedButton = Array.from(pane.querySelectorAll('button[data-module-id]'))
+                .find(button => button.dataset.moduleId === String(focusModuleId));
+            (movedButton || pane).focus({preventScroll: true});
+        }
+    }
+    function renderCompanySwitcher(companies) {
+        const previous = editingCompanyId;
+        companySwitcher.replaceChildren();
+        companies.forEach(company => {
+            const option = document.createElement('option');
+            option.value = String(company.company_id);
+            option.textContent = company.name || `Bedrift ${company.company_id}`;
+            companySwitcher.appendChild(option);
+        });
+        if (!companies.length) {
+            editingCompanyId = null;
+            renderModuleEditor();
+            return;
+        }
+        editingCompanyId = companies.some(company => String(company.company_id) === String(previous))
+            ? String(previous) : String(companies[0].company_id);
+        companySwitcher.value = editingCompanyId;
+        const focus = focusAfterPreview;
+        renderModuleEditor(focus?.id ?? null, focus?.target ?? null);
+        focusAfterPreview = null;
     }
     function renderSubscription(company) {
         const card = portalText(quotes, 'article', '', 'border rounded p-3 mb-2');
@@ -161,9 +267,17 @@ document.addEventListener('DOMContentLoaded', () => {
             portalText(card, 'div', 'Ingen eksisterende abonnement registrert.', 'small text-muted mb-1');
         }
         portalText(card, 'div', 'Katalogestimat etter valgte moduler', 'small fw-semibold mt-2');
-        priceNode(card, 'Månedlig pris for hele modulpakken', company.monthly_total, company.currency);
-        priceNode(card, 'Engangsoppsett for nye moduler', company.setup_total, company.currency);
-        priceNode(card, 'Månedspris som lagres', company.proposed_monthly, company.currency);
+        priceNode(card, 'Månedlig modulpakke, brutto', company.monthly_total, company.currency);
+        priceNode(card, 'Månedsrabatt', company.monthly_discount_amount, company.currency);
+        priceNode(card, 'Månedspris etter rabatt', company.proposed_monthly, company.currency);
+        priceNode(card, 'Etablering for alle valgte moduler, brutto', company.selected_setup_total, company.currency);
+        priceNode(card, 'Etablering for alle valgte moduler, netto', company.selected_setup_net_total, company.currency);
+        priceNode(card, 'Nytt oppsett, brutto', company.setup_gross_total, company.currency);
+        priceNode(card, 'Rabatt på nytt oppsett', company.setup_discount_amount, company.currency);
+        priceNode(card, 'Oppstart som forfaller nå, netto', company.setup_total, company.currency);
+        if (Array.isArray(company.removed_module_ids) && company.removed_module_ids.length) {
+            portalText(card, 'div', `${company.removed_module_ids.length} eksisterende ${company.removed_module_ids.length === 1 ? 'modul fjernes' : 'moduler fjernes'} fra tilgangen.`, 'small text-warning-emphasis mt-2');
+        }
         if (Array.isArray(company.missing_prices) && company.missing_prices.length) {
             const missing = portalText(card, 'div', '', 'alert alert-warning py-2 px-3 small mt-2 mb-0');
             portalText(missing, 'strong', 'Manglende prisinformasjon');
@@ -194,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         acknowledgement.checked = false;
         acknowledgement.disabled = true;
         previewQuote = null;
+        hasNormalizedSelectionQuote = false;
         status.replaceChildren();
         portalText(status, 'div', 'Oppdaterer forhåndsvisningen …', 'small text-muted mb-2');
         clearQuoteContent();
@@ -201,23 +316,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function loadSubscriptionPreview(revision) {
         const companyIds = Array.from(portalSelectedCompanies);
-        const moduleIds = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'), input => input.value);
+        const selections = {};
+        companyIds.forEach(id => {
+            const maxUsers = userLimits.has(id) ? userLimits.get(id) : userLimit.value;
+            const discount = discountsFor(id);
+            selections[id] = {
+                module_ids: Array.from(moduleSelections.get(id) || []),
+                max_users: maxUsers === null || maxUsers === undefined || maxUsers === '' ? null : Number(maxUsers),
+                plan_setup_discount: discount.setup,
+                plan_monthly_discount: discount.monthly
+            };
+        });
+        const isInitial = !hasInitializedSelection;
+        const moduleCount = Object.values(selections).reduce((count, selection) => count + selection.module_ids.length, 0);
         document.getElementById('companyGrantSummary').textContent =
-            `${companyIds.length} valgte bedrifter · ${moduleIds.length} valgte moduler. Eksisterende tilganger beholdes.`;
-        list.setAttribute('aria-busy', 'true');
+            `${companyIds.length} bedrifter · ${moduleCount} valgte bedriftstilganger. Endringer vurderes per bedrift.`;
+        availableList.setAttribute('aria-busy', 'true');
+        selectedList.setAttribute('aria-busy', 'true');
         try {
-            const data = await portalPost('/saas_portal/api/preview_company_subscription.php', {
+            const request = {
                 company_ids: companyIds,
-                module_ids: moduleIds,
                 csrf_token: portalCsrf
-            });
+            };
+            if (!isInitial) request.selections = selections;
+            const data = await portalPost('/saas_portal/api/preview_company_subscription.php', request);
             if (revision !== previewRevision) return;
             if (data.read_only !== true || typeof data.apply_available !== 'boolean') throw new Error('Svaret bekrefter ikke en gyldig prisforhåndsvisning.');
             const modules = Array.isArray(data.modules) ? data.modules : [];
             const companies = Array.isArray(data.companies) ? data.companies : [];
             previewQuote = data;
+            if (!hasInitializedSelection) {
+                companies.forEach(company => {
+                    const id = String(company.company_id);
+                    moduleSelections.set(id, new Set((company.existing_module_ids || company.module_ids || []).map(String)));
+                    userLimits.set(id, parseUserLimit(company.max_users));
+                    planDiscounts.set(id, {
+                        monthly: discountValue(company.plan_monthly_discount),
+                        setup: discountValue(company.plan_setup_discount)
+                    });
+                });
+                hasInitializedSelection = true;
+            } else {
+                companies.forEach(company => {
+                    const id = String(company.company_id);
+                    if (!moduleSelections.has(id)) moduleSelections.set(id, new Set((company.existing_module_ids || []).map(String)));
+                    if (!userLimits.has(id)) userLimits.set(id, parseUserLimit(company.max_users));
+                    if (!planDiscounts.has(id)) {
+                        planDiscounts.set(id, {
+                            monthly: discountValue(company.plan_monthly_discount),
+                            setup: discountValue(company.plan_setup_discount)
+                        });
+                    }
+                });
+            }
+            companies.forEach(company => companyMetadata.set(String(company.company_id), company));
+            hasNormalizedSelectionQuote = !isInitial;
             warnings.replaceChildren();
-            renderModules(modules, moduleIds);
+            catalogModules = modules;
+            renderCompanySwitcher(companies);
             quotes.replaceChildren();
             companies.forEach(renderSubscription);
             issuer.replaceChildren();
@@ -232,9 +388,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const notice = portalText(warnings, 'div', '', 'alert alert-warning py-2');
                 data.warnings.forEach(message => portalText(notice, 'div', message));
             }
-            if (!moduleIds.length) portalText(status, 'div', 'Velg moduler for å se et estimat for tillegg. Gjeldende abonnement vises uavhengig av valget.', 'small text-muted');
+            if (!moduleCount) portalText(status, 'div', 'Ingen moduler valgt. Et tomt utvalg er en gyldig endring og fjerner alle modultilganger for bedriften.', 'small text-muted');
             if (!companies.length) portalText(quotes, 'div', 'Velg minst én bedrift for å se pris per bedrift.', 'portal-empty');
             updateSaveControls();
+            if (isInitial) queueSubscriptionPreview();
         } catch (error) {
             if (revision !== previewRevision) return;
             quotes.replaceChildren();
@@ -244,15 +401,63 @@ document.addEventListener('DOMContentLoaded', () => {
             acknowledgement.checked = false;
             acknowledgement.disabled = true;
             submit.disabled = true;
-            if (!list.querySelector('input[type="checkbox"]')) {
-                list.replaceChildren();
-                portalText(list, 'div', 'Katalogen kunne ikke lastes.', 'portal-empty');
+            if (!catalogModules.length) {
+                availableList.replaceChildren();
+                selectedList.replaceChildren();
+                portalText(availableList, 'div', 'Katalogen kunne ikke lastes.', 'portal-empty');
             }
             portalFailure('companyGrantStatus', error.message, () => queueSubscriptionPreview());
         } finally {
-            if (revision === previewRevision) list.setAttribute('aria-busy', 'false');
+            if (revision === previewRevision) {
+                availableList.setAttribute('aria-busy', 'false');
+                selectedList.setAttribute('aria-busy', 'false');
+            }
         }
     }
+    companySwitcher.addEventListener('change', () => {
+        editingCompanyId = companySwitcher.value;
+        renderModuleEditor();
+    });
+    userLimit.addEventListener('input', () => {
+        if (!editingCompanyId) return;
+        const metadata = companyMetadata.get(String(editingCompanyId));
+        const active = Math.max(0, Number(metadata?.active_users) || 0);
+        const raw = userLimit.value.trim();
+        const parsed = raw === '' ? null : Number(raw);
+        userLimits.set(String(editingCompanyId),
+            parsed !== null && Number.isInteger(parsed) && parsed >= active ? parsed : null);
+        queueSubscriptionPreview();
+    });
+    function handleDiscountInput(input, key) {
+        if (!editingCompanyId) return;
+        const raw = input.value.trim().replace(',', '.');
+        if (raw === '') {
+            input.setCustomValidity('');
+            discountHelp.textContent = discountHelpText;
+            discountHelp.className = 'small text-muted mb-0';
+            planDiscounts.set(String(editingCompanyId), {...discountsFor(editingCompanyId), [key]: '0.00'});
+            queueSubscriptionPreview();
+            return;
+        }
+        if (!/^\d{1,3}(?:\.\d{1,2})?$/.test(raw) || !Number.isFinite(Number(raw)) || Number(raw) > 100) {
+            input.setCustomValidity('Angi en rabatt mellom 0 og 100 med maks to desimaler.');
+            discountHelp.textContent = input.validationMessage;
+            discountHelp.className = 'small text-danger mb-0';
+            acknowledgement.checked = false;
+            updateSaveControls();
+            return;
+        }
+        input.setCustomValidity('');
+        discountHelp.textContent = discountHelpText;
+        discountHelp.className = 'small text-muted mb-0';
+        planDiscounts.set(String(editingCompanyId), {
+            ...discountsFor(editingCompanyId),
+            [key]: Number(raw).toFixed(2)
+        });
+        queueSubscriptionPreview();
+    }
+    monthlyDiscountInput.addEventListener('input', () => handleDiscountInput(monthlyDiscountInput, 'monthly'));
+    setupDiscountInput.addEventListener('input', () => handleDiscountInput(setupDiscountInput, 'setup'));
     document.getElementById('grantConfirmButton').addEventListener('click', () => {
         modal.show();
     });
@@ -261,14 +466,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (submit.disabled || savingSubscription || !previewQuote) return;
         const data = {
             company_ids: Array.from(portalSelectedCompanies),
-            module_ids: Array.from(list.querySelectorAll('input:checked'), input => input.value),
+            selections: Object.fromEntries(Array.from(portalSelectedCompanies, id => [id, {
+                module_ids: Array.from(moduleSelections.get(id) || []),
+                max_users: userLimits.get(id) ?? null,
+                plan_setup_discount: discountsFor(id).setup,
+                plan_monthly_discount: discountsFor(id).monthly
+            }])),
             quote_hash: previewQuote.quote_hash,
             confirmed: true,
             csrf_token: portalCsrf
         };
         savingSubscription = true;
         updateSaveControls();
-        list.querySelectorAll('input').forEach(input => { input.disabled = true; });
+        renderModuleEditor();
         submit.textContent = 'Lagrer …';
         status.replaceChildren();
         try {
@@ -285,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             acknowledgement.checked = false;
             portalFailure('companyGrantStatus', error.message, queueSubscriptionPreview);
             submit.textContent = 'Bekreft og lagre';
-            list.querySelectorAll('input').forEach(input => { input.disabled = false; });
+            renderModuleEditor();
         } finally {
             savingSubscription = false;
             updateSaveControls();
@@ -297,6 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ++previewRevision;
             window.clearTimeout(previewTimer);
             previewQuote = null;
+            hasNormalizedSelectionQuote = false;
             updateSaveControls();
         }
     });
@@ -304,12 +515,15 @@ document.addEventListener('DOMContentLoaded', () => {
         window.clearTimeout(previewTimer);
         previewRevision++;
         previewQuote = null;
+        hasNormalizedSelectionQuote = false;
         subscriptionSaved = false;
         acknowledgement.checked = false;
         acknowledgement.disabled = true;
         submit.textContent = 'Bekreft og lagre';
-        list.replaceChildren();
-        portalText(list, 'div', '', 'portal-skeleton');
+        availableList.replaceChildren();
+        selectedList.replaceChildren();
+        portalText(availableList, 'div', '', 'portal-skeleton');
+        portalText(selectedList, 'div', '', 'portal-skeleton');
         quotes.replaceChildren();
         portalText(quotes, 'div', '', 'portal-skeleton');
         warnings.replaceChildren();

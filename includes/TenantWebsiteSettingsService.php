@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/CompanyModuleAccess.php';
 require_once __DIR__ . '/../saas_portal/services/PortalCompanyService.php';
 
 /** Sparse, company-scoped updates; module configuration is never company SEO. */
@@ -102,6 +103,7 @@ class TenantWebsiteSettingsService {
             $stmt->execute([$company]);
             if (!$stmt->fetchColumn()) throw new InvalidArgumentException('Bedriften finnes ikke.');
             if ($config) {
+                if (!in_array($module,array_column(CompanyModuleAccess::adminModules($this->db,$actor),'id'),true)) throw new InvalidArgumentException('Modulen er ikke tilgjengelig på bedriftens plan.');
                 $stmt = $this->db->prepare('SELECT sm.id FROM system_modules sm JOIN tenant_admin_modules tam ON tam.module_id=sm.id WHERE sm.id=? AND sm.is_active=1 AND tam.tenant_admin_id=?');
                 $stmt->execute([$module,$actor]);
                 if (!$stmt->fetchColumn()) throw new InvalidArgumentException('Du har ikke tilgang til den valgte modulen.');
