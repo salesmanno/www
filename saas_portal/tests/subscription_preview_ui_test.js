@@ -19,6 +19,7 @@ let fixtureFail=false;
 let fixtureMissing=false;
 let fixtureSlow=false;
 let fixtureSaveFail=false;
+let fixtureWrongSelection=false;
 let fixturePrice='50.00';
 const calls=[];
 function portalText(parent,tag,text,classes=''){const node=document.createElement(tag);node.textContent=text;node.className=classes;parent.appendChild(node);return node;}
@@ -59,7 +60,7 @@ async function portalPost(url,body){
     const setupDiscountAmount=discount(newly.reduce((sum,moduleId)=>sum+setupOf(moduleId),0),setupDiscount);
     const selectedSetupDiscountAmount=discount(fullSetup,setupDiscount);
     const setupGross=newly.reduce((sum,moduleId)=>sum+setupOf(moduleId),0);
-   return {company_id:id,name:id==='A'?'Alpha':'Beta',existing_module_ids:base[id],module_ids:chosen,new_module_ids:newly,removed_module_ids:removed,
+    return {company_id:id,name:id==='A'?'Alpha':'Beta',existing_module_ids:id==='A'?['M1','M2']:base[id],module_ids:fixtureWrongSelection&&id==='A'?['M1','M2']:chosen,new_module_ids:newly,removed_module_ids:removed,
      monthly_total:monthly.toFixed(2),monthly_discount_amount:monthlyDiscountAmount.toFixed(2),proposed_monthly:(monthly-monthlyDiscountAmount).toFixed(2),
      selected_setup_total:fullSetup.toFixed(2),selected_setup_net_total:(fullSetup-selectedSetupDiscountAmount).toFixed(2),
      setup_gross_total:setupGross.toFixed(2),setup_discount_amount:setupDiscountAmount.toFixed(2),setup_total:(setupGross-setupDiscountAmount).toFixed(2),
@@ -129,7 +130,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
    selectedModule().click();await settle();
     expect(document.activeElement.dataset.moduleId==='M1'&&document.activeElement.parentElement===document.getElementById('companyGrantAvailable'),'Focus did not follow the moved module');
    expect(selected.textContent.includes('Ingen moduler valgt'),'Removing the active module did not allow empty selections');
-    expect(quotes.textContent.includes('Gratis'),'Empty exact selection did not produce a zero package');
+     const alphaAmount=label=>Array.from(quotes.querySelector('article').querySelectorAll('div')).find(node=>node.firstElementChild?.textContent===label)?.lastElementChild.textContent;
+     expect(alphaAmount('Månedlig modulpakke, brutto')==='0,00 NOK'&&alphaAmount('Etablering for alle valgte moduler, brutto')==='0,00 NOK','Empty exact selection did not produce zero totals');
    const inPane=(pane,name)=>Array.from(pane.querySelectorAll('button')).find(button=>button.textContent.includes(name));
    const addM2=()=>inPane(document.getElementById('companyGrantAvailable'),'Salg');
    const removeM2=()=>inPane(document.getElementById('companyGrantSelected'),'Salg');
@@ -145,12 +147,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
    addM2().click();await settle();
    expect(document.getElementById('companyGrantSelected').textContent.includes('Ikke konfigurert')&&quotes.textContent.includes('Manglende prisinformasjon'),'Missing price treated as free');
    fixtureMissing=false;
+    fixtureWrongSelection=true;removeM2().click();await settle();
+    expect(quotes.textContent===''&&submit.disabled&&document.getElementById('companyGrantStatus').textContent.includes('samsvarer ikke'),'Wrong quoted module set was displayed or saveable');
+    expect(selected.textContent.includes('Ingen moduler valgt'),'Rejected response changed user selection');
+    fixtureWrongSelection=false;document.querySelector('#companyGrantStatus button').click();await settle();
+    addM2().click();await settle();
    fixtureFail=true;removeM2().click();await settle();
   expect(quotes.textContent==='','Failure left stale price');
   const retry=document.getElementById('companyGrantStatus').querySelector('button');
   expect(retry,'Retry absent');
    fixtureFail=false;retry.click();await settle();
-    expect(quotes.textContent.includes('Gratis'),'Retry did not preserve the exact empty selection');
+     expect(alphaAmount('Månedlig modulpakke, brutto')==='0,00 NOK','Retry did not preserve the exact empty selection');
    expect(document.getElementById('companyGrantAvailable').getAttribute('aria-busy')==='false','Loading stuck');
    const previews=calls.filter(call=>call.url.endsWith('/preview_company_subscription.php'));
    expect(previews.every(call=>call.body.csrf_token==='test-csrf'),'Unexpected preview payload');

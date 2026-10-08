@@ -112,6 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function quotePricingIsConsistent(company) {
         if (!company.currency) return false;
         const selected = moduleSelections.get(String(company.company_id)) || new Set();
+        const quoted = Array.isArray(company.module_ids) ? company.module_ids.map(String) : [];
+        if (quoted.length !== selected.size || new Set(quoted).size !== quoted.length ||
+            quoted.some(id => !selected.has(id))) return false;
         return Array.from(selected).every(id => {
             const module = catalogModules.find(item => String(item.id) === String(id));
             return module && module.price_monthly !== null && module.price_monthly !== undefined && module.price_monthly !== '' &&
@@ -146,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function decimalText(value) {
         if (value === null || value === undefined || value === '') return 'Ikke konfigurert';
         const raw = String(value).trim();
-        if (/^[+-]?0+(?:[.,]0+)?$/.test(raw)) return 'Gratis';
+        if (/^[+-]?0+(?:[.,]0+)?$/.test(raw)) return '0,00';
         return raw.replace('.', ',');
     }
     function priceNode(parent, label, value, currency) {
@@ -267,6 +270,12 @@ document.addEventListener('DOMContentLoaded', () => {
             portalText(card, 'div', 'Ingen eksisterende abonnement registrert.', 'small text-muted mb-1');
         }
         portalText(card, 'div', 'Katalogestimat etter valgte moduler', 'small fw-semibold mt-2');
+        const chosen = new Set((company.module_ids || []).map(String));
+        portalText(card, 'div', `${chosen.size} valgte moduler`, 'small text-muted mb-1');
+        catalogModules.filter(module => chosen.has(String(module.id))).forEach(module => {
+            priceNode(card, `${module.name || 'Modul'} · per måned`, module.price_monthly, module.price_currency);
+            priceNode(card, `${module.name || 'Modul'} · etablering`, module.price_setup, module.price_currency);
+        });
         priceNode(card, 'Månedlig modulpakke, brutto', company.monthly_total, company.currency);
         priceNode(card, 'Månedsrabatt', company.monthly_discount_amount, company.currency);
         priceNode(card, 'Månedspris etter rabatt', company.proposed_monthly, company.currency);
@@ -348,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!hasInitializedSelection) {
                 companies.forEach(company => {
                     const id = String(company.company_id);
-                    moduleSelections.set(id, new Set((company.existing_module_ids || company.module_ids || []).map(String)));
+                    moduleSelections.set(id, new Set((company.module_ids || company.existing_module_ids || []).map(String)));
                     userLimits.set(id, parseUserLimit(company.max_users));
                     planDiscounts.set(id, {
                         monthly: discountValue(company.plan_monthly_discount),
@@ -373,6 +382,12 @@ document.addEventListener('DOMContentLoaded', () => {
             hasNormalizedSelectionQuote = !isInitial;
             warnings.replaceChildren();
             catalogModules = modules;
+            if (companies.some(company => {
+                const selected = moduleSelections.get(String(company.company_id));
+                const quoted = Array.isArray(company.module_ids) ? company.module_ids.map(String) : [];
+                return !selected || selected.size !== quoted.length ||
+                    quoted.some(id => !selected.has(id)) || new Set(quoted).size !== quoted.length;
+            })) throw new Error('Prisberegningen samsvarer ikke med modulvalget. Ingen feilaktig totalsum kan lagres. Oppdater forhåndsvisningen.');
             renderCompanySwitcher(companies);
             quotes.replaceChildren();
             companies.forEach(renderSubscription);

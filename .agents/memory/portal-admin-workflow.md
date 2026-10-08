@@ -13,7 +13,9 @@ Modulvelgeren skal vise tilgjengelige moduler til venstre og bedriftens valgte m
 
 **Why:** Brukeren utvidet den tidligere additive tildelingen til redigering av hele bedriftens modulutvalg.
 
-**How to apply:** Last inn dagens moduler som valgte. Vis tillegg og fjerninger før bekreftelse, og bevar separate utvalg ved redigering av flere bedrifter.
+**How to apply:** Last inn dagens moduler som valgte. Vis tillegg og fjerninger før bekreftelse, og bevar separate utvalg ved redigering av flere bedrifter. Prisoversikten skal bare summere det valgte utvalget, ikke alle katalogmoduler eller en kombinasjon av nåværende og historiske tilganger.
+
+**Why (prisavgrensning):** Brukeren påpekte at modultildelingen viste totalsummer for flere moduler enn de hadde valgt.
 
 Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; SuperUsers skal bare kunne tildeles moduler fra disse features.
 

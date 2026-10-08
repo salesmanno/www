@@ -68,6 +68,17 @@ try {
         catch (InvalidArgumentException $e) {}
     }
     $db->exec("UPDATE saas_subscription_plans SET features='sales' WHERE id='P'");
+    $unselected=$service->preview(['A'],null,'actor')['companies'][0];
+    subscriptionExpect($unselected['module_ids']===['M1'] && $unselected['existing_module_ids']===['M1'],'Plan template silently selected an ungranted module');
+    subscriptionExpect($unselected['monthly_total']==='100.00' && $unselected['selected_setup_total']==='200.00','Unselected plan module inflated totals');
+    $empty=$service->preview(['A'],[],'actor')['companies'][0];
+    subscriptionExpect($empty['module_ids']===[] && $empty['monthly_total']==='0.00' && $empty['selected_setup_total']==='0.00','Explicit empty selection inherited plan prices');
+    $db->exec("UPDATE tenant_subscriptions SET plan_id=NULL WHERE company_id='B'");
+    $own=$service->preview(['A'],null,'actor')['companies'][0];
+    subscriptionExpect($own['module_ids']===['M2'] && $own['monthly_total']==='50.00' && $own['selected_setup_total']==='25.00' && $own['setup_total']==='0.00','Legacy grants inflated company-specific plan selection or charged existing modules again');
+    $explicit=$service->preview(['A'],null,'actor',false,['A'=>['module_ids'=>['M2'],'max_users'=>4]])['companies'][0];
+    subscriptionExpect(!$explicit['blockers'] && $explicit['removed_module_ids']===['M1'],'Explicit company selection did not prepare reconciliation of legacy excess grants');
+    $db->exec("UPDATE tenant_subscriptions SET plan_id='P' WHERE company_id='B'");
     subscriptionExpect($service->preview(['A'], [], 'actor')['companies'][0]['blockers'] !== [], 'Access disagreement not flagged');
     $db->exec("INSERT INTO tenant_subscriptions VALUES ('S3','C','',NULL,'active','monthly'),('S4','C','',NULL,'active','monthly')");
     subscriptionExpect(count($service->preview(['C'], [], 'actor')['companies'][0]['blockers']) >= 2, 'Multiple subscriptions not blocked');

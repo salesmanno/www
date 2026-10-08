@@ -87,6 +87,7 @@ final class PortalSubscriptionPreview {
                  FROM tenant_subscriptions s LEFT JOIN saas_subscription_plans p ON p.id=s.plan_id
                  LEFT JOIN self_company issuer ON issuer.id=s.self_company_id WHERE s.company_id=?' . $lock
             );
+            $planUseQuery=$this->db->prepare('SELECT COUNT(DISTINCT company_id) FROM tenant_subscriptions WHERE plan_id=?');
             $companies = [];
             foreach ($companyIds as $id) {
                 $companyQuery->execute([$id]);
@@ -99,6 +100,7 @@ final class PortalSubscriptionPreview {
                 $subscriptions = $subscriptionQuery->fetchAll(PDO::FETCH_ASSOC);
                 $subscription = count($subscriptions) === 1 ? $subscriptions[0] : null;
                 $existingIds = $legacyIds;
+                $initialIds = $legacyIds;
                 $blockers = [];
                 $notes = [];
                 if (!(int)$company['is_active']) $blockers[] = 'Bedriften er inaktiv.';
@@ -121,14 +123,27 @@ final class PortalSubscriptionPreview {
                             $legacySorted = $legacyIds;
                             sort($planIds, SORT_STRING);
                             sort($legacySorted, SORT_STRING);
-                            if ($planIds !== $legacySorted) $blockers[] = 'Planens features og eksisterende modultilganger er ulike. Tilgangene må avklares før lagring.';
-                            $existingIds = array_values(array_unique(array_merge($legacyIds, $planIds)));
+                            $planUseQuery->execute([$subscription['plan_id']]);
+                            $sharedPlan=(int)$planUseQuery->fetchColumn()>1;
+                            if (!$sharedPlan) {
+                                // The company's own plan is authoritative. Legacy
+                                // grants remain relevant for removal/history only,
+                                // not for selecting or pricing extra modules.
+                                $initialIds=$planIds;
+                                $existingIds=array_values(array_unique(array_merge($legacyIds,$planIds)));
+                            }
+                            if ($planIds !== $legacySorted) {
+                                $notes[]=$sharedPlan
+                                    ? 'Den delte planen avviker fra bedriftstilgangene. Bare bedriftens aktive moduler er forhåndsvalgt; valgt oppsett blir bedriftsspesifikt ved bekreftet lagring.'
+                                    : 'Eldre modultilganger avviker fra bedriftens egen plan. Prisene gjelder bare valgte moduler; tilgangene samordnes ved bekreftet lagring.';
+                                if ($selections===null) $blockers[] = 'Planens features og eksisterende modultilganger er ulike. Tilgangene må avklares før lagring.';
+                            }
                         } catch (InvalidArgumentException | JsonException $e) {
                             $blockers[] = 'Planens features har ugyldig format.';
                         }
                     } else $notes[] = 'En bedriftsspesifikk plan må klargjøres ved godkjent lagring.';
                 }
-                $requested = $selections[$id]['module_ids'] ?? $moduleIds ?? $existingIds;
+                $requested = $selections[$id]['module_ids'] ?? $moduleIds ?? $initialIds;
                 $quote = PortalSubscriptionPricing::calculate($modules, $existingIds, $requested);
                 $quote['active_users'] = PortalSuperUserQuota::activeCount($this->db, $id);
                 if (!in_array('max_users',$planColumns,true)) $blockers[]='Brukergrensekolonnen mangler. Installer abonnementsmigreringen først.';
