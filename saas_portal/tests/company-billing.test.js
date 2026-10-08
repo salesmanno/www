@@ -62,11 +62,13 @@ function makeHarness() {
     const storageChoices = {};
     const environmentHelp = {};
     const clearSecrets = {};
+    const providerStatus = {};
+    const providerRepair = {};
     const consentWraps = {};
     const plaintextWarnings = {};
     const basicIds = [
         'paymentConfigStatus', 'paymentCredentialWarning', 'paymentLockLabel', 'paymentLockHelp',
-        'paymentUnlockButton', 'paymentCancelButton', 'paymentUnlockCountdown',
+        'paymentUnlockButton', 'paymentCancelButton', 'paymentUnlockCountdown', 'paymentEmptyState',
         'subscriptionStatus', 'subscriptionDetails', 'subscriptionDueUnlock',
         'subscriptionDueDate', 'subscriptionDueSave', 'subscriptionDueForm',
         'subscriptionDueCancel', 'subscriptionEditCountdown', 'subscriptionGross',
@@ -108,6 +110,8 @@ function makeHarness() {
         selectors[gateway] = new MockElement(gateway, 'select', 'production');
         storageChoices[gateway] = form.elements.namedItem('credential_storage');
         environmentHelp[gateway] = new MockElement(`${gateway} environment help`);
+        providerStatus[gateway] = new MockElement(`${gateway} status`);
+        providerRepair[gateway] = new MockElement(`${gateway} repair`);
         consentWraps[gateway] = new MockElement(`${gateway} consent wrapper`);
         plaintextWarnings[gateway] = new MockElement(`${gateway} plaintext warning`);
     });
@@ -123,6 +127,10 @@ function makeHarness() {
             if (match) return selectors[match[1]];
             match = selector.match(/data-environment-help="(\w+)"/);
             if (match) return environmentHelp[match[1]];
+            match = selector.match(/data-gateway-status="(\w+)"/);
+            if (match) return providerStatus[match[1]];
+            match = selector.match(/data-gateway-repair="(\w+)"/);
+            if (match) return providerRepair[match[1]];
             match = selector.match(/data-credential-storage="(\w+)"/);
             if (match) return storageChoices[match[1]];
             match = selector.match(/data-plaintext-consent="(\w+)"/);
@@ -144,6 +152,7 @@ function makeHarness() {
         querySelectorAll: () => []
     };
     let reloadCount = 0;
+    let confirmCount = 0;
     const context = {
         companyId: 'test-company',
         portalCsrf: 'test-csrf',
@@ -151,7 +160,10 @@ function makeHarness() {
         Intl, Date, Number, String, Math, Object, Array, Set, URLSearchParams,
         setInterval: () => 1,
         clearInterval() {},
-        window: {confirm: () => true, location: {reload: () => { reloadCount += 1; }}},
+        window: {
+            confirm: () => { confirmCount += 1; return true; },
+            location: {reload: () => { reloadCount += 1; }}
+        },
         portalRequest: async () => ({}),
         postCalls: [],
         portalPost: async (url, payload) => {
@@ -181,8 +193,9 @@ function makeHarness() {
     vm.createContext(context);
     vm.runInContext(source, context);
     return {
-        context, elements, forms, selectors, storageChoices, clearSecrets,
+        context, elements, forms, selectors, storageChoices, clearSecrets, providerStatus, providerRepair,
         reloadCount: () => reloadCount,
+        confirmCount: () => confirmCount,
         evaluate(code) { return vm.runInContext(code, context); }
     };
 }
@@ -233,7 +246,7 @@ test('refresh failure and loading never leave due-date editing enabled', async (
     assert.equal(app.elements.subscriptionDueUnlock.disabled, true);
 });
 
-test('encrypted credential readiness warning stays visible and blocks secret writes only', () => {
+test('encrypted credential readiness warning stays visible without blocking existing storage', () => {
     const app = makeHarness();
     app.context.getResult = {
         can_edit: true,
@@ -260,6 +273,63 @@ test('encrypted credential readiness warning stays visible and blocks secret wri
     assert.equal(app.forms.vipps.elements.namedItem('vipps_client_id').disabled, false);
     assert.equal(app.forms.vipps.elements.namedItem('vipps_client_secret').disabled, false);
     assert.equal(app.forms.vipps.elements.namedItem('vipps_subscription_key').disabled, false);
+});
+
+test('empty provider can be created with all first-save keys; raw storage needs assisted confirmation', async () => {
+    const fresh = makeHarness();
+    const emptyResponse = {
+        can_edit: true, credentials_readonly: false, encrypted_credentials_ready: true,
+        version: 0, gateways: []
+    };
+    fresh.context.portalRequest = async () => emptyResponse;
+    fresh.context.getResult = emptyResponse;
+    fresh.evaluate('billingShowGatewayData(getResult)');
+    fresh.evaluate("billingEditToken = 'fresh-edit'; billingEditExpires = Math.floor(Date.now() / 1000) + 300; billingSetGatewayControls(true)");
+    fresh.forms.vipps.elements.namedItem('vipps_client_id').value = 'client-first';
+    fresh.forms.vipps.elements.namedItem('vipps_client_secret').value = 'secret-first';
+    fresh.forms.vipps.elements.namedItem('vipps_merchant_serial_number').value = 'merchant-first';
+    fresh.forms.vipps.elements.namedItem('vipps_subscription_key').value = 'subscription-first';
+    await fresh.evaluate("savePaymentGateway('vipps')");
+    const firstSave = fresh.context.postCalls.find(call => call.url.includes('save_payment_gateway.php'));
+    const firstGatewayCredentials = {
+        vipps_client_id: 'client-first', vipps_client_secret: 'secret-first',
+        vipps_merchant_serial_number: 'merchant-first', vipps_subscription_key: 'subscription-first'
+    };
+    for (const key of ['vipps_client_id', 'vipps_client_secret', 'vipps_merchant_serial_number', 'vipps_subscription_key']) {
+        assert.equal(firstSave.payload[key], firstGatewayCredentials[key]);
+        assert.ok(Object.hasOwn(firstSave.payload, key), `${key} included on the first save`);
+    }
+    assert.equal(fresh.confirmCount(), 1, 'first provider save still requires final confirmation');
+
+    const assisted = makeHarness();
+    assisted.context.getResult = {
+        can_edit: true, credentials_readonly: false, encrypted_credentials_ready: false,
+        version: 7, gateways: [{gateway_name: 'vipps', credential_environment: 'production'}]
+    };
+    assisted.context.portalRequest = async () => assisted.context.getResult;
+    assisted.evaluate('billingShowGatewayData(getResult)');
+    assisted.evaluate("billingEditToken = 'edit'; billingEditExpires = Math.floor(Date.now() / 1000) + 300; billingSetGatewayControls(true)");
+    assisted.forms.vipps.elements.namedItem('vipps_client_secret').value = 'raw-secret';
+    await assisted.evaluate("savePaymentGateway('vipps')");
+    const assistedSave = assisted.context.postCalls.find(call => call.url.includes('save_payment_gateway.php'));
+    assert.equal(assistedSave.payload.credential_storage, 'plaintext');
+    assert.equal(assistedSave.payload.credential_storage_confirmed, true);
+    assert.equal(assistedSave.payload.vipps_client_secret, 'raw-secret');
+    assert.equal(assisted.confirmCount(), 2, 'raw-storage consent is followed by final save confirmation');
+});
+
+test('missing linked payment configuration is visible but remains repairable', () => {
+    const app = makeHarness();
+    app.context.repairResult = {
+        can_edit: true, credentials_readonly: false, encrypted_credentials_ready: true,
+        version: 18, gateways: [{gateway_name: 'stripe', configuration_missing: true}]
+    };
+    app.evaluate('billingShowGatewayData(repairResult)');
+    assert.match(app.providerStatus.stripe.textContent, /kobling mangler/i);
+    assert.equal(app.providerRepair.stripe.hidden, false);
+    assert.equal(app.elements.paymentUnlockButton.disabled, false);
+    app.evaluate("billingEditToken = 'edit'; billingGatewayVersion = 18; billingSetGatewayControls(true)");
+    assert.equal(app.forms.stripe.elements.namedItem('stripe_public_key').disabled, false);
 });
 
 test('storage defaults to existing; plaintext requires fresh explicit consent and clears on mode/lock/save', async () => {

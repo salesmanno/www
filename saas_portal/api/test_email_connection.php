@@ -1,4 +1,17 @@
 <?php
+require_once __DIR__.'/portal_request.php';
+require_once __DIR__.'/../../config/database.php';
+require_once __DIR__.'/../services/PortalDatabase.php';
+require_once __DIR__.'/../services/PortalBillingAccess.php';
+try {
+    $data=portalPostData();
+    PortalBillingAccess::requireAdmin(PortalDatabase::connect(),(string)$_SESSION['saas_admin_id']);
+} catch (PortalSaasAuthorizationException $e) {
+    portalReply(403,['success'=>false,'message'=>$e->getMessage()]);
+} catch (Throwable $e) {
+    [$status,$body]=PortalDatabase::failure($e,'email_connection_test','Kunne ikke starte tilkoblingstesten.','settings_unavailable');
+    portalReply($status,$body);
+}
 session_start();
 require_once __DIR__.'/../../config/database.php';
 require_once __DIR__.'/../auth/require_active.php';
@@ -12,7 +25,6 @@ if (!isset($_SESSION['saas_admin_id'])) {
 header('Content-Type: application/json');
 
 try {
-    $data = json_decode(file_get_contents('php://input'), true);
     
     $smtp_test = false;
     $imap_test = false;
@@ -28,9 +40,9 @@ try {
             // Prøv å opprette socket-tilkobling med SSL/TLS-støtte
             $context = stream_context_create([
                 'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true
+                    'verify_peer' => true,
+                    'verify_peer_name' => true,
+                    'allow_self_signed' => false
                 ]
             ]);
             

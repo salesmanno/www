@@ -118,5 +118,29 @@ try {
     billingAssert(PortalSubscriptionDates::days('2026-10-31','2026-10-31')===0 && PortalSubscriptionDates::days('2026-11-01','2026-10-31')===-1,'Due signs');
     billingAssert(PortalSubscriptionDates::days('2026-03-28','2026-03-30')===2,'DST calendar days');
     billingReject(fn()=>PortalSubscriptionDates::valid('2026-02-30'),InvalidArgumentException::class);
+    // Same failure reported in real installations: gateway row exists but its
+    // linked configuration is missing. Repair in-place, not in another module.
+    $db->exec("UPDATE economy_payment_gateways SET configuration_id='missing' WHERE company_id='A'");
+    $service=new PortalCompanySettings($db);
+    billingAssert($service->getPayments('A')['gateways'][0]['configuration_missing']===true,'Broken link blocks read/unlock');
+    $service->savePayment('A',$data+['credential_storage'=>'plaintext','credential_storage_confirmed'=>true]+$edit('A'),'admin');
+    billingAssert($db->query("SELECT COUNT(*) FROM economy_payment_gateways WHERE company_id='A'")->fetchColumn()==1,'Repair duplicated provider');
+    billingAssert($service->getPayments('A')['gateways'][0]['configuration_missing']===false,'Missing configuration was not repaired');
+    // Complete legacy schema, including tenant-only owner FK: SaaS actors must
+    // not be inserted into unrelated tenant-admin foreign keys.
+    $db->exec('DROP TABLE economy_payment_gateways');
+    $db->exec('DROP TABLE economy_configuration_data');
+    $db->exec('CREATE TABLE old_tenant_admins(id CHAR(36) PRIMARY KEY) ENGINE=InnoDB');
+    $db->exec('CREATE TABLE economy_payment_gateways(id CHAR(36) PRIMARY KEY,company_id CHAR(36) NOT NULL,gateway_name VARCHAR(50) NOT NULL,display_name VARCHAR(255) NOT NULL,is_active INT DEFAULT 0,test_mode INT DEFAULT 1,vipps_client_id VARCHAR(255),vipps_client_secret_encrypted TEXT,vipps_merchant_serial_number VARCHAR(255),vipps_subscription_key VARCHAR(255),stripe_public_key VARCHAR(255),stripe_secret_key_encrypted TEXT,stripe_webhook_secret VARCHAR(255),paypal_client_id VARCHAR(255),paypal_client_secret_encrypted TEXT,paypal_webhook_id VARCHAR(255),created_by CHAR(36) NULL,updated_at DATETIME,FOREIGN KEY(created_by) REFERENCES old_tenant_admins(id)) ENGINE=InnoDB');
+    $storage=['credential_storage'=>'plaintext','credential_storage_confirmed'=>true,'is_active'=>true,'test_mode'=>false];
+    foreach ([
+        'vipps'=>['vipps_client_id'=>'legacy-client','vipps_client_secret'=>'legacy-vipps-private','vipps_merchant_serial_number'=>'legacy-merchant','vipps_subscription_key'=>'legacy-sub-private'],
+        'stripe'=>['stripe_public_key'=>'legacy-pk','stripe_secret_key'=>'legacy-stripe-private','stripe_webhook_secret'=>'legacy-webhook-private'],
+        'paypal'=>['paypal_client_id'=>'legacy-paypal-client','paypal_client_secret'=>'legacy-paypal-private','paypal_webhook_id'=>'legacy-hook']
+    ] as $gateway=>$keys) {
+        $service->savePayment('A',['gateway_name'=>$gateway]+$keys+$storage+$edit('A'),'admin');
+    }
+    billingAssert($db->query("SELECT COUNT(*) FROM economy_payment_gateways WHERE company_id='A' AND is_active=1 AND created_by IS NULL")->fetchColumn()==3,'First setup failed for legacy providers / tenant FK');
+    billingAssert(!str_contains(json_encode($service->getPayments('A')),'private'),'Legacy provider credentials leaked');
     echo "PASS: billing roles, lock/expiry/revocation, isolation, cipher safety, creation/removal, environment separation, stale versions, gross/net/100% discounts, dates and month-end.\n";
 } finally { $db->exec("DROP DATABASE IF EXISTS {$schema}"); }

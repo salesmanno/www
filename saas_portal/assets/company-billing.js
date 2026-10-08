@@ -53,6 +53,37 @@ function billingStatus(message, type) {
     }
 }
 
+function billingUpdateProviderCards(gateways, failed = false) {
+    const providers = ['vipps', 'stripe', 'paypal'];
+    const items = new Map((Array.isArray(gateways) ? gateways : [])
+        .map(item => [String(item.gateway_name || ''), item]));
+    providers.forEach(gateway => {
+        const badge = document.querySelector(`[data-gateway-status="${gateway}"]`);
+        const item = items.get(gateway);
+        const repair = document.querySelector(`[data-gateway-repair="${gateway}"]`);
+        if (repair) repair.hidden = failed || !item?.configuration_missing;
+        if (!badge) return;
+        if (failed) {
+            badge.textContent = 'Ikke tilgjengelig';
+            badge.className = 'badge text-bg-secondary';
+        } else if (!item) {
+            badge.textContent = 'Ikke konfigurert';
+            badge.className = 'badge text-bg-light text-dark';
+        } else if (item.configuration_missing) {
+            badge.textContent = 'Kobling mangler · kan repareres';
+            badge.className = 'badge text-bg-warning';
+        } else if (item.is_active == 1 || item.is_active === true) {
+            badge.textContent = item.test_mode == 1 || item.test_mode === true ? 'Aktiv · test' : 'Aktiv';
+            badge.className = 'badge text-bg-success';
+        } else {
+            badge.textContent = 'Deaktivert';
+            badge.className = 'badge text-bg-secondary';
+        }
+    });
+    const emptyState = document.getElementById('paymentEmptyState');
+    if (emptyState && !failed) emptyState.hidden = items.size > 0;
+}
+
 function billingSetGatewayControls(enabled) {
     Object.entries(billingGatewayForms).forEach(([gateway, config]) => {
         const form = document.getElementById(config.form);
@@ -230,6 +261,7 @@ function billingShowGatewayData(data) {
     billingEncryptedCredentialsReady = data.encrypted_credentials_ready === true || data.encrypted_credentials_ready === 1;
     billingRenderCredentialWarning(billingEncryptedCredentialsReady, data.notice || '');
     Object.values(billingGatewayForms).forEach(config => document.getElementById(config.form).reset());
+    billingUpdateProviderCards(billingGateways);
 
     billingGateways.forEach(gateway => {
         const key = String(gateway.gateway_name || '');
@@ -255,9 +287,7 @@ function billingShowGatewayData(data) {
             : 'Kunne ikke bekrefte at innstillingene kan redigeres sikkert.';
     document.getElementById('paymentUnlockButton').disabled =
         !billingGatewayCanEdit || data.credentials_readonly !== false || billingGatewayVersion === null;
-    billingStatus(data.notice || (billingGateways.length
-        ? ''
-        : 'Ingen betalingsleverandør er konfigurert for bedriften.'), data.notice ? 'info' : '');
+    billingStatus(data.notice || '', data.notice ? 'info' : '');
 }
 
 async function loadPaymentGateways() {
@@ -285,6 +315,7 @@ async function loadPaymentGateways() {
             return;
         }
         billingStatus(error.message || 'Betalingsinnstillingene er ikke tilgjengelige.', 'danger');
+        billingUpdateProviderCards([], true);
         const root = document.getElementById('paymentConfigStatus');
         const retry = document.createElement('button');
         retry.type = 'button';
@@ -294,7 +325,7 @@ async function loadPaymentGateways() {
         root.querySelector('.alert')?.appendChild(retry);
         billingGatewayCanEdit = false;
         billingEncryptedCredentialsReady = false;
-        billingRenderCredentialWarning(null, 'Kunne ikke bekrefte sikker lagring. Hemmelige felt forblir deaktivert.');
+        billingRenderCredentialWarning(null, 'Krypteringsstøtte kunne ikke bekreftes. Vanlige innstillinger og fjerning er bare tilgjengelig når tjenesten lastes; rå nøkkellagring krever uttrykkelig bekreftelse.');
         billingSetGatewayControls(false);
     }
 }
@@ -369,11 +400,11 @@ function billingStartGatewayCountdown() {
 
 async function billingRelockGateways(message = '') {
     const token = billingEditToken;
+    billingGatewaySaving = true;
     clearInterval(billingEditTimer);
     billingEditTimer = null;
     billingEditToken = '';
     billingEditExpires = 0;
-    billingGatewaySaving = false;
     billingClearSecrets();
     document.getElementById('paymentUnlockCountdown').textContent = '';
     document.getElementById('paymentLockLabel').textContent = 'Betalingsinnstillinger er låst';
@@ -388,6 +419,8 @@ async function billingRelockGateways(message = '') {
             // Local controls remain locked even if the revocation request cannot be confirmed.
         }
     }
+    billingGatewaySaving = false;
+    billingSetGatewayControls(true);
     if (message) billingStatus(message, 'info');
 }
 
@@ -435,13 +468,25 @@ async function savePaymentGateway(gateway) {
         const checkbox = document.querySelector(`#payment [data-clear-secret="${name}"]`);
         return checkbox?.checked && form.elements.namedItem(name);
     });
-    const storageMode = form.elements.namedItem('credential_storage')?.value === 'plaintext'
-        ? 'plaintext' : 'existing';
-    const plaintextConsent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
-    const storageConfirmed = storageMode === 'plaintext' && !!plaintextConsent?.checked;
     const hasSecretReplacement = billingGatewaySecretFields[gateway].some(name =>
         String(form.elements.namedItem(name)?.value || '').trim() !== ''
     );
+    const storageControl = form.elements.namedItem('credential_storage');
+    let storageMode = storageControl?.value === 'plaintext' ? 'plaintext' : 'existing';
+    let plaintextConsent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+    if (storageMode === 'existing' && hasSecretReplacement && !billingEncryptedCredentialsReady) {
+        const approved = window.confirm(
+            'Krypteringsstøtte for enkelte felt er ikke verifisert. Vil du uttrykkelig lagre nye verdier rått og ukryptert? Velg bare dette hvis betalingsmodulen leser rå verdier, ikke hvis den forventer dekoding.'
+        );
+        if (!approved) return;
+        storageControl.value = 'plaintext';
+        billingRefreshStorageChoice(gateway, true);
+        plaintextConsent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+        if (plaintextConsent) plaintextConsent.checked = true;
+        billingSetGatewayControls(true);
+        storageMode = 'plaintext';
+    }
+    const storageConfirmed = storageMode === 'plaintext' && !!plaintextConsent?.checked;
     if (storageMode === 'plaintext' && hasSecretReplacement && !storageConfirmed) {
         billingStatus('Bekreft uttrykkelig rå, ukryptert lagring før du lagrer nye nøkler.', 'warning');
         return;

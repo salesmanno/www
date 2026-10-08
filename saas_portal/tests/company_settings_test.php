@@ -33,6 +33,10 @@ try {
         $edit=PortalBillingAccess::unlock('payment',$company,'actor',$service->paymentVersion($company));
         $service->savePayment($company,$data+$edit+['confirmed'=>true],'actor');
     };
+    $saveEmail=function(string $company,array $data) use ($service): void {
+        $edit=PortalBillingAccess::unlock('email',$company,'actor',$service->emailVersion($company));
+        $service->saveEmail($company,$data+$edit+['confirmed'=>true],'actor');
+    };
     $email = $service->getEmail('A');
     checkSettings($email['layout']==='email_configs' && $email['config']['smtp_from_email']==='sender@example.test', 'Email mapping');
     checkSettings(!str_contains(json_encode($email),'encrypted-fixture'), 'Email credential leak');
@@ -41,11 +45,11 @@ try {
     checkSettings($payment['gateways'][0]['display_name']==='Custom Vipps', 'Config display name');
     checkSettings(!str_contains(json_encode($payment),'secret-fixture') && !str_contains(json_encode($payment),'subscription-fixture'), 'Payment credential leak');
     rejectSettings(fn()=>$service->getEmail('missing'));
-    rejectSettings(fn()=>$service->saveEmail('A',['smtp_password'=>'plaintext']));
-    $service->saveEmail('A',['smtp_host'=>'changed.example.test','smtp_from_email'=>'new@example.test','smtp_port'=>'2525']);
+    rejectSettings(fn()=>$saveEmail('A',['smtp_password'=>'plaintext']));
+    $saveEmail('A',['smtp_host'=>'changed.example.test','smtp_from_email'=>'new@example.test','smtp_port'=>'2525']);
     $emailRow = $db->query("SELECT * FROM email_configs WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
     checkSettings($emailRow['smtp_password_encrypted']==='encrypted-fixture' && $emailRow['automail_sales_order']==1 && $emailRow['imap_username']==='sender', 'Email preserved credentials and omitted/unrelated fields');
-    rejectSettings(fn()=>$service->saveEmail('A',['smtp_port'=>'0']));
+    rejectSettings(fn()=>$saveEmail('A',['smtp_port'=>'0']));
     $beforeB = $db->query("SELECT * FROM economy_configuration_data WHERE company_id='B'")->fetch(PDO::FETCH_ASSOC);
     $savePayment('A',['gateway_name'=>'vipps','vipps_client_id'=>'new-client','is_active'=>'on','test_mode'=>false]);
     $config = $db->query("SELECT * FROM economy_configuration_data WHERE id='ca'")->fetch(PDO::FETCH_ASSOC);
@@ -55,11 +59,11 @@ try {
     $savePayment('A',['gateway_name'=>'vipps','vipps_subscription_key'=>'overwrite']);
     checkSettings($db->query("SELECT subscription_key FROM economy_configuration_data WHERE id='ca'")->fetchColumn()==='overwrite','Explicit key replacement');
     $db->exec("UPDATE economy_payment_gateways SET configuration_id='cb' WHERE id='ga'");
-    rejectSettings(fn()=>$service->getPayments('A'));
+    checkSettings($service->getPayments('A')['gateways'][0]['configuration_missing']===true,'Broken configuration must allow protected repair');
     $db->exec("UPDATE economy_payment_gateways SET configuration_id='ca' WHERE id='ga'");
     // Real protected HTTP endpoints, with configuration and sessions isolated in /tmp.
     foreach (['config','includes','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
-    foreach (['portal_request','company_settings_request','get_email_config','get_payment_gateways','save_email_config','save_payment_gateway','connect_email','payment_edit'] as $file) {
+    foreach (['portal_request','company_settings_request','get_email_config','get_payment_gateways','save_email_config','save_payment_gateway','connect_email','payment_edit','email_edit','test_email_connection'] as $file) {
         copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
     }
     foreach (['PortalCompanySettings','PortalDatabase','PortalSaasIdentity','PortalBillingAccess','PortalBillingAudit'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
@@ -98,7 +102,13 @@ try {
         [$status,$body] = $request($endpoint);
         checkSettings($status===200 && $body['success']===true, 'HTTP settings read');
     }
-    checkSettings($request('save_email_config',['company_id'=>'A','csrf_token'=>'csrf','smtp_from_name'=>'HTTP sender'])[0]===200, 'HTTP email save');
+    $emailRequest=function(string $endpoint,array $payload) use ($request): array {
+        $version=$request('get_email_config')[1]['version'];
+        $edit=$request('email_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$version])[1];
+        return $request($endpoint,$payload+['company_id'=>'A','csrf_token'=>'csrf','edit_token'=>$edit['edit_token'],'version'=>$edit['version'],'confirmed'=>true]);
+    };
+    checkSettings($request('save_email_config',['company_id'=>'A','csrf_token'=>'csrf','smtp_from_name'=>'HTTP sender'])[0]===403,'HTTP locked email save');
+    checkSettings($emailRequest('save_email_config',['smtp_from_name'=>'HTTP sender'])[0]===200, 'HTTP email save');
     checkSettings($request('save_payment_gateway',['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps'])[0]===403, 'HTTP locked payment save');
     $version=$request('get_payment_gateways')[1]['version'];
     $edit=$request('payment_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$version])[1];
@@ -113,7 +123,35 @@ try {
     $masked=$request('get_payment_gateways')[1];
     checkSettings(!str_contains(json_encode($masked),'http-private-fixture'),'Raw key leaked over HTTP');
     checkSettings($request('save_payment_gateway',$rawPayload+['credential_storage_confirmed'=>true])[0]===403,'Successful raw save must relock');
-    checkSettings($request('connect_email',['company_id'=>'A','csrf_token'=>'csrf'])[0]===200, 'HTTP activation');
+    checkSettings($emailRequest('connect_email',[])[0]===200, 'HTTP activation');
+    checkSettings($request('test_email_connection',['smtp_host'=>'ignored.example.test'],false)[0]===403,'Anonymous connectivity test must not open sockets');
+    checkSettings($request('test_email_connection',['company_id'=>'A'])[0]===403,'Connectivity test CSRF');
+    $mailBefore=$db->query("SELECT * FROM email_configs WHERE id='ea'")->fetch(PDO::FETCH_ASSOC);
+    checkSettings($emailRequest('save_email_config',['configuration_id'=>'eb','smtp_from_name'=>'not-allowed'])[0]===400,'Email account must belong to company');
+    checkSettings($db->query("SELECT * FROM email_configs WHERE id='ea'")->fetch(PDO::FETCH_ASSOC)===$mailBefore,'Cross-company rejection mutated account');
+    $db->exec("DELETE FROM email_configs WHERE company_id='A'");
+    $empty=$request('get_email_config')[1];
+    checkSettings($empty['config']===null && $empty['can_edit']===true && $empty['credentials_readonly']===false,'Empty email must be creatable');
+    $mailNew=['create_new'=>true,'smtp_from_email'=>'new@example.test','smtp_from_name'=>'New account','smtp_host'=>'smtp.example.test','smtp_port'=>587,'smtp_username'=>'new@example.test','smtp_password'=>'http-mail-private','credential_storage'=>'plaintext','credential_storage_confirmed'=>true];
+    checkSettings($emailRequest('save_email_config',$mailNew)[0]===200,'HTTP first email creation including password');
+    $mail=$request('get_email_config')[1]['config'];
+    checkSettings($db->query("SELECT smtp_password_encrypted FROM email_configs WHERE company_id='A'")->fetchColumn()==='http-mail-private','Email password not saved in chosen format');
+    checkSettings(!str_contains(json_encode($request('get_email_config')[1]),'http-mail-private'),'Email password leaked in GET');
+    checkSettings($request('save_email_config',['company_id'=>'A','csrf_token'=>'csrf','configuration_id'=>$mail['configuration_id'],'smtp_from_name'=>'without-unlock'])[0]===403,'Email save must relock');
+    checkSettings($emailRequest('save_email_config',['configuration_id'=>$mail['configuration_id'],'smtp_password'=>'','smtp_from_name'=>'Renamed'])[0]===200,'Email blank password update');
+    checkSettings($db->query("SELECT smtp_password_encrypted FROM email_configs WHERE company_id='A'")->fetchColumn()==='http-mail-private','Blank password erased existing email password');
+    $second=$mailNew; $second['smtp_from_email']='second@example.test'; $second['smtp_password']='second-private';
+    checkSettings($emailRequest('save_email_config',$second)[0]===200,'Additional email account creation');
+    $accounts=$request('get_email_config')[1];
+    checkSettings($accounts['selection_required']===true && count($accounts['configs'])===2,'Multiple email account selection');
+    checkSettings($emailRequest('save_email_config',['smtp_from_name'=>'ambiguous'])[0]===400,'Ambiguous email write must be rejected');
+    checkSettings($emailRequest('save_email_config',['configuration_id'=>$mail['configuration_id'],'clear_secrets'=>['smtp_password']])[0]===200,'Explicit selected-account password removal');
+    checkSettings($db->query("SELECT smtp_password_encrypted FROM email_configs WHERE id=".$db->quote($mail['configuration_id']))->fetchColumn()===null,'Selected password not removed');
+    checkSettings($db->query("SELECT smtp_password_encrypted FROM email_configs WHERE email='second@example.test'")->fetchColumn()==='second-private','Other account secret altered');
+    $db->exec("UPDATE saas_admins SET role='global_admin' WHERE id='actor'");
+    checkSettings($request('get_email_config')[1]['can_edit']===false,'Global module access is not email administration');
+    checkSettings($request('email_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$accounts['version']])[0]===403,'Global user cannot unlock email');
+    $db->exec("UPDATE saas_admins SET role='admin' WHERE id='actor'");
     file_put_contents($dir.'/config/outage','1');
     foreach (['get_email_config','get_payment_gateways'] as $endpoint) {
         [$status,$body] = $request($endpoint);
@@ -126,7 +164,7 @@ try {
     $db->exec('CREATE TABLE tenant_email_config(id CHAR(36),company_id CHAR(36),smtp_host VARCHAR(255),smtp_port INT,smtp_encryption VARCHAR(10),smtp_username VARCHAR(255),smtp_from_email VARCHAR(255),smtp_from_name VARCHAR(255),imap_host VARCHAR(255),imap_port INT,imap_encryption VARCHAR(10),imap_username VARCHAR(255),updated_at DATETIME) ENGINE=InnoDB');
     $db->exec("INSERT INTO tenant_email_config VALUES ('legacy','A','legacy.example.test',587,'tls','legacy','legacy@example.test','Legacy',NULL,993,'ssl',NULL,NOW())");
     checkSettings($service->getEmail('A')['config']['smtp_host']==='legacy.example.test','Legacy email read');
-    $service->saveEmail('A',['smtp_from_name'=>'Updated legacy']);
+    $saveEmail('A',['smtp_from_name'=>'Updated legacy']);
     checkSettings($service->getEmail('A')['config']['smtp_from_name']==='Updated legacy','Legacy email save');
     $db->exec('DROP TABLE economy_payment_gateways');
     $db->exec('CREATE TABLE economy_payment_gateways(id CHAR(36),company_id CHAR(36),gateway_name VARCHAR(50),display_name VARCHAR(100),is_active INT,test_mode INT,vipps_client_id VARCHAR(255),vipps_merchant_serial_number VARCHAR(255),updated_at DATETIME) ENGINE=InnoDB');

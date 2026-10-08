@@ -25,6 +25,7 @@ class PortalCompanySettings {
                 'smtp_host'=>'smtp_host', 'smtp_port'=>'smtp_port', 'smtp_username'=>'smtp_username',
                 'smtp_from_email'=>'email', 'smtp_from_name'=>'display_name',
                 'imap_host'=>'imap_host', 'imap_port'=>'imap_port', 'imap_username'=>'imap_username',
+                'smtp_encryption'=>'smtp_encryption','imap_encryption'=>'imap_encryption',
             ], true];
         }
         if (!$this->columns('tenant_email_config')) throw new RuntimeException('Email settings schema missing');
@@ -34,46 +35,66 @@ class PortalCompanySettings {
         ), false];
     }
 
-    private function oneEmail(string $table, string $company): ?array {
+    private function emailRows(string $table, string $company): array {
         // Never read encrypted passwords, signatures, or unrelated automation settings.
         $cols = $this->columns($table);
         $safe = array_intersect($cols, ['id','smtp_host','smtp_port','smtp_encryption','smtp_username',
             'smtp_from_email','smtp_from_name','email','display_name','imap_host','imap_port',
             'imap_encryption','imap_username','updated_at','is_active']);
         $select = '`'.implode('`,`', $safe).'`';
-        $s = $this->db->prepare("SELECT {$select} FROM `{$table}` WHERE company_id=? LIMIT 2");
+        $s = $this->db->prepare("SELECT {$select} FROM `{$table}` WHERE company_id=? ORDER BY id");
         $s->execute([$company]);
         $rows = $s->fetchAll(PDO::FETCH_ASSOC);
-        if (count($rows) > 1) throw new InvalidArgumentException('Firmaet har flere e-postoppsett. Velg og administrer kontoen i e-postmodulen.');
+        return $rows;
+    }
+
+    private function oneEmail(string $table,string $company,?string $id=null): ?array {
+        $rows=$this->emailRows($table,$company);
+        if ($id!==null && $id!=='') {
+            foreach ($rows as $row) if ($row['id']===$id) return $row;
+            throw new InvalidArgumentException('Den valgte e-postkontoen tilhører ikke bedriften.');
+        }
+        if (count($rows)>1) throw new InvalidArgumentException('Velg hvilken e-postkonto som skal redigeres i SaaS-portalen.');
         return $rows[0] ?? null;
     }
 
-    public function getEmail(string $company): array {
+    public function getEmail(string $company,?string $id=null): array {
         $this->company($company);
         [$table, $map, $modern] = $this->emailLayout();
-        $row = $this->oneEmail($table, $company);
+        $rows=$this->emailRows($table,$company);
+        $row = ($id===null && count($rows)>1)?null:$this->oneEmail($table,$company,$id);
         $config = null;
         if ($row) {
             $config = [];
             foreach ($map as $field=>$column) $config[$field] = $row[$column] ?? null;
             $config['updated_at'] = $row['updated_at'] ?? null;
+            $config['configuration_id']=$row['id'];
+            $config['is_active']=$row['is_active'] ?? 0;
         }
-        return ['config'=>$config, 'layout'=>$table, 'credentials_readonly'=>$modern,
-            'notice'=>$modern ? 'Hentes fra email_configs. Eksisterende passord og automatiske e-postvalg beholdes. Passord og krypteringsvalg administreres i e-postmodulen.' : null];
+        $columns=$this->columns($table);
+        $supported=array_keys(array_filter($map,fn($col)=>in_array($col,$columns,true)));
+        foreach (['smtp_password','imap_password'] as $field) if (in_array($field,$columns,true) || in_array($field.'_encrypted',$columns,true)) $supported[]=$field;
+        return ['config'=>$config,'configs'=>array_map(fn($r)=>[
+            'configuration_id'=>$r['id'],'smtp_from_email'=>$r[$map['smtp_from_email']] ?? '',
+            'smtp_from_name'=>$r[$map['smtp_from_name']] ?? ''
+        ],$rows),'selection_required'=>count($rows)>1 && !$row,'supported_fields'=>$supported,
+            'layout'=>$table,'version'=>$this->emailVersion($company),'credentials_readonly'=>false,
+            'encrypted_credentials_ready'=>$this->encryptCredential!==null || PaymentCredentialCipher::available(),
+            'notice'=>'Opprett eller rediger e-postkontoen her i SaaS-portalen. Tomme passordfelt bevarer eksisterende verdier. Felt som ikke finnes i installert oppsett, er markert utilgjengelige. Nye passord lagres med kjent kryptering eller uttrykkelig bekreftet klartekst.'];
+    }
+
+    public function emailVersion(string $company): string {
+        $this->company($company);
+        [$table]=$this->emailLayout();
+        $s=$this->db->prepare("SELECT * FROM `{$table}` WHERE company_id=? ORDER BY id".($this->db->inTransaction()?' FOR UPDATE':''));
+        $s->execute([$company]);
+        return PortalBillingAccess::version($s->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function text(array $data, string $key): string {
         $value = $data[$key] ?? '';
         if (!is_string($value) || strlen($value)>2000) throw new InvalidArgumentException('Ugyldig verdi i innstillingene.');
         return trim($value);
-    }
-
-    private function rejectCredentials(array $data, array $fields): void {
-        foreach ($fields as $field) {
-            if (($data[$field] ?? '') !== '') {
-                throw new InvalidArgumentException('Hemmelige innstillinger må endres i den tilhørende modulen. Eksisterende krypterte verdier er ikke endret.');
-            }
-        }
     }
 
     private function update(string $table, array $values, string $id, string $company): void {
@@ -85,42 +106,104 @@ class PortalCompanySettings {
         $s->execute([...array_values($values), $id, $company]);
     }
 
-    public function saveEmail(string $company, array $data): void {
-        $this->company($company);
+    public function saveEmail(string $company, array $data,string $actor): void {
+        PortalBillingAccess::check('email',$company,$actor,$data);
+        $this->db->beginTransaction();
+        try {
+        $this->lockSettingsCompany($company,$actor);
         [$table, $map, $modern] = $this->emailLayout();
-        if ($modern) $this->rejectCredentials($data, ['smtp_password','imap_password']);
-        $row = $this->oneEmail($table, $company);
-        if (!$row) throw new InvalidArgumentException('Opprett e-postkontoen i e-postmodulen først. Ingen innstillinger er endret.');
+        $this->requireTransactional($table);
+        if (!hash_equals($this->emailVersion($company),$data['version'])) throw new PortalPaymentConflictException('E-postoppsettet er endret. Last inn og bekreft på nytt.');
+        $id=$data['configuration_id'] ?? null;
+        if ($id!==null && (!is_string($id) || strlen($id)>36)) throw new InvalidArgumentException('Ugyldig e-postkonto.');
+        $create=($data['create_new'] ?? false)===true;
+        if ($create && $id) throw new InvalidArgumentException('Velg enten ny konto eller eksisterende konto.');
+        $row=$create?null:$this->oneEmail($table,$company,$id);
+        $columns=$this->columns($table);
         $values = [];
         foreach ($map as $field=>$column) {
             if (!array_key_exists($field, $data)) continue;
+            if (!in_array($column,$columns,true)) {
+                if ($this->text($data,$field)!=='') throw new InvalidArgumentException('E-postoppsettet har ikke kolonnen '.$field.'. Ingen endringer er lagret.');
+                continue;
+            }
             if (str_ends_with($field, '_port')) {
                 $port = filter_var($data[$field], FILTER_VALIDATE_INT);
                 if ($port === false || $port<1 || $port>65535) throw new InvalidArgumentException('Port må være mellom 1 og 65535.');
                 $values[$column] = $port;
-            } else $values[$column] = $this->text($data, $field);
+            } else {
+                $value=$this->text($data,$field);
+                if (str_ends_with($field,'_encryption') && !in_array($value,['none','ssl','tls'],true)) throw new InvalidArgumentException('Ugyldig sikkerhetsvalg.');
+                $values[$column]=$value;
+            }
         }
         if (isset($values[$map['smtp_from_email']]) && !filter_var($values[$map['smtp_from_email']], FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Oppgi en gyldig avsenderadresse.');
         }
+        $storage=$data['credential_storage'] ?? 'existing';
+        if (!in_array($storage,['existing','plaintext'],true)) throw new InvalidArgumentException('Ugyldig passordlagring.');
+        $clear=$data['clear_secrets'] ?? [];
+        if (!is_array($clear) || !array_is_list($clear) || array_diff($clear,['smtp_password','imap_password'])) throw new InvalidArgumentException('Ugyldig fjerning av passord.');
+        foreach (['smtp_password','imap_password'] as $field) {
+            $plain=$this->text($data,$field);
+            $remove=in_array($field,$clear,true);
+            if ($plain==='' && !$remove) continue;
+            if ($plain!=='' && $remove) throw new InvalidArgumentException('Velg enten erstatning eller fjerning av passord.');
+            $target=in_array($field.'_encrypted',$columns,true)?$field.'_encrypted':$field;
+            if (!in_array($target,$columns,true)) throw new InvalidArgumentException('Oppsettet mangler '.$field.'.');
+            if ($plain!=='' && $storage==='plaintext' && ($data['credential_storage_confirmed'] ?? false)!==true) throw new InvalidArgumentException('Bekreft uttrykkelig klartekstlagring av passord.');
+            $values[$target]=$remove?null:($storage==='existing' && str_ends_with($target,'_encrypted')?
+                ($this->encryptCredential?($this->encryptCredential)($plain):PaymentCredentialCipher::encrypt($plain)):$plain);
+        }
+        if (!$row) {
+            $address=$values[$map['smtp_from_email']] ?? '';
+            if (!filter_var($address,FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Oppgi avsenderadressen for den nye e-postkontoen.');
+            $values+=['id'=>self::uuid(),'company_id'=>$company,$map['smtp_from_name']=>$address];
+            if (in_array('is_active',$columns,true)) $values['is_active']=array_key_exists('is_active',$data)?$this->flag($data,'is_active'):0;
+        } elseif (array_key_exists('is_active',$data) && in_array('is_active',$columns,true)) $values['is_active']=$this->flag($data,'is_active');
         if (!$modern) {
-            foreach (['smtp_password','imap_password'] as $field) {
-                if (($data[$field] ?? '') !== '') $values[$field] = $this->text($data, $field);
-            }
             $values += ['is_connected'=>0,'last_test_status'=>'not_tested','last_test_at'=>null,'last_error_message'=>null];
         }
-        $this->update($table, $values, $row['id'], $company);
+        $values=array_intersect_key($values,array_flip($columns));
+        if ($row) $this->update($table,$values,$row['id'],$company);
+        else $this->insertPayment($table,$values);
+        $this->db->commit();
+        PortalBillingAccess::lock('email');
+        } catch (Throwable $e) { if ($this->db->inTransaction()) $this->db->rollBack(); throw $e; }
     }
 
-    public function activateEmail(string $company): void {
-        $this->company($company);
+    public function activateEmail(string $company,array $data,string $actor): void {
+        PortalBillingAccess::check('email',$company,$actor,$data);
+        $this->db->beginTransaction();
+        try {
+        $this->lockSettingsCompany($company,$actor);
         [$table] = $this->emailLayout();
-        $row = $this->oneEmail($table, $company);
+        $this->requireTransactional($table);
+        if (!hash_equals($this->emailVersion($company),$data['version'])) throw new PortalPaymentConflictException('E-postoppsettet er endret. Last inn på nytt.');
+        $id=$data['configuration_id'] ?? null;
+        if ($id!==null && !is_string($id)) throw new InvalidArgumentException('Ugyldig konto.');
+        $row = $this->oneEmail($table, $company,$id);
         if (!$row || empty($row['smtp_host']) || empty($row['smtp_username'])) {
             throw new InvalidArgumentException('Lagre SMTP-vert og brukernavn før aktivering.');
         }
         // Activation is not a successful SMTP authentication test.
         $this->update($table, [$table==='email_configs' ? 'is_active' : 'is_connected'=>1], $row['id'], $company);
+        $this->db->commit();
+        PortalBillingAccess::lock('email');
+        } catch (Throwable $e) { if ($this->db->inTransaction()) $this->db->rollBack(); throw $e; }
+    }
+
+    private function requireTransactional(string $table): void {
+        $s=$this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+        $s->execute([$table]);
+        if (strcasecmp((string)$s->fetchColumn(),'InnoDB')!==0) throw new InvalidArgumentException('Oppsettet krever transaksjonssikre tabeller.');
+    }
+
+    private function lockSettingsCompany(string $company,string $actor): void {
+        $s=$this->db->prepare('SELECT id FROM tenant_companies WHERE id=? FOR UPDATE');
+        $s->execute([$company]);
+        if (!$s->fetchColumn()) throw new InvalidArgumentException('Bedriften finnes ikke.');
+        PortalBillingAccess::requireAdmin($this->db,$actor,true);
     }
 
     private function paymentLayout(): bool {
@@ -133,14 +216,38 @@ class PortalCompanySettings {
         return false;
     }
 
+    private function paymentColumn(array $columns,string $field,string $generic,string $environment,bool $modern,bool $secret=false): ?string {
+        $prefix=$environment==='test'?'test_':'';
+        $bases=$modern?[$prefix.$generic,$prefix.$field]:[$field];
+        foreach ($bases as $base) {
+            if ($secret && in_array($base.'_encrypted',$columns,true)) return $base.'_encrypted';
+            if (in_array($base,$columns,true)) return $base;
+        }
+        return null;
+    }
+
+    private function paymentEnvironments(array $columns): array {
+        foreach (['test_client_id','test_public_key','test_vipps_client_id','test_stripe_public_key','test_paypal_client_id'] as $column) {
+            if (in_array($column,$columns,true)) return ['production','test'];
+        }
+        return ['production'];
+    }
+
     public function getPayments(string $company): array {
         $this->company($company);
         $modern = $this->paymentLayout();
         if ($modern) {
+            $columns=$this->columns('economy_configuration_data');
+            $projection=[];
+            foreach (['config_name','client_id','merchant_serial_number','public_key','webhook_id'] as $column) {
+                $alias=$column==='config_name'?'display_name':$column;
+                $projection[]=(in_array($column,$columns,true)?"c.`{$column}`":'NULL')." AS `{$alias}`";
+            }
+            $typeJoin=in_array('gateway_type',$columns,true)?' AND c.gateway_type=g.gateway_name':'';
             $s = $this->db->prepare('SELECT g.id,g.gateway_name,g.is_active,g.test_mode,c.id AS configuration_id,
-                c.config_name AS display_name,c.client_id,c.merchant_serial_number,c.public_key,c.webhook_id
+                '.implode(',',$projection).'
                 FROM economy_payment_gateways g LEFT JOIN economy_configuration_data c
-                ON c.id=g.configuration_id AND c.company_id=g.company_id AND c.gateway_type=g.gateway_name
+                ON c.id=g.configuration_id AND c.company_id=g.company_id'.$typeJoin.'
                 WHERE g.company_id=?');
         } else {
             // Deliberately exclude client secrets, subscription keys and webhook secrets.
@@ -153,10 +260,10 @@ class PortalCompanySettings {
         $rows = $s->fetchAll(PDO::FETCH_ASSOC);
         $seen = [];
         foreach ($rows as &$row) {
-            if (isset($seen[$row['gateway_name']])) throw new InvalidArgumentException('Flere oppsett for samme betalingsleverandør må administreres i økonomimodulen.');
+            if (isset($seen[$row['gateway_name']])) throw new InvalidArgumentException('Flere oppsett for samme betalingsleverandør finnes. Velg ett entydig oppsett før endring; ingen data er endret.');
             $seen[$row['gateway_name']] = true;
             if ($modern) {
-                if (!$row['configuration_id']) throw new InvalidArgumentException('Betalingsleverandøren mangler en gyldig konfigurasjon for dette firmaet.');
+                $row['configuration_missing']=!$row['configuration_id'];
                 $row['vipps_client_id'] = $row['gateway_name']==='vipps' ? $row['client_id'] : null;
                 $row['vipps_merchant_serial_number'] = $row['gateway_name']==='vipps' ? $row['merchant_serial_number'] : null;
                 $row['paypal_client_id'] = $row['gateway_name']==='paypal' ? $row['client_id'] : null;
@@ -164,9 +271,31 @@ class PortalCompanySettings {
                 $row['stripe_public_key'] = $row['gateway_name']==='stripe' ? $row['public_key'] : null;
                 unset($row['client_id'], $row['merchant_serial_number'], $row['public_key'], $row['webhook_id']);
                 $columns=$this->columns('economy_configuration_data');
-                $row['credential_environments']=in_array('test_client_id',$columns,true) || in_array('test_public_key',$columns,true)?['production','test']:['production'];
-                $testColumns=array_intersect($columns,['test_client_id','test_merchant_serial_number','test_public_key','test_webhook_id']);
+                $publicMap=match($row['gateway_name']) {
+                    'vipps'=>['vipps_client_id'=>'client_id','vipps_merchant_serial_number'=>'merchant_serial_number'],
+                    'stripe'=>['stripe_public_key'=>'public_key'],
+                    'paypal'=>['paypal_client_id'=>'client_id','paypal_webhook_id'=>'webhook_id'],
+                    default=>[]
+                };
+                foreach ($publicMap as $field=>$generic) {
+                    $target=$this->paymentColumn($columns,$field,$generic,'production',true);
+                    if ($target && $row['configuration_id']) {
+                        $q=$this->db->prepare("SELECT `{$target}` FROM economy_configuration_data WHERE id=? AND company_id=?");
+                        $q->execute([$row['configuration_id'],$company]);
+                        $row[$field]=$q->fetchColumn();
+                    }
+                }
+                $row['credential_environments']=$this->paymentEnvironments($columns);
                 $row['test_values']=[];
+                foreach ($publicMap as $field=>$generic) {
+                    $target=$this->paymentColumn($columns,$field,$generic,'test',true);
+                    if ($target && $row['configuration_id']) {
+                        $q=$this->db->prepare("SELECT `{$target}` FROM economy_configuration_data WHERE id=? AND company_id=?");
+                        $q->execute([$row['configuration_id'],$company]);
+                        $row['test_values'][$field]=$q->fetchColumn();
+                    }
+                }
+                $testColumns=array_intersect($columns,['test_client_id','test_merchant_serial_number','test_public_key','test_webhook_id']);
                 if ($testColumns) {
                     $q=$this->db->prepare('SELECT `'.implode('`,`',$testColumns).'` FROM economy_configuration_data WHERE id=? AND company_id=?');
                     $q->execute([$row['configuration_id'],$company]);
@@ -185,11 +314,12 @@ class PortalCompanySettings {
         }
         unset($row);
         $columns=$modern?$this->columns('economy_configuration_data'):[];
-        $environments=in_array('test_client_id',$columns,true) || in_array('test_public_key',$columns,true)?['production','test']:['production'];
+        $environments=$this->paymentEnvironments($columns);
         return ['gateways'=>$rows, 'credential_environments'=>$environments,'credentials_readonly'=>false,
             'encrypted_credentials_ready'=>$this->encryptCredential!==null || PaymentCredentialCipher::available(),
             'version'=>$this->paymentVersion($company),
-            'notice'=>'Oppsettet er låst til du velger redigering. Tomme nøkkelfelt beholder lagrede verdier. Produksjons- og testnøkler lagres separat.'.
+            'notice'=>'Oppsettet er låst til du velger redigering. Tomme nøkkelfelt beholder lagrede verdier. '.
+                ($modern?'Produksjons- og testnøkler bruker separate felt når disse finnes.':'Dette eldre oppsettet bruker ett sett nøkkelfelt; testmodus velger miljø, ikke et separat sett lagrede nøkler.').
                 (($this->encryptCredential!==null || PaymentCredentialCipher::available())?'':' Kolonnenavn alene fastslår ikke kryptering. Nye verdier i slike felt krever kjent krypteringsfunksjon eller et uttrykkelig bekreftet valg om klartekst. Eksisterende verdier konverteres ikke.')];
     }
 
@@ -260,8 +390,8 @@ class PortalCompanySettings {
             $prefix=$environment==='test'?'test_':'';
             $values = [];
             foreach ($map as $field=>$column) {
-                $target=$modern?$prefix.$column:$field;
-                if (array_key_exists($field,$data) && !in_array($target,$columns,true)) {
+                $target=$this->paymentColumn($columns,$field,$column,$environment,$modern);
+                if (array_key_exists($field,$data) && !$target) {
                     if ($this->text($data,$field)!=='') throw new InvalidArgumentException('Oppsettet mangler feltet for valgt nøkkelmiljø.');
                     continue;
                 }
@@ -275,12 +405,11 @@ class PortalCompanySettings {
             $clear=$data['clear_secrets'] ?? [];
             if (!is_array($clear) || !array_is_list($clear) || array_diff($clear,array_keys($secrets))) throw new InvalidArgumentException('Ugyldig valg for fjerning av nøkkel.');
             foreach ($secrets as $field=>$column) {
-                $base=$modern?$prefix.$column:$field;
-                $target=in_array($base.'_encrypted',$columns,true)?$base.'_encrypted':$base;
+                $target=$this->paymentColumn($columns,$field,$column,$environment,$modern,true);
                 $plain=$this->text($data,$field);
                 if ($plain!=='' && in_array($field,$clear,true)) throw new InvalidArgumentException('Velg enten erstatning eller fjerning av nøkkelen.');
                 if ($plain==='' && !in_array($field,$clear,true)) continue;
-                if (!in_array($target,$columns,true)) throw new InvalidArgumentException('Oppsettet mangler nøkkelfeltet. Ingen verdier er endret.');
+                if (!$target) throw new InvalidArgumentException('Oppsettet mangler nøkkelfeltet. Ingen verdier er endret.');
                 if ($plain!=='' && $storage==='plaintext' && ($data['credential_storage_confirmed'] ?? null)!==true) {
                     throw new InvalidArgumentException('Klartekst må bekreftes uttrykkelig. Bruk dette bare hvis betalingsmodulen leser nøklene direkte, uten dekryptering. Ingen endringer er lagret.');
                 }
@@ -290,7 +419,7 @@ class PortalCompanySettings {
             }
             if ($modern) {
                 // A shared configuration must not change another gateway implicitly.
-                if ($row) {
+                if ($row && $row['configuration_id']) {
                     $s = $this->db->prepare('SELECT COUNT(*) FROM economy_payment_gateways WHERE configuration_id=? AND id<>?');
                     $s->execute([$row['configuration_id'],$row['id']]);
                     if ((int)$s->fetchColumn()>0) throw new InvalidArgumentException('Delt betalingsoppsett kan ikke endres uten å avklare koblingene først.');
@@ -298,20 +427,19 @@ class PortalCompanySettings {
                     $this->update('economy_payment_gateways', $flags, $row['id'], $company);
                 } else {
                     $configuration=self::uuid();
-                    $config=$values+$flags+['id'=>$configuration,'company_id'=>$company,'gateway_type'=>$gateway,'config_name'=>ucfirst($gateway)];
-                    foreach (['created_by','updated_by'] as $column) if (in_array($column,$columns,true)) $config[$column]=$actor;
+                    $config=$values+$flags+['id'=>$configuration,'company_id'=>$company,'gateway_type'=>$gateway,'config_name'=>ucfirst($gateway),'display_name'=>ucfirst($gateway)];
+                    $config=array_intersect_key($config,array_flip($columns));
                     $this->insertPayment('economy_configuration_data',$config);
                     $grant=$flags+['id'=>self::uuid(),'company_id'=>$company,'configuration_id'=>$configuration,'gateway_name'=>$gateway];
                     $gatewayColumns=$this->columns('economy_payment_gateways');
                     if (in_array('display_name',$gatewayColumns,true)) $grant['display_name']=ucfirst($gateway);
-                    if (in_array('created_by',$gatewayColumns,true)) $grant['created_by']=$actor;
-                    $this->insertPayment('economy_payment_gateways',$grant);
+                    if ($row) $this->update('economy_payment_gateways',['configuration_id'=>$configuration]+$flags,$row['id'],$company);
+                    else $this->insertPayment('economy_payment_gateways',$grant);
                 }
             } else {
                 if ($row) $this->update('economy_payment_gateways', $values+$flags, $row['id'], $company);
                 else {
                     $create=$values+$flags+['id'=>self::uuid(),'company_id'=>$company,'gateway_name'=>$gateway,'display_name'=>ucfirst($gateway)];
-                    if (in_array('created_by',$columns,true)) $create['created_by']=$actor;
                     $this->insertPayment('economy_payment_gateways',$create);
                 }
             }
@@ -331,13 +459,9 @@ class PortalCompanySettings {
                     'paypal'=>['client_id','client_secret']
                 };
                 foreach ($required as $column) {
-                    $base=$modern?$mode.$column:'';
-                    if (!$modern) $base=match($column) {
-                        'merchant_serial_number'=>'vipps_merchant_serial_number',
-                        default=>$gateway.'_'.$column
-                    };
-                    $target=array_key_exists($base.'_encrypted',$saved)?$base.'_encrypted':$base;
-                    if (!isset($saved[$target]) || trim((string)$saved[$target])==='') {
+                    $field=$gateway.'_'.$column;
+                    $target=$this->paymentColumn(array_keys($saved),$field,$column,$mode?'test':'production',$modern,true);
+                    if (!$target || !isset($saved[$target]) || trim((string)$saved[$target])==='') {
                         throw new InvalidArgumentException('Betalingsleverandøren kan ikke aktiveres før alle påkrevde nøkler for valgt miljø er satt. Ingen endringer er lagret.');
                     }
                 }

@@ -16,15 +16,26 @@ try {
     $service = new PortalCompanySettings($db);
     $company = $data['company_id'];
     $actor=(string)$_SESSION['saas_admin_id'];
-    if (in_array($settingsAction,['payments_get','payment_save'],true)) PortalSaasIdentity::active($db,$actor);
+    PortalSaasIdentity::active($db,$actor);
     switch ($settingsAction ?? '') {
-        case 'email_get': portalReply(200, ['success'=>true]+$service->getEmail($company));
+        case 'email_get':
+            $canEdit=true;
+            try { PortalBillingAccess::requireAdmin($db,$actor); } catch (PortalSaasAuthorizationException $e) { $canEdit=false; }
+            $id=$data['configuration_id'] ?? null;
+            if ($id!==null && !is_string($id)) throw new InvalidArgumentException('Ugyldig e-postkonto.');
+            portalReply(200,['success'=>true,'can_edit'=>$canEdit]+$service->getEmail($company,$id));
         case 'payments_get':
             $canEdit=true;
             try { PortalBillingAccess::requireAdmin($db,$actor); } catch (PortalSaasAuthorizationException $e) { $canEdit=false; }
             portalReply(200, ['success'=>true,'can_edit'=>$canEdit]+$service->getPayments($company));
-        case 'email_save': $service->saveEmail($company,$data); break;
-        case 'email_activate': $service->activateEmail($company); break;
+        case 'email_save':
+            $service->saveEmail($company,$data,$actor);
+            PortalBillingAudit::log($db,$company,$actor,'email_settings_updated',$data['credential_storage'] ?? 'existing');
+            break;
+        case 'email_activate':
+            $service->activateEmail($company,$data,$actor);
+            PortalBillingAudit::log($db,$company,$actor,'email_settings_activated');
+            break;
         case 'payment_save':
             PortalBillingAccess::requireAdmin($db,$actor);
             $service->savePayment($company,$data,$actor);
@@ -37,9 +48,11 @@ try {
         : ($settingsAction==='payment_save'?'Betalingsoppsettet er lagret. Tomme nøkkelfelt er beholdt.':'Innstillingene er lagret. Eksisterende hemmelige verdier er beholdt.')]);
 } catch (PortalSaasAuthorizationException $e) {
     PortalBillingAccess::lock('payment');
+    PortalBillingAccess::lock('email');
     portalReply(403,['success'=>false,'message'=>$e->getMessage()]);
 } catch (PortalPaymentConflictException $e) {
     PortalBillingAccess::lock('payment');
+    PortalBillingAccess::lock('email');
     portalReply(409,['success'=>false,'message'=>$e->getMessage()]);
 } catch (InvalidArgumentException $e) {
     portalReply(400, ['success'=>false,'message'=>$e->getMessage()]);

@@ -48,6 +48,27 @@ bevares eksisterende ciphertext, og erstatning av slike verdier avvises
 atomisk til kontrakten er kjent.
 Ikke bruk en testencoder i applikasjonen. Nøkler returneres aldri til klienten.
 
+E-postoppsett følger samme SaaS-adminbeskyttelse, CSRF, femminutters opplåsing,
+versjonskontroll og eksplisitte lagringsbekreftelse. Nye kontoer kan opprettes
+direkte i portalen. Hvis flere kontoer finnes, må en konto velges uttrykkelig;
+`configuration_id` kontrolleres mot bedriften. `create_new=true` oppretter en
+ny konto og må ikke kombineres med en eksisterende konto-ID. Tomme passord
+bevarer verdiene; `clear_secrets` kan eksplisitt fjerne `smtp_password` eller
+`imap_password`. Passord returneres aldri. Klartekstvalg gjelder samme
+lagringskontrakt og advarsel som for betalingsnøkler.
+
+Felter som ikke finnes i installert e-postskjema, rapporteres med
+`supported_fields` og hindrer ikke opprettelse av SMTP-oppsett med feltene som
+finnes. Ingen DDL kjøres automatisk for valgfrie IMAP- eller sikkerhetsfelter.
+Tilkoblingstesten er SaaS-admin- og CSRF-beskyttet og kontrollerer
+nettverkstilkobling, ikke SMTP-/IMAP-passordautentisering eller faktisk sending.
+
+Manglende koblet betalingskonfigurasjon kan repareres ved uttrykkelig lagring
+av leverandøroppsettet, uten å endre en annen bedrifts rad eller opprette en
+duplikatleverandør. SaaS-adminens ID settes ikke i `created_by`-felt som kan
+referere til tenant-administratorer; SaaS-handlingen registreres separat i
+eksisterende aktivitetslogg.
+
 # Abonnementspriser
 
 Kodearbeid og tester krever ikke tilgang til den faktiske databasen.

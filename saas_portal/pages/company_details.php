@@ -188,8 +188,46 @@ if (!$company) {
                         <i class="bi bi-envelope"></i> Epost-konfigurasjon
                     </h3>
                     <p class="text-muted">Konfigurer SMTP og IMAP innstillinger for <?= htmlspecialchars($company['name']) ?></p>
+
+                    <div class="portal-panel mb-3" id="emailEditPanel">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div>
+                                <strong id="emailLockLabel">E-postinnstillinger er låst</strong>
+                                <div class="small text-muted" id="emailLockHelp">Velg konto og lås opp for en tidsbegrenset endring.</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="emailUnlockCountdown" class="small text-muted" aria-live="polite"></span>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="emailUnlockButton" disabled>Lås opp for redigering</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="emailCancelButton" hidden>Avbryt og lås</button>
+                            </div>
+                        </div>
+                        <div class="row align-items-end mt-3">
+                            <div class="col-md-7">
+                                <label for="emailAccountPicker" class="form-label">E-postkonto</label>
+                                <select id="emailAccountPicker" class="form-select" disabled>
+                                    <option value="">Laster kontoer…</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5 small text-muted" id="emailAccountHelp">Velg hvilken konto som skal redigeres.</div>
+                        </div>
+                    </div>
+                    <div id="emailCredentialWarning" class="alert alert-warning mb-3" role="status" aria-live="polite" hidden></div>
                     
                     <form id="emailConfigForm">
+                        <input type="hidden" id="emailConfigurationId" name="configuration_id">
+                        <div class="portal-panel p-3 mb-4">
+                            <label class="form-label" for="email_credential_storage">Lagring for nye passord</label>
+                            <select class="form-select" id="email_credential_storage" name="credential_storage" data-email-storage disabled>
+                                <option value="existing">Eksisterende lagringsmåte (standard)</option>
+                                <option value="plaintext">Rå lagring uten kryptering</option>
+                            </select>
+                            <div class="form-text">Rå lagring skal bare velges hvis e-postmodulen leser rå passord, ikke hvis den forventer dekoding.</div>
+                            <div class="alert alert-warning mt-2 mb-2" data-email-plaintext-warning hidden>Passordene som fylles inn lagres ukryptert, også i kolonner med navn som slutter på _encrypted.</div>
+                            <label class="form-check small mt-2" data-email-plaintext-consent-wrap hidden>
+                                <input class="form-check-input" type="checkbox" data-email-plaintext-consent disabled>
+                                <span class="form-check-label">Jeg forstår at nye passord lagres ukryptert og bekrefter rå lagring.</span>
+                            </label>
+                        </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <h5 class="mb-3">SMTP (Utgående epost)</h5>
@@ -218,6 +256,7 @@ if (!$company) {
                                 <div class="mb-3">
                                     <label class="form-label">Passord</label>
                                     <input type="password" class="form-control" id="smtp_password" name="smtp_password" placeholder="La stå tom for å beholde eksisterende">
+                                    <label class="form-check small text-muted mt-2"><input class="form-check-input" type="checkbox" data-email-clear-secret="smtp_password" disabled> <span class="form-check-label">Fjern lagret SMTP-passord ved lagring</span></label>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Fra-adresse</label>
@@ -256,22 +295,24 @@ if (!$company) {
                                 <div class="mb-3">
                                     <label class="form-label">Passord</label>
                                     <input type="password" class="form-control" id="imap_password" name="imap_password" placeholder="La stå tom for å beholde eksisterende">
+                                    <label class="form-check small text-muted mt-2"><input class="form-check-input" type="checkbox" data-email-clear-secret="imap_password" disabled> <span class="form-check-label">Fjern lagret IMAP-passord ved lagring</span></label>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="d-flex justify-content-between align-items-center mt-4">
-                            <div>
-                                <button type="button" class="btn btn-outline-secondary" onclick="testEmailConnection()">
-                                    <i class="bi bi-check-circle"></i> Test tilkobling
+                            <div class="small text-muted" id="emailSupportedFieldsNotice"></div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary" id="testEmailBtn" onclick="testEmailConnection()" disabled>
+                                    <i class="bi bi-activity"></i> Test nettverkstilkobling
                                 </button>
-                                <button type="button" class="btn btn-success ms-2" id="connectEmailBtn" onclick="connectEmail()">
-                                    <i class="bi bi-link-45deg"></i> Koble opp
+                                <button type="button" class="btn btn-success" id="connectEmailBtn" onclick="connectEmail()" disabled>
+                                    <i class="bi bi-link-45deg"></i> Aktiver e-post
+                                </button>
+                                <button type="button" class="btn btn-primary-custom" id="emailSaveButton" onclick="saveEmailConfig()" disabled>
+                                    <i class="bi bi-save"></i> Lagre konfigurasjon
                                 </button>
                             </div>
-                            <button type="button" class="btn btn-primary-custom" onclick="saveEmailConfig()">
-                                <i class="bi bi-save"></i> Lagre konfigurasjon
-                            </button>
                         </div>
                     </form>
                     
@@ -305,27 +346,38 @@ if (!$company) {
                         Kontrollerer om sikker lagring av betalingsnøkler er tilgjengelig…
                     </div>
                     
-                    <ul class="nav nav-pills mb-4" id="paymentGatewayTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="vipps-pill" data-bs-toggle="pill" data-bs-target="#vipps-config" type="button">
-                                Vipps
+                    <div class="portal-empty mb-3" id="paymentEmptyState" role="status" hidden>
+                        <strong>Ingen betalingsleverandør er satt opp ennå.</strong>
+                        <div class="small mt-1">Velg en leverandør for å opprette den første konfigurasjonen. Innstillingene er ikke avhengige av aktiv modulbruk.</div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-3" onclick="document.getElementById('vipps-pill').click()">Start med Vipps</button>
+                    </div>
+                    <div class="row g-3 mb-4" id="paymentProviderCards" role="tablist" aria-label="Betalingsleverandører">
+                        <div class="col-md-4">
+                            <button class="nav-link active text-start border rounded w-100 h-100 p-3" id="vipps-pill" data-bs-toggle="pill" data-bs-target="#vipps-config" type="button" role="tab">
+                                <span class="d-flex justify-content-between align-items-center"><strong>Vipps</strong><span class="badge text-bg-secondary" data-gateway-status="vipps">Kontrollerer…</span></span>
+                                <span class="d-block small text-muted mt-2">Nøkler, miljø og aktivering</span>
                             </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="stripe-pill" data-bs-toggle="pill" data-bs-target="#stripe-config" type="button">
-                                Stripe
+                        </div>
+                        <div class="col-md-4">
+                            <button class="nav-link text-start border rounded w-100 h-100 p-3" id="stripe-pill" data-bs-toggle="pill" data-bs-target="#stripe-config" type="button" role="tab">
+                                <span class="d-flex justify-content-between align-items-center"><strong>Stripe</strong><span class="badge text-bg-secondary" data-gateway-status="stripe">Kontrollerer…</span></span>
+                                <span class="d-block small text-muted mt-2">Nøkler, miljø og aktivering</span>
                             </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="paypal-pill" data-bs-toggle="pill" data-bs-target="#paypal-config" type="button">
-                                PayPal
+                        </div>
+                        <div class="col-md-4">
+                            <button class="nav-link text-start border rounded w-100 h-100 p-3" id="paypal-pill" data-bs-toggle="pill" data-bs-target="#paypal-config" type="button" role="tab">
+                                <span class="d-flex justify-content-between align-items-center"><strong>PayPal</strong><span class="badge text-bg-secondary" data-gateway-status="paypal">Kontrollerer…</span></span>
+                                <span class="d-block small text-muted mt-2">Nøkler, miljø og aktivering</span>
                             </button>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                     
                     <div class="tab-content" id="paymentGatewayTabContent">
                         <!-- Vipps Configuration -->
                         <div class="tab-pane fade show active" id="vipps-config" role="tabpanel">
+                            <div class="alert alert-warning mb-3" data-gateway-repair="vipps" role="status" hidden>
+                                Denne Vipps-raden mangler kobling til betalingskonfigurasjonen. En bevisst lagring reparerer koblingen.
+                            </div>
                             <form id="vippsConfigForm">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
@@ -390,6 +442,9 @@ if (!$company) {
                         
                         <!-- Stripe Configuration -->
                         <div class="tab-pane fade" id="stripe-config" role="tabpanel">
+                            <div class="alert alert-warning mb-3" data-gateway-repair="stripe" role="status" hidden>
+                                Denne Stripe-raden mangler kobling til betalingskonfigurasjonen. En bevisst lagring reparerer koblingen.
+                            </div>
                             <form id="stripeConfigForm">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
@@ -450,6 +505,9 @@ if (!$company) {
                         
                         <!-- PayPal Configuration -->
                         <div class="tab-pane fade" id="paypal-config" role="tabpanel">
+                            <div class="alert alert-warning mb-3" data-gateway-repair="paypal" role="status" hidden>
+                                Denne PayPal-raden mangler kobling til betalingskonfigurasjonen. En bevisst lagring reparerer koblingen.
+                            </div>
                             <form id="paypalConfigForm">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
@@ -1219,170 +1277,6 @@ if (!$company) {
             return div.innerHTML;
         }
         
-        let emailSettingsLoaded = false;
-        function settingsControls(section, enabled) {
-            document.querySelectorAll(`#${section} form input, #${section} form select, #${section} button[onclick]`)
-                .forEach(control => control.disabled = !enabled);
-        }
-        function settingsSecrets(ids, disabled) {
-            ids.forEach(id => {
-                const input = document.getElementById(id);
-                input.disabled = disabled;
-                if (disabled) {
-                    input.value = '';
-                    input.placeholder = 'Beholdes – administreres i tilhørende modul';
-                }
-            });
-        }
-        settingsControls('email', false);
-        function loadEmailConfig() {
-            emailSettingsLoaded = false;
-            settingsControls('email', false);
-            fetch(`/saas_portal/api/get_email_config.php?company_id=${companyId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) throw new Error(data.message || 'Kunne ikke hente epost-konfigurasjonen.');
-                if (data.success && data.config) {
-                    const config = data.config;
-                    document.getElementById('smtp_host').value = config.smtp_host || '';
-                    document.getElementById('smtp_port').value = config.smtp_port || '587';
-                    document.getElementById('smtp_encryption').value = config.smtp_encryption || 'tls';
-                    document.getElementById('smtp_username').value = config.smtp_username || '';
-                    document.getElementById('smtp_from_email').value = config.smtp_from_email || '';
-                    document.getElementById('smtp_from_name').value = config.smtp_from_name || '';
-                    
-                    document.getElementById('imap_host').value = config.imap_host || '';
-                    document.getElementById('imap_port').value = config.imap_port || '993';
-                    document.getElementById('imap_encryption').value = config.imap_encryption || 'ssl';
-                    document.getElementById('imap_username').value = config.imap_username || '';
-                }
-                emailSettingsLoaded = true;
-                settingsControls('email', !!data.config);
-                settingsSecrets(['smtp_password','imap_password'], !data.config || !!data.credentials_readonly);
-                ['smtp_encryption','imap_encryption'].forEach(id => {
-                    document.getElementById(id).disabled = !data.config || !!data.credentials_readonly;
-                });
-                document.getElementById('emailConfigNotice').textContent = data.notice || '';
-                document.getElementById('connectEmailBtn').innerHTML = '<i class="bi bi-link-45deg"></i> Aktiver e-post';
-                document.getElementById('emailConfigStatus').textContent = data.config ? '' : 'Ingen e-postkonto finnes for firmaet. Opprett kontoen i e-postmodulen først.';
-            })
-            .catch(err => portalFailure('emailConfigStatus', err.message, loadEmailConfig));
-        }
-        
-        function saveEmailConfig() {
-            if (!emailSettingsLoaded) return;
-            const formData = new FormData(document.getElementById('emailConfigForm'));
-            formData.append('company_id', companyId);
-            formData.append('csrf_token', portalCsrf);
-            
-            const data = {};
-            formData.forEach((value, key) => data[key] = value);
-            
-            fetch('/saas_portal/api/save_email_config.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(data => {
-                const status = document.getElementById('emailConfigStatus');
-                if (data.success) {
-                    status.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> Epost-konfigurasjon lagret!</div>';
-                    setTimeout(() => status.innerHTML = '', 3000);
-                } else {
-                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
-                }
-            })
-            .catch(err => {
-                document.getElementById('emailConfigStatus').innerHTML = 
-                    `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved lagring</div>`;
-            });
-        }
-        
-        function testEmailConnection() {
-            const formData = new FormData(document.getElementById('emailConfigForm'));
-            formData.append('company_id', companyId);
-            
-            const data = {};
-            formData.forEach((value, key) => data[key] = value);
-            
-            const status = document.getElementById('emailConfigStatus');
-            status.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass"></i> Tester tilkobling...</div>';
-            
-            fetch('/saas_portal/api/test_email_connection.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    status.innerHTML = `
-                        <div class="alert alert-success">
-                            <i class="bi bi-check-circle"></i> <strong>Test vellykket!</strong><br>
-                            ${data.smtp_test ? 'SMTP tilkobling OK<br>' : ''}
-                            ${data.imap_test ? 'IMAP tilkobling OK' : ''}
-                        </div>`;
-                } else {
-                    status.innerHTML = `
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle"></i> <strong>Test delvis vellykket</strong><br>
-                            ${data.smtp_test ? 'SMTP: OK<br>' : 'SMTP: ' + escapeHtml(data.smtp_error || 'Feil') + '<br>'}
-                            ${data.imap_test ? 'IMAP: OK' : 'IMAP: ' + escapeHtml(data.imap_error || 'Feil')}
-                        </div>`;
-                }
-            })
-            .catch(err => {
-                status.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Feil ved testing av tilkobling</div>';
-            });
-        }
-        
-        function connectEmail() {
-            if (!emailSettingsLoaded) return;
-            const statusDiv = document.getElementById('emailConnectionStatus');
-            const btn = document.getElementById('connectEmailBtn');
-            
-            statusDiv.className = 'mt-3 alert alert-info';
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '<i class="bi bi-hourglass"></i> Kobler opp email-system...';
-            btn.disabled = true;
-            
-            fetch('/saas_portal/api/connect_email.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ company_id: companyId, csrf_token: portalCsrf })
-            })
-            .then(r => r.json())
-            .then(data => {
-                btn.disabled = false;
-                if (data.success) {
-                    statusDiv.className = 'mt-3 alert alert-success';
-                    statusDiv.innerHTML = `
-                        <i class="bi bi-check-circle-fill"></i> <strong>E-postoppsett aktivert</strong><br>
-                        <small>${escapeHtml(data.message)}</small>
-                    `;
-                    setTimeout(() => {
-                        statusDiv.style.display = 'none';
-                    }, 5000);
-                } else {
-                    statusDiv.className = 'mt-3 alert alert-danger';
-                    statusDiv.innerHTML = `<i class="bi bi-x-circle-fill"></i> ${escapeHtml(data.message)}`;
-                }
-            })
-            .catch(err => {
-                btn.disabled = false;
-                statusDiv.className = 'mt-3 alert alert-danger';
-                statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> Feil ved oppkobling';
-            });
-        }
-        
-        // The initially active tab does not emit shown.bs.tab.
-        loadEmailConfig();
-        // Laste epost-konfigurasjon når fanen åpnes
-        document.getElementById('email-tab').addEventListener('shown.bs.tab', function () {
-            loadEmailConfig();
-        });
-        
         // DNS-administrasjon funksjoner
         function loadDNSInfo() {
             fetch(`/saas_portal/api/get_subdomain_info.php?company_id=${companyId}`)
@@ -1587,6 +1481,7 @@ if (!$company) {
         
         // Initial loading is coordinated by company-workspace.js.
     </script>
+    <script src="/saas_portal/assets/company-email.js"></script>
     <script src="/saas_portal/assets/company-billing.js"></script>
     <script src="/saas_portal/assets/brreg-staff-import.js"></script>
 </body>

@@ -11,7 +11,11 @@ final class PortalBillingAudit {
             (new ActivityLogger($db))->log($company,$actor,'SaaS-administrator',$action,
                 $action==='payment_settings_updated'?
                     ($storage==='plaintext'?'oppdaterte betalingsoppsett med uttrykkelig valgt klartekstlagring':'oppdaterte betalingsoppsett'):
-                    'oppdaterte forfallsdato',null,null,30);
+                    match($action) {
+                        'email_settings_updated'=>$storage==='plaintext'?'oppdaterte e-postoppsett med uttrykkelig valgt klartekstlagring':'oppdaterte e-postoppsett',
+                        'email_settings_activated'=>'aktiverte e-postoppsett',
+                        default=>'oppdaterte forfallsdato'
+                    },null,null,30);
         } catch (Throwable $e) { error_log('Billing change committed; audit logging failed.'); }
     }
 }

@@ -69,7 +69,7 @@ Aktivitetsfeeder skal vise lesbare setninger om aktør, handling og arrangement 
 
 **How to apply:** Bevar denne presentasjonen på både oversikten og bedriftssiden. Detaljer må også være tilgjengelige med tastatur og berøring, og begrenses til relevante tillatte data, ikke rå audit- eller autentiseringsdata.
 
-Betalingsløsninger skal kunne opprettes og administreres i SaaS-portalen uavhengig av bedriftens moduler, bare av SaaS-admins. Redigering skal beskyttes mot utilsiktede endringer.
+E-post og betalingsløsninger skal kunne opprettes og administreres i SaaS-portalen, som er høyeste systemnivå, uavhengig av bedriftens moduler og uten å måtte opprette oppsettet i en tenant-modul først. Bare SaaS-admins skal ha denne retten. Redigering skal beskyttes mot utilsiktede endringer.
 
 **Why:** Brukeren presiserte at dette er høyeste administrasjonsnivå og at oppsett ikke skal henvises til økonomimodulen.
 
