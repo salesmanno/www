@@ -9,11 +9,11 @@ Keep global activity and logged-in users together on the company overview, rathe
 
 **How to apply:** Preserve this hierarchy when extending the portal. New “Opprett SuperUser” actions belong to the selected employee and create a tenant login, not a SaaS-wide administrator. Existing unlinked accounts must remain manageable; do not delete or silently attach them during UI restructuring.
 
-Bulk company-module assignment adds permissions without removing existing grants.
+Modulvelgeren skal vise tilgjengelige moduler til venstre og bedriftens valgte moduler til høyre. Klikk flytter modulen mellom listene, og også aktive moduler skal kunne fjernes.
 
-**Why:** The requested operation was to give selected companies module access, not to replace all their existing permissions.
+**Why:** Brukeren utvidet den tidligere additive tildelingen til redigering av hele bedriftens modulutvalg.
 
-**How to apply:** Any future bulk revoke/replace operation must be separately labelled and explicitly confirmed.
+**How to apply:** Last inn dagens moduler som valgte. Vis tillegg og fjerninger før bekreftelse, og bevar separate utvalg ved redigering av flere bedrifter.
 
 Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; SuperUsers skal bare kunne tildeles moduler fra disse features.
 
@@ -32,6 +32,12 @@ Abonnementsoppsett skal vises som en kolonne på skjermen ved modultildeling. Be
 **Why:** Brukeren valgte «På skjermen ved modultildeling» og presiserte behovet for månedspris.
 
 **How to apply:** Vis løpende månedsbeløp og engangsetablering separat i modultildelingsflyten.
+
+Modulvelgeren skal vise sluttsum for månedlig pris og etablering, og la operatøren sette `saas_subscription_plans.max_users` som grense for bedriftens SuperUsers.
+
+**Why:** Brukeren ba uttrykkelig om begge totalsummene og om å bestemme hvor mange SuperUsers bedriften kan ha.
+
+**How to apply:** Oppdater summene ved valg og fravalg. Brukergrensen må håndheves på serveren, ikke bare vises i skjemaet; globale SaaS-identiteter er ikke firmakontoer.
 
 Prisene i modulkatalogen er standardpriser, ikke en tillatelse til å endre eksisterende avtalte abonnementspriser.
 
