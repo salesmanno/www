@@ -21,6 +21,12 @@ Bedriftens modultilgang skal bestemmes av `saas_subscription_plans.features`; Su
 
 **How to apply:** Bruk bedriftens abonnementstilknytning til å finne features. Brukeren valgte individuell modultilgang per bedrift: endringer i en bedrifts features skal ikke endre andre bedrifters tilgang, selv om de tidligere delte plan.
 
+Abonnementsutsteder for bedriftene skal være Salesman fra `self_company`, ikke en utsteder hentet fra `tenant_companies`.
+
+**Why:** Brukeren valgte Salesman og presiserte «fra self_company ja».
+
+**How to apply:** Bruk denne utstederen ved klargjøring av abonnementstilknytninger. Selve valget er ikke en godkjenning av endringer i faktiske data.
+
 Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet og skal ikke ha firmaets modulrestriksjoner.
 
 **Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.
