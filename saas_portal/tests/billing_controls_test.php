@@ -36,6 +36,23 @@ try {
     billingReject(fn()=>$service->savePayment('A',$data+$edit('A'),'admin'),InvalidArgumentException::class);
     billingAssert($db->query('SELECT COUNT(*) FROM economy_payment_gateways')->fetchColumn()==0,'Missing codec must roll back creation');
     billingAssert($service->paymentVersion('A')===$before,'Missing codec changed data');
+    foreach ([null,false,'true',1] as $confirmation) {
+        billingReject(fn()=>$service->savePayment('A',$data+['credential_storage'=>'plaintext','credential_storage_confirmed'=>$confirmation]+$edit('A'),'admin'),InvalidArgumentException::class);
+        billingAssert($service->paymentVersion('A')===$before,'Unconfirmed raw storage changed data');
+    }
+    billingReject(fn()=>$service->savePayment('A',$data+['credential_storage'=>'unknown']+$edit('A'),'admin'),InvalidArgumentException::class);
+    $service->savePayment('A',$data+['credential_storage'=>'plaintext','credential_storage_confirmed'=>true]+$edit('A'),'admin');
+    billingAssert($db->query("SELECT client_secret_encrypted FROM economy_configuration_data WHERE company_id='A'")->fetchColumn()==='private-client-fixture','Confirmed raw storage unexpectedly encrypted/hashed the key');
+    billingAssert(!str_contains(json_encode($service->getPayments('A')),'private-'),'Raw credentials leaked on read');
+    $raw=$db->query("SELECT * FROM economy_configuration_data WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    $service->savePayment('A',['gateway_name'=>'vipps','vipps_client_secret'=>'','vipps_subscription_key'=>'','is_active'=>false]+$edit('A'),'admin');
+    billingAssert($db->query("SELECT client_secret_encrypted FROM economy_configuration_data WHERE company_id='A'")->fetchColumn()===$raw['client_secret_encrypted'],'Default mode changed stored raw key on blank');
+    $service->savePayment('A',['gateway_name'=>'vipps','clear_secrets'=>['vipps_client_secret'],'is_active'=>false]+$edit('A'),'admin');
+    billingAssert($db->query("SELECT client_secret_encrypted FROM economy_configuration_data WHERE company_id='A'")->fetchColumn()===null,'Removal required unavailable encoder');
+    // Confirmed raw test keys must not rewrite production keys.
+    $service->savePayment('A',['gateway_name'=>'vipps','credential_environment'=>'test','credential_storage'=>'plaintext','credential_storage_confirmed'=>true,'vipps_client_secret'=>'raw-test-fixture','is_active'=>false]+$edit('A'),'admin');
+    $rawTest=$db->query("SELECT * FROM economy_configuration_data WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    billingAssert($rawTest['test_client_secret_encrypted']==='raw-test-fixture' && $rawTest['subscription_key']===$raw['subscription_key'],'Raw test mode altered production keys');
     // A fixture-owned codec is deliberately injected, never used in the app.
     $service=new PortalCompanySettings($db,fn(string $v)=>'fixture-cipher:'.base64_encode($v));
     $service->savePayment('A',$data+$edit('A'),'admin');

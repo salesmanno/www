@@ -190,7 +190,7 @@ class PortalCompanySettings {
             'encrypted_credentials_ready'=>$this->encryptCredential!==null || PaymentCredentialCipher::available(),
             'version'=>$this->paymentVersion($company),
             'notice'=>'Oppsettet er låst til du velger redigering. Tomme nøkkelfelt beholder lagrede verdier. Produksjons- og testnøkler lagres separat.'.
-                (($this->encryptCredential!==null || PaymentCredentialCipher::available())?'':' Erstatning av krypterte nøkler krever at betalingsmodulens eksisterende kryptering kobles til først.')];
+                (($this->encryptCredential!==null || PaymentCredentialCipher::available())?'':' Kolonnenavn alene fastslår ikke kryptering. Nye verdier i slike felt krever kjent krypteringsfunksjon eller et uttrykkelig bekreftet valg om klartekst. Eksisterende verdier konverteres ikke.')];
     }
 
     private function flag(array $data, string $key): int {
@@ -228,6 +228,8 @@ class PortalCompanySettings {
         $gateway = $data['gateway_name'] ?? '';
         if (!in_array($gateway, ['vipps','stripe','paypal'], true)) throw new InvalidArgumentException('Ugyldig betalingsleverandør.');
         PortalBillingAccess::check('payment',$company,$actor,$data);
+        $storage=$data['credential_storage'] ?? 'existing';
+        if (!in_array($storage,['existing','plaintext'],true)) throw new InvalidArgumentException('Ugyldig lagringsmåte for betalingsnøkler.');
         $this->db->beginTransaction();
         try {
             // Serialize this company's settings writers without locking other companies.
@@ -279,8 +281,12 @@ class PortalCompanySettings {
                 if ($plain!=='' && in_array($field,$clear,true)) throw new InvalidArgumentException('Velg enten erstatning eller fjerning av nøkkelen.');
                 if ($plain==='' && !in_array($field,$clear,true)) continue;
                 if (!in_array($target,$columns,true)) throw new InvalidArgumentException('Oppsettet mangler nøkkelfeltet. Ingen verdier er endret.');
+                if ($plain!=='' && $storage==='plaintext' && ($data['credential_storage_confirmed'] ?? null)!==true) {
+                    throw new InvalidArgumentException('Klartekst må bekreftes uttrykkelig. Bruk dette bare hvis betalingsmodulen leser nøklene direkte, uten dekryptering. Ingen endringer er lagret.');
+                }
                 $values[$target]=in_array($field,$clear,true)?null:
-                    (str_ends_with($target,'_encrypted')?($this->encryptCredential ? ($this->encryptCredential)($plain) : PaymentCredentialCipher::encrypt($plain)):$plain);
+                    ($storage==='existing' && str_ends_with($target,'_encrypted')?
+                        ($this->encryptCredential ? ($this->encryptCredential)($plain) : PaymentCredentialCipher::encrypt($plain)):$plain);
             }
             if ($modern) {
                 // A shared configuration must not change another gateway implicitly.
@@ -344,5 +350,3 @@ class PortalCompanySettings {
         }
     }
 }
-
-class PortalPaymentConflictException extends RuntimeException {}

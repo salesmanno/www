@@ -15,11 +15,11 @@ Existing legacy endpoints are also not authoritative documentation of the active
 
 **How to apply:** Verify field ownership in live metadata before reusing old SQL. Preserve unrelated settings and support the installed layout rather than creating a competing settings table.
 
-Preserve existing encrypted credentials when no compatible encoding contract has been established.
+Preserve existing credentials by default when no compatible encoding contract has been established; a column ending in `_encrypted` does not establish that its values are actually encrypted.
 
 **Why:** The portal's obsolete settings layout did not establish how the active modules decode their encrypted credentials. Writing plaintext into a column named “encrypted” would risk both broken connections and insecure storage.
 
-**How to apply:** Settings adapters may update verified non-secret fields while preserving credentials and unrelated automation/test settings. SaaS-admin must be able to manage payment setup in the portal without company-module restrictions, but encrypted replacements must reuse the owning module's verified codec. Never infer the format from a column name or invent an incompatible ciphertext format.
+**How to apply:** Settings adapters may update non-secret fields and explicitly remove secrets without a codec. SaaS-admin must manage payment setup without company-module restrictions. Default replacements in encrypted-named fields require the owning module's verified codec. Following the user's request to remove the blanket block, raw replacements may instead use an explicit, fresh confirmation that the payment module expects plaintext, with a visible unencrypted-storage warning. Never select raw storage automatically, convert untouched values, or infer the format from the column name.
 
 Separate schema compatibility from request-time database availability.
 

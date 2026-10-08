@@ -56,20 +56,25 @@ function billingStatus(message, type) {
 function billingSetGatewayControls(enabled) {
     Object.entries(billingGatewayForms).forEach(([gateway, config]) => {
         const form = document.getElementById(config.form);
+        const storageMode = form.elements.namedItem('credential_storage')?.value || 'existing';
+        const plaintextConsent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+        const plaintextAllowed = storageMode === 'plaintext' && !!plaintextConsent?.checked;
+        const editorLocked = !enabled || !billingGatewayCanEdit || !billingEditToken || billingGatewaySaving;
         form.querySelectorAll('input, select').forEach(control => {
             if (control.name === 'display_name') return;
-            const blockedSecret = Boolean((billingSecretFields.includes(control.name) || control.dataset.clearSecret) &&
-                !billingEncryptedCredentialsReady);
-            control.disabled = !enabled || !billingGatewayCanEdit || !billingEditToken || billingGatewaySaving || blockedSecret;
+            const secretReplacementNeedsConsent = billingSecretFields.includes(control.name) &&
+                storageMode === 'plaintext' && !plaintextAllowed;
+            control.disabled = editorLocked || secretReplacementNeedsConsent;
         });
         form.querySelectorAll('button[onclick^="savePaymentGateway"]').forEach(button => {
-            button.disabled = !enabled || !billingGatewayCanEdit || !billingEditToken || billingGatewaySaving;
+            button.disabled = editorLocked;
         });
         form.querySelectorAll('[data-clear-secret]').forEach(control => {
-            control.disabled = !enabled || !billingGatewayCanEdit || !billingEditToken || billingGatewaySaving || !billingEncryptedCredentialsReady;
+            control.disabled = editorLocked;
         });
+        if (plaintextConsent) plaintextConsent.disabled = editorLocked;
         const button = form.querySelector('button[onclick^="savePaymentGateway"]');
-        if (button) button.disabled = !enabled || !billingGatewayCanEdit || !billingEditToken || billingGatewaySaving;
+        if (button) button.disabled = editorLocked;
     });
     document.getElementById('paymentUnlockButton').disabled =
         !billingGatewayCanEdit || !!billingEditToken || billingGatewaySaving;
@@ -81,7 +86,7 @@ function billingRenderCredentialWarning(ready, notice = '') {
     if (ready === null) {
         warning.hidden = false;
         warning.className = 'alert alert-warning mb-4';
-        warning.textContent = notice || 'Kunne ikke bekrefte at sikker lagring er tilgjengelig. Hemmelige felt forblir deaktivert.';
+        warning.textContent = notice || 'Krypteringsstøtte for *_encrypted-felter er ikke verifisert. Eksisterende lagringsmåte kan bruke rå kolonner, men krypterte utskiftinger kan avvises. Rå lagring krever uttrykkelig bekreftelse.';
         return;
     }
     if (ready) {
@@ -98,9 +103,10 @@ function billingRenderCredentialWarning(ready, notice = '') {
     warning.hidden = false;
     warning.className = 'alert alert-warning mb-4';
     warning.textContent = [
-        'Sikker lagring av nye eller endrede hemmelige betalingsnøkler er ikke tilgjengelig.',
-        'Nøkkelfeltene er deaktivert; vanlige innstillinger kan fortsatt oppdateres.',
-        'Koble til krypteringskoden før hemmelige verdier kan endres.',
+        'Krypteringsstøtte for *_encrypted-felter er ikke verifisert.',
+        'Eksisterende lagringsmåte bruker gjeldende kode for *_encrypted-felter og rå lagring for andre kolonner; krypterte utskiftinger kan avvises til kodekoblingen er verifisert.',
+        'Vanlige innstillinger og eksplisitt fjerning kan fortsatt brukes.',
+        'Rå lagring er ukryptert selv i *_encrypted-kolonner; velg den bare hvis betalingsmodulen leser rå verdier, aldri ved antatt kompatibel dekoding.',
         notice
     ].filter(Boolean).join(' ');
 }
@@ -136,7 +142,34 @@ function billingRenderGatewayPublicFields(gateway, environment) {
         const clear = document.querySelector(`#payment [data-clear-secret="${field}"]`);
         if (clear) clear.checked = false;
     });
+    billingResetCredentialStorage(gateway);
     billingGatewayEnvironments[gateway] = environment;
+    billingSetGatewayControls(true);
+}
+
+function billingResetCredentialStorage(gateway) {
+    const form = document.getElementById(billingGatewayForms[gateway].form);
+    const storage = form.elements.namedItem('credential_storage');
+    const consent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+    if (storage) storage.value = 'existing';
+    if (consent) consent.checked = false;
+    const warning = document.querySelector(`[data-plaintext-warning="${gateway}"]`);
+    const consentWrap = document.querySelector(`[data-plaintext-consent-wrap="${gateway}"]`);
+    if (warning) warning.hidden = true;
+    if (consentWrap) consentWrap.hidden = true;
+}
+
+function billingRefreshStorageChoice(gateway, resetConsent = false) {
+    const form = document.getElementById(billingGatewayForms[gateway].form);
+    const storage = form.elements.namedItem('credential_storage');
+    const consent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+    const plaintext = storage?.value === 'plaintext';
+    if (resetConsent && consent) consent.checked = false;
+    const warning = document.querySelector(`[data-plaintext-warning="${gateway}"]`);
+    const consentWrap = document.querySelector(`[data-plaintext-consent-wrap="${gateway}"]`);
+    if (warning) warning.hidden = !plaintext;
+    if (consentWrap) consentWrap.hidden = !plaintext;
+    billingSetGatewayControls(true);
 }
 
 function billingConfigureGatewayEnvironment(gateway, item) {
@@ -185,6 +218,7 @@ function billingClearSecrets() {
         const checkbox = document.querySelector(`#payment [data-clear-secret="${name}"]`);
         if (checkbox) checkbox.checked = false;
     });
+    Object.keys(billingGatewayForms).forEach(billingResetCredentialStorage);
 }
 
 function billingShowGatewayData(data) {
@@ -228,11 +262,14 @@ function billingShowGatewayData(data) {
 
 async function loadPaymentGateways() {
     const request = ++billingGatewayRequest;
+    if (billingEditToken) await billingRelockGateways();
+    else billingClearSecrets();
     billingGatewayCanEdit = false;
     billingEncryptedCredentialsReady = false;
     billingRenderCredentialWarning(null, 'Kontrollerer tilgjengeligheten av sikker lagring av betalingsnøkler…');
     billingSetGatewayControls(false);
     document.getElementById('paymentUnlockButton').disabled = true;
+    if (request !== billingGatewayRequest) return;
     billingStatus('Henter betalingsinnstillinger…');
     try {
         const data = await portalRequest('/saas_portal/api/get_payment_gateways.php?company_id=' + encodeURIComponent(billingCompanyId));
@@ -398,6 +435,17 @@ async function savePaymentGateway(gateway) {
         const checkbox = document.querySelector(`#payment [data-clear-secret="${name}"]`);
         return checkbox?.checked && form.elements.namedItem(name);
     });
+    const storageMode = form.elements.namedItem('credential_storage')?.value === 'plaintext'
+        ? 'plaintext' : 'existing';
+    const plaintextConsent = form.querySelector(`[data-plaintext-consent="${gateway}"]`);
+    const storageConfirmed = storageMode === 'plaintext' && !!plaintextConsent?.checked;
+    const hasSecretReplacement = billingGatewaySecretFields[gateway].some(name =>
+        String(form.elements.namedItem(name)?.value || '').trim() !== ''
+    );
+    if (storageMode === 'plaintext' && hasSecretReplacement && !storageConfirmed) {
+        billingStatus('Bekreft uttrykkelig rå, ukryptert lagring før du lagrer nye nøkler.', 'warning');
+        return;
+    }
     const message = clearSecrets.length
         ? `Lagre ${config.display}-innstillingene og fjern de valgte hemmelige verdiene?`
         : `Lagre endringene i ${config.display}-innstillingene?`;
@@ -411,6 +459,8 @@ async function savePaymentGateway(gateway) {
         edit_token: billingEditToken,
         version: billingGatewayVersion,
         credential_environment: billingGatewayEnvironments[gateway] || 'production',
+        credential_storage: storageMode,
+        credential_storage_confirmed: storageConfirmed,
         confirmed: true,
         clear_secrets: clearSecrets,
         is_active: !!form.elements.namedItem('is_active')?.checked,
@@ -680,6 +730,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector(`[data-gateway-environment="${gateway}"]`).addEventListener('change', event => {
             billingRenderGatewayPublicFields(gateway, event.target.value);
         });
+        const storage = document.querySelector(`[data-credential-storage="${gateway}"]`);
+        storage.addEventListener('change', () => billingRefreshStorageChoice(gateway, true));
+        const consent = document.querySelector(`[data-plaintext-consent="${gateway}"]`);
+        consent.addEventListener('change', () => billingSetGatewayControls(true));
     });
     document.getElementById('paymentUnlockButton').addEventListener('click', billingUnlockGateways);
     document.getElementById('paymentCancelButton').addEventListener('click', () => billingRelockGateways('Endringene ble avbrutt. Ingen betalingsinnstillinger ble lagret.'));

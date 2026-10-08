@@ -18,10 +18,11 @@ final class PortalSubscriptionOverview {
         $s=$this->db->prepare('SELECT id FROM tenant_companies WHERE id=?');
         $s->execute([$company]);
         if (!$s->fetchColumn()) throw new InvalidArgumentException('Bedriften finnes ikke.');
-        $rows=$this->rows($company);
+        $lock=$this->db->inTransaction();
+        $rows=$this->rows($company,$lock);
         if (!$rows) return ['subscription'=>null];
         $row=$rows[0];
-        $s=$this->db->prepare('SELECT * FROM saas_subscription_plans WHERE id=?');
+        $s=$this->db->prepare('SELECT * FROM saas_subscription_plans WHERE id=?'.($lock?' FOR UPDATE':''));
         $s->execute([$row['plan_id']]);
         $plan=$s->fetch(PDO::FETCH_ASSOC) ?: [];
         $s=$this->db->prepare('SELECT default_currency FROM self_company WHERE id=?');

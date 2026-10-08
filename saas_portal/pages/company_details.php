@@ -353,6 +353,19 @@ if (!$company) {
                                     </select>
                                     <div class="form-text" data-environment-help="vipps">Testmiljø er utilgjengelig for denne leverandøren.</div>
                                 </div>
+                                <div class="portal-panel p-3 mb-3" data-storage-panel="vipps">
+                                    <label class="form-label" for="vipps_credential_storage">Lagring for nye nøkler</label>
+                                    <select class="form-select" id="vipps_credential_storage" name="credential_storage" data-credential-storage="vipps" disabled>
+                                        <option value="existing">Eksisterende lagringsmåte (standard)</option>
+                                        <option value="plaintext">Rå lagring uten kryptering</option>
+                                    </select>
+                                    <div class="form-text">Rå lagring skal bare velges hvis betalingsmodulen leser rå verdier, ikke hvis den forventer dekoding.</div>
+                                    <div class="alert alert-warning mt-2 mb-2" data-plaintext-warning="vipps" hidden>Valgte betalingsnøkler lagres ukryptert, også i kolonner med navn som slutter på _encrypted.</div>
+                                    <label class="form-check small mt-2" data-plaintext-consent-wrap="vipps" hidden>
+                                        <input class="form-check-input" type="checkbox" data-plaintext-consent="vipps" disabled>
+                                        <span class="form-check-label">Jeg forstår at disse nøklene lagres ukryptert og bekrefter rå lagring.</span>
+                                    </label>
+                                </div>
                                 <div class="mb-3">
                                     <label class="form-label">Client ID</label>
                                     <input type="text" class="form-control" id="vipps_client_id" name="vipps_client_id">
@@ -404,6 +417,19 @@ if (!$company) {
                                     </select>
                                     <div class="form-text" data-environment-help="stripe">Testmiljø er utilgjengelig for denne leverandøren.</div>
                                 </div>
+                                <div class="portal-panel p-3 mb-3" data-storage-panel="stripe">
+                                    <label class="form-label" for="stripe_credential_storage">Lagring for nye nøkler</label>
+                                    <select class="form-select" id="stripe_credential_storage" name="credential_storage" data-credential-storage="stripe" disabled>
+                                        <option value="existing">Eksisterende lagringsmåte (standard)</option>
+                                        <option value="plaintext">Rå lagring uten kryptering</option>
+                                    </select>
+                                    <div class="form-text">Rå lagring skal bare velges hvis betalingsmodulen leser rå verdier, ikke hvis den forventer dekoding.</div>
+                                    <div class="alert alert-warning mt-2 mb-2" data-plaintext-warning="stripe" hidden>Valgte betalingsnøkler lagres ukryptert, også i kolonner med navn som slutter på _encrypted.</div>
+                                    <label class="form-check small mt-2" data-plaintext-consent-wrap="stripe" hidden>
+                                        <input class="form-check-input" type="checkbox" data-plaintext-consent="stripe" disabled>
+                                        <span class="form-check-label">Jeg forstår at disse nøklene lagres ukryptert og bekrefter rå lagring.</span>
+                                    </label>
+                                </div>
                                 <div class="mb-3">
                                     <label class="form-label">Public Key</label>
                                     <input type="text" class="form-control" id="stripe_public_key" name="stripe_public_key">
@@ -450,6 +476,19 @@ if (!$company) {
                                         <option value="test">Test</option>
                                     </select>
                                     <div class="form-text" data-environment-help="paypal">Testmiljø er utilgjengelig for denne leverandøren.</div>
+                                </div>
+                                <div class="portal-panel p-3 mb-3" data-storage-panel="paypal">
+                                    <label class="form-label" for="paypal_credential_storage">Lagring for nye nøkler</label>
+                                    <select class="form-select" id="paypal_credential_storage" name="credential_storage" data-credential-storage="paypal" disabled>
+                                        <option value="existing">Eksisterende lagringsmåte (standard)</option>
+                                        <option value="plaintext">Rå lagring uten kryptering</option>
+                                    </select>
+                                    <div class="form-text">Rå lagring skal bare velges hvis betalingsmodulen leser rå verdier, ikke hvis den forventer dekoding.</div>
+                                    <div class="alert alert-warning mt-2 mb-2" data-plaintext-warning="paypal" hidden>Valgte betalingsnøkler lagres ukryptert, også i kolonner med navn som slutter på _encrypted.</div>
+                                    <label class="form-check small mt-2" data-plaintext-consent-wrap="paypal" hidden>
+                                        <input class="form-check-input" type="checkbox" data-plaintext-consent="paypal" disabled>
+                                        <span class="form-check-label">Jeg forstår at disse nøklene lagres ukryptert og bekrefter rå lagring.</span>
+                                    </label>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Client ID</label>

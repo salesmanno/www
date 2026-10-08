@@ -28,7 +28,7 @@ try {
         case 'payment_save':
             PortalBillingAccess::requireAdmin($db,$actor);
             $service->savePayment($company,$data,$actor);
-            PortalBillingAudit::log($db,$company,$actor,'payment_settings_updated');
+            PortalBillingAudit::log($db,$company,$actor,'payment_settings_updated',$data['credential_storage'] ?? 'existing');
             break;
         default: portalReply(404, ['success'=>false,'message'=>'Ukjent handling.']);
     }

@@ -1,4 +1,5 @@
 <?php
+class PortalPaymentConflictException extends RuntimeException {}
 require_once __DIR__.'/PortalSaasIdentity.php';
 
 /** Financial administration is distinct from global module access. */

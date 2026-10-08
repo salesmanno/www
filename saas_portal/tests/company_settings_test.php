@@ -103,6 +103,16 @@ try {
     $version=$request('get_payment_gateways')[1]['version'];
     $edit=$request('payment_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$version])[1];
     checkSettings($request('save_payment_gateway',['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps','vipps_client_id'=>'http-client','is_active'=>'on','test_mode'=>false,'confirmed'=>true,'edit_token'=>$edit['edit_token'],'version'=>$edit['version']])[0]===200, 'HTTP payment save');
+    $version=$request('get_payment_gateways')[1]['version'];
+    $edit=$request('payment_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$version])[1];
+    $rawPayload=['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps','vipps_client_secret'=>'http-private-fixture','is_active'=>true,'test_mode'=>false,'confirmed'=>true,'edit_token'=>$edit['edit_token'],'version'=>$edit['version'],'credential_storage'=>'plaintext'];
+    checkSettings($request('save_payment_gateway',$rawPayload)[0]===400,'HTTP raw replacement needs separate confirmation');
+    checkSettings($db->query("SELECT client_secret_encrypted FROM economy_configuration_data WHERE id='ca'")->fetchColumn()==='secret-fixture','Rejected raw HTTP edit mutated secret');
+    checkSettings($request('save_payment_gateway',$rawPayload+['credential_storage_confirmed'=>true])[0]===200,'HTTP confirmed raw replacement without codec');
+    checkSettings($db->query("SELECT client_secret_encrypted FROM economy_configuration_data WHERE id='ca'")->fetchColumn()==='http-private-fixture','HTTP raw key was not stored directly');
+    $masked=$request('get_payment_gateways')[1];
+    checkSettings(!str_contains(json_encode($masked),'http-private-fixture'),'Raw key leaked over HTTP');
+    checkSettings($request('save_payment_gateway',$rawPayload+['credential_storage_confirmed'=>true])[0]===403,'Successful raw save must relock');
     checkSettings($request('connect_email',['company_id'=>'A','csrf_token'=>'csrf'])[0]===200, 'HTTP activation');
     file_put_contents($dir.'/config/outage','1');
     foreach (['get_email_config','get_payment_gateways'] as $endpoint) {

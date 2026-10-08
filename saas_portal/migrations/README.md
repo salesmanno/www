@@ -24,13 +24,28 @@ Betalingsredigering og datoendringer krever en aktiv SaaS-adminrolle
 femminutters redigeringstillatelse. `global_admin` gir ikke automatisk denne
 administrasjonsrettigheten. Eksisterende innlogginger og roller endres ikke.
 
-**Uavklart før krypterte nøkler kan erstattes:** Prosjektet inneholder ikke
-betalingsmodulens eksisterende encoder/decoder. Ingen ny krypteringsstandard
-gjettes ut fra kolonnenavn. Koble den verifiserte eksisterende encoderen inn med
+**Lagringsmåte for betalingsnøkler:** Kolonnenavn som slutter på `_encrypted`
+er ikke bevis på hvilket format betalingsmodulen bruker. Som standard
+bevares eksisterende verdier og erstatning i slike felt bruker kun en kjent
+encoder. Prosjektet inneholder ikke betalingsmodulens encoder/decoder.
+Ingen ny krypteringsstandard gjettes ut fra kolonnenavn.
+
+Dersom betalingsmodulen faktisk leser klartekst, kan SaaS-admin velge
+`credential_storage=plaintext` og bekrefte `credential_storage_confirmed=true`
+i tillegg til vanlig opplåsing og lagringsbekreftelse. Da lagres kun nye,
+uttrykkelig innskrevne hemmelige verdier direkte, også i felt med `_encrypted`
+i navnet. Dette gir **ikke kryptering i applikasjonen**, og må ikke brukes med
+en betalingsmodul som forventer dekryptering. Valget er ikke et automatisk
+standardvalg, og konverterer ikke andre eksisterende nøkler. Tomme felt
+bevarer eksisterende verdi. Uttrykkelig fjerning krever ingen encoder.
+Lagringsvalget logges uten noen nøkkelverdier.
+
+Ved faktisk kryptert lagring: Koble den verifiserte eksisterende encoderen inn med
 `PaymentCredentialCipher::configure($encoder)` i en felles bootstrap etter at
 helperen er lastet; tjenester kan også få samme verifiserte closure eksplisitt.
-Denne koblingen er foreløpig ikke konfigurert. Eksisterende ciphertext bevares,
-og erstatning av krypterte verdier avvises atomisk til kontrakten er kjent.
+Denne koblingen er foreløpig ikke konfigurert. Ved standard lagringsvalg
+bevares eksisterende ciphertext, og erstatning av slike verdier avvises
+atomisk til kontrakten er kjent.
 Ikke bruk en testencoder i applikasjonen. Nøkler returneres aldri til klienten.
 
 # Abonnementspriser
