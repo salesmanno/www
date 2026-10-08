@@ -283,6 +283,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             <div class="workspace-actions">
                 <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i> Opprett ny bedrift</button>
                 <button type="button" class="btn btn-outline-primary" id="grantModeButton">Tildel moduler</button>
+                <button type="button" class="btn btn-outline-secondary" id="moduleTransitionPreviewButton">Forhåndsvis tilgangsovergang</button>
                 <button type="button" class="btn btn-primary-custom" id="grantConfirmButton" hidden disabled>Velg moduler (0)</button>
             </div>
         </div>
@@ -424,8 +425,20 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         </div></div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="modal fade" id="moduleTransitionPreviewModal" tabindex="-1" aria-labelledby="moduleTransitionPreviewTitle">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title h5" id="moduleTransitionPreviewTitle">Forhåndsvis tilgangsovergang</h2><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
+            <div class="modal-body">
+                <div class="alert alert-info">Kun forhåndsvisning. Dagens modultilganger og innlogginger er uendret. Ingen abonnementer, brukerroller eller passord lagres her.</div>
+                <div id="moduleTransitionPreviewStatus" role="status" aria-live="polite"></div>
+                <div id="moduleTransitionPreviewContent" aria-busy="false"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="moduleTransitionPreviewRefresh">Oppdater forhåndsvisning</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button></div>
+        </div></div>
+    </div>
     <script src="/saas_portal/assets/portal-workspace.js"></script>
     <script src="/saas_portal/assets/dashboard-workspace.js"></script>
+    <script src="/saas_portal/assets/module-transition-preview.js"></script>
     <script>
         const portalCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         // Global references for auto-fill functionality
