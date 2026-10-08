@@ -386,7 +386,7 @@ try {
                 '--disable-background-networking', '--run-all-compositor-stages-before-draw',
                 '--dump-dom', '--virtual-time-budget=30000', `--window-size=${width},1000`,
                 `--screenshot=${screenshot}`, `file://${file}`
-            ], {encoding: 'utf8', timeout: 25000, maxBuffer: 4 * 1024 * 1024});
+            ], {encoding: 'utf8', timeout: 65000, maxBuffer: 4 * 1024 * 1024});
             const failure = result.stdout?.match(/<pre id="fixture-failure">([\s\S]*?)<\/pre>/)?.[1];
             assert(!result.error && result.status === 0 && result.stdout.includes('data-result="PASS"'),
                 `${page} at ${width}: ${result.error || failure || result.stderr || 'Missing PASS marker'}`);

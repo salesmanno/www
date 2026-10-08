@@ -51,6 +51,7 @@ try {
     subscriptionExpect($report['read_only'] && !$report['apply_available'] && $report['issuer']['name'] === 'Salesman', 'Issuer and read-only contract');
     foreach ($report['companies'] as $company) {
         subscriptionExpect($company['monthly_total'] === '150.00' && $company['setup_total'] === '25.00', 'Company totals');
+        subscriptionExpect($company['proposed_monthly'] === '125.00', 'Existing agreement plus new module price');
         subscriptionExpect($company['features'] === 'events,sales' && !$company['blockers'], 'Additive company features');
         subscriptionExpect($company['subscription']['agreed_monthly'] === '75.00', 'Agreed discount overwritten');
         subscriptionExpect($company['subscription']['currency'] === 'NOK', 'Existing issuer currency lost');

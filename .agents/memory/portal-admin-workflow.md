@@ -39,6 +39,12 @@ Prisene i modulkatalogen er standardpriser, ikke en tillatelse til å endre eksi
 
 **How to apply:** Skill katalogestimat fra gjeldende avtale i visningen. Krev en uttrykkelig avklaring før eksisterende avtalte priser erstattes ved senere lagring.
 
+Utvikling av abonnementsoppsett skal utføres programmatisk uten å være avhengig av tilgang til den faktiske databasen.
+
+**Why:** Brukeren presiserte «du trenger IKKE databasetilkobling for å utføre arbeidet, gjør det programmatisk uten å være avhengig av databasens tilgang».
+
+**How to apply:** Klargjør kode og eksplisitte migreringer, og verifiser mot isolerte testdatabaser. Ikke gjør manglende tilgang til faktiske data til en blokkering for kodearbeidet.
+
 Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet og skal ikke ha firmaets modulrestriksjoner.
 
 **Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.

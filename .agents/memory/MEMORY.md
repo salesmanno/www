@@ -3,3 +3,4 @@
 - [Linked employee email](linked-employee-email.md) — require a coordinated account-email flow before unlocking email edits for staff with admin accounts.
 - [Portal administration](portal-admin-workflow.md) — shared activity/session overview, employee-linked accounts and additive company-module grants.
 - [Gratis arrangementer](event-pricing-policy.md) — ordinærpris 0 uten alternative priser skal tillate reservasjon uten betalingskrav.
+- [Isolated MySQL tests](isolated-mysql-tests.md) — --no-defaults does not exclude connection environment variables; force a fixture socket and an environment allowlist.

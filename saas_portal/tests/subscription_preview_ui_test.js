@@ -16,25 +16,33 @@ const portalCsrf='test-csrf';
 let fixtureFail=false;
 let fixtureMissing=false;
 let fixtureSlow=false;
+let fixtureSaveFail=false;
 const calls=[];
 function portalText(parent,tag,text,classes=''){const node=document.createElement(tag);node.textContent=text;node.className=classes;parent.appendChild(node);return node;}
 function portalFailure(id,message,retry){const node=document.getElementById(id);node.replaceChildren();portalText(node,'p',message);if(retry){const b=portalText(node,'button','Prøv igjen');b.onclick=retry;}}
 function showActivityHistory(){}
 function loadActivityStream(){}
 function loadActiveSessions(){}
+function loadCompanies(){}
+function portalLogo(){}
+function portalButton(parent,label,handler,classes=''){const button=portalText(parent,'button',label,classes);button.addEventListener('click',handler);return button;}
 let activityPaused=false;
 async function portalPost(url,body){
  calls.push({url,body:structuredClone(body)});
+ if(url.endsWith('/save_company_subscription.php')){
+  if(fixtureSaveFail)throw new Error('Pris endret. Oppdater oppsettet.');
+  return {success:true,message:'Abonnement og modultilgang er lagret.'};
+ }
  const slow=fixtureSlow;fixtureSlow=false;
  if(slow) await new Promise(resolve=>setTimeout(resolve,1200));
  if(fixtureFail)throw new Error('Midlertidig utilgjengelig');
  const added=body.module_ids.includes('M2');
- return {success:true,read_only:true,apply_available:false,price_schema_ready:!fixtureMissing,
+ return {success:true,read_only:true,apply_available:true,quote_hash:'a'.repeat(64),price_schema_ready:!fixtureMissing,
  issuer:{id:'issuer',name:'Salesman'},warnings:fixtureMissing?['Priskolonner mangler']:[],
  modules:[{id:'M1',module_key:'events',name:'Arrangement',description:null,price_monthly:'100.00',price_setup:'200.00',price_currency:'NOK'},
  {id:'M2',module_key:'sales',name:'<img src=x onerror="window.injected=true"> Salg',description:'Beskrivelse',price_monthly:fixtureMissing?null:'50.00',price_setup:'25.00',price_currency:'NOK'}],
  companies:[{company_id:'A',name:'Alpha',module_ids:added?['M1','M2']:['M1'],new_module_ids:added?['M2']:[],
- features:added?'events,sales':'events',monthly_total:fixtureMissing?null:(added?'150.00':'100.00'),setup_total:added?'25.00':'0.00',currency:'NOK',
+ features:added?'events,sales':'events',monthly_total:fixtureMissing?null:(added?'150.00':'100.00'),proposed_monthly:fixtureMissing?null:(added?'125.00':'75.00'),setup_total:added?'25.00':'0.00',currency:'NOK',
  missing_prices:fixtureMissing?[{module_id:'M2',name:'Salg',fields:['price_monthly']}]:[],
  blockers:[],notes:['En bedriftsspesifikk plan må klargjøres.'],
  subscription:{status:'active',billing_cycle:'monthly',plan_name:'Avtale',agreed_monthly:'75.00',currency:'NOK'}}]};
@@ -75,7 +83,20 @@ document.addEventListener('DOMContentLoaded',async()=>{
   fixtureFail=false;fixtureMissing=false;retry.click();await settle();
   expect(quotes.textContent.includes('150,00'),'Retry did not preserve selection');
   expect(list.getAttribute('aria-busy')==='false','Loading stuck');
-  expect(calls.every(call=>call.url.endsWith('/preview_company_subscription.php')&&call.body.csrf_token==='test-csrf'),'Mutation or unprotected request sent');
+  expect(calls.every(call=>call.url.endsWith('/preview_company_subscription.php')&&call.body.csrf_token==='test-csrf'),'Unexpected save before confirmation');
+  const acknowledgement=document.getElementById('companyGrantAcknowledgement');
+  acknowledgement.click();
+  expect(!submit.disabled,'Confirmed valid quote cannot be saved');
+  fixtureSaveFail=true;submit.click();await settle();
+  expect(submit.disabled&&document.getElementById('companyGrantStatus').textContent.includes('Pris endret'),'Stale save not handled');
+  expect(choose().checked,'Save failure erased module selection');
+  fixtureSaveFail=false;document.querySelector('#companyGrantStatus button').click();await settle();
+  expect(submit.disabled&&!acknowledgement.checked,'Refresh did not require confirmation again');
+  acknowledgement.click();submit.click();submit.click();await settle();
+  const saves=calls.filter(call=>call.url.endsWith('/save_company_subscription.php'));
+  expect(saves.length===2&&saves[1].body.confirmed===true&&saves[1].body.quote_hash==='a'.repeat(64),'Duplicate save or wrong confirmation payload');
+  expect(document.getElementById('companyGrantStatus').textContent.includes('er lagret'),'Success invisible');
+  expect(submit.disabled&&portalSelectedCompanies.size===0,'Success left saving active');
   const bounds=modal.querySelector('.modal-dialog').getBoundingClientRect();
   expect(bounds.left>=0&&bounds.right<=innerWidth+1,'Modal overflow');
   expect(modal.scrollWidth<=innerWidth+1,'Content overflow');
@@ -88,7 +109,7 @@ try {
     const js = fs.readFileSync(path.join(os.tmpdir(), 'portal-workspace-bootstrap-5.3.0.js'), 'utf8');
     const html = `<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><script>${setup}</script></head><body>
         <button id="grantModeButton">Tildel moduler</button><button id="grantConfirmButton">Velg moduler</button>
-        <input id="activitySearch"><button id="sessionRefreshButton">Oppdater økter</button>
+        <input id="activitySearch"><button id="sessionRefreshButton">Oppdater økter</button><div id="companiesList"></div>
         ${dashboard.slice(start,end)}<script>${js}</script><script>${read('assets/dashboard-workspace.js')}</script>
         <div id="testResult"></div><script>${checks}</script></body></html>`;
     const file = path.join(directory, 'subscription.html');
@@ -101,7 +122,7 @@ try {
         const outcome = result.stdout.match(/<div id="testResult"[^>]*>([\s\S]*?)<\/div>/);
         assert(result.stdout.includes('data-status="PASS"'), `${width}px: ${outcome ? outcome[1] : 'No result'}`);
     }
-    console.log('Subscription UI passed: desktop/mobile, estimates, stale responses, missing prices, retry, no writes.');
+    console.log('Subscription UI passed: desktop/mobile, estimates, stale responses, missing prices, explicit save, retry, duplicate-click protection.');
 } finally {
     fs.rmSync(directory, {recursive:true,force:true});
 }

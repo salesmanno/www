@@ -419,9 +419,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     
     <div class="modal fade" id="companyGrantModal" tabindex="-1" aria-labelledby="companyGrantTitle">
         <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
-            <div class="modal-header"><div><h2 class="modal-title h5 mb-1" id="companyGrantTitle">Gjennomgå moduler og abonnement</h2><p class="small mb-0 text-white-50">Forhåndsvisning – ingen tilganger eller abonnementer endres.</p></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
+            <div class="modal-header"><div><h2 class="modal-title h5 mb-1" id="companyGrantTitle">Moduler og abonnement</h2><p class="small mb-0 text-white-50">Gjennomgå prisene og bekreft før abonnementene lagres.</p></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
             <div class="modal-body">
-                <div class="alert alert-info py-2" role="note">Dette er et katalogestimat, ikke en aktivert bestilling. Eksisterende tilganger beholdes.</div>
+                <div class="alert alert-info py-2" role="note">Eksisterende tilganger og avtalepriser beholdes. Nye modulers månedspris legges til avtalen. Engangsetablering registreres separat; ingen betaling trekkes automatisk.</div>
                 <p id="companyGrantSummary" class="text-muted mb-3"></p>
                 <div id="companyGrantStatus" role="status" aria-live="polite"></div>
                 <div class="row g-3 align-items-start">
@@ -443,8 +443,12 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     <div id="companyGrantCompanyQuotes"></div>
                 </section>
                 <div id="companyGrantWarnings" class="mt-3"></div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="companyGrantAcknowledgement" disabled>
+                    <label class="form-check-label" for="companyGrantAcknowledgement">Jeg bekrefter prisene og vil lagre abonnement og modultilgang for de valgte bedriftene.</label>
+                </div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled aria-describedby="companyGrantSubmitNote">Tildeling ikke aktivert</button><span id="companyGrantSubmitNote" class="small text-muted w-100 text-end">Endringer kan ikke lagres fra denne forhåndsvisningen.</span></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled aria-describedby="companyGrantSubmitNote">Bekreft og lagre</button><span id="companyGrantSubmitNote" class="small text-muted w-100 text-end">Alle priser og tilganger kontrolleres på nytt ved lagring.</span></div>
         </div></div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

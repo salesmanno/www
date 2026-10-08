@@ -70,8 +70,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const quotes = document.getElementById('companyGrantCompanyQuotes');
     const issuer = document.getElementById('companyGrantIssuer');
     const warnings = document.getElementById('companyGrantWarnings');
+    const acknowledgement = document.getElementById('companyGrantAcknowledgement');
     let previewRevision = 0;
     let previewTimer = null;
+    let previewQuote = null;
+    let savingSubscription = false;
+    let subscriptionSaved = false;
+
+    function updateSaveControls() {
+        const ready = previewQuote && previewQuote.apply_available === true && previewQuote.price_schema_ready === true &&
+            /^[a-f0-9]{64}$/.test(previewQuote.quote_hash || '') &&
+            previewQuote.companies.length === portalSelectedCompanies.size &&
+            list.querySelector('input:checked') &&
+            previewQuote.companies.every(company => !company.blockers.length && !company.missing_prices.length &&
+                company.proposed_monthly !== null && company.setup_total !== null && company.currency);
+        acknowledgement.disabled = !ready || savingSubscription || subscriptionSaved;
+        submit.disabled = acknowledgement.disabled || !acknowledgement.checked;
+    }
+    acknowledgement.addEventListener('change', updateSaveControls);
 
     document.getElementById('grantModeButton').addEventListener('click', () => {
         portalGrantMode = !portalGrantMode;
@@ -110,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = moduleId;
             input.className = 'form-check-input me-2';
             input.checked = selectedIds.includes(moduleId);
+            input.disabled = savingSubscription || subscriptionSaved;
             input.addEventListener('change', queueSubscriptionPreview);
             label.appendChild(input);
             const content = portalText(label, 'span', '', 'd-inline-block align-top');
@@ -146,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         portalText(card, 'div', 'Katalogestimat etter valgte moduler', 'small fw-semibold mt-2');
         priceNode(card, 'Månedlig pris for hele modulpakken', company.monthly_total, company.currency);
         priceNode(card, 'Engangsoppsett for nye moduler', company.setup_total, company.currency);
+        priceNode(card, 'Månedspris som lagres', company.proposed_monthly, company.currency);
         if (Array.isArray(company.missing_prices) && company.missing_prices.length) {
             const missing = portalText(card, 'div', '', 'alert alert-warning py-2 px-3 small mt-2 mb-0');
             portalText(missing, 'strong', 'Manglende prisinformasjon');
@@ -169,9 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         warnings.replaceChildren();
     }
     function queueSubscriptionPreview() {
+        if (savingSubscription || subscriptionSaved) return;
         const revision = ++previewRevision;
         window.clearTimeout(previewTimer);
         submit.disabled = true;
+        acknowledgement.checked = false;
+        acknowledgement.disabled = true;
+        previewQuote = null;
         status.replaceChildren();
         portalText(status, 'div', 'Oppdaterer forhåndsvisningen …', 'small text-muted mb-2');
         clearQuoteContent();
@@ -190,9 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 csrf_token: portalCsrf
             });
             if (revision !== previewRevision) return;
-            if (data.read_only !== true || data.apply_available !== false) throw new Error('Svaret bekrefter ikke en skrivebeskyttet forhåndsvisning.');
+            if (data.read_only !== true || typeof data.apply_available !== 'boolean') throw new Error('Svaret bekrefter ikke en gyldig prisforhåndsvisning.');
             const modules = Array.isArray(data.modules) ? data.modules : [];
             const companies = Array.isArray(data.companies) ? data.companies : [];
+            previewQuote = data;
+            warnings.replaceChildren();
             renderModules(modules, moduleIds);
             quotes.replaceChildren();
             companies.forEach(renderSubscription);
@@ -210,11 +234,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (!moduleIds.length) portalText(status, 'div', 'Velg moduler for å se et estimat for tillegg. Gjeldende abonnement vises uavhengig av valget.', 'small text-muted');
             if (!companies.length) portalText(quotes, 'div', 'Velg minst én bedrift for å se pris per bedrift.', 'portal-empty');
+            updateSaveControls();
         } catch (error) {
             if (revision !== previewRevision) return;
             quotes.replaceChildren();
             issuer.textContent = 'Ikke tilgjengelig';
             warnings.replaceChildren();
+            previewQuote = null;
+            acknowledgement.checked = false;
+            acknowledgement.disabled = true;
+            submit.disabled = true;
             if (!list.querySelector('input[type="checkbox"]')) {
                 list.replaceChildren();
                 portalText(list, 'div', 'Katalogen kunne ikke lastes.', 'portal-empty');
@@ -227,9 +256,58 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('grantConfirmButton').addEventListener('click', () => {
         modal.show();
     });
+    submit.addEventListener('click', async () => {
+        updateSaveControls();
+        if (submit.disabled || savingSubscription || !previewQuote) return;
+        const data = {
+            company_ids: Array.from(portalSelectedCompanies),
+            module_ids: Array.from(list.querySelectorAll('input:checked'), input => input.value),
+            quote_hash: previewQuote.quote_hash,
+            confirmed: true,
+            csrf_token: portalCsrf
+        };
+        savingSubscription = true;
+        updateSaveControls();
+        list.querySelectorAll('input').forEach(input => { input.disabled = true; });
+        submit.textContent = 'Lagrer …';
+        status.replaceChildren();
+        try {
+            const result = await portalPost('/saas_portal/api/save_company_subscription.php', data);
+            subscriptionSaved = true;
+            portalText(status, 'div', result.message || 'Abonnement og modultilgang er lagret.', 'alert alert-success');
+            portalSelectedCompanies.clear();
+            portalGrantMode = false;
+            portalRenderCompanies(portalCompanies);
+            loadCompanies();
+            submit.textContent = 'Lagret';
+        } catch (error) {
+            previewQuote = null;
+            acknowledgement.checked = false;
+            portalFailure('companyGrantStatus', error.message, queueSubscriptionPreview);
+            submit.textContent = 'Bekreft og lagre';
+            list.querySelectorAll('input').forEach(input => { input.disabled = false; });
+        } finally {
+            savingSubscription = false;
+            updateSaveControls();
+        }
+    });
+    modalRoot.addEventListener('hide.bs.modal', event => {
+        if (savingSubscription) event.preventDefault();
+        else {
+            ++previewRevision;
+            window.clearTimeout(previewTimer);
+            previewQuote = null;
+            updateSaveControls();
+        }
+    });
     modalRoot.addEventListener('shown.bs.modal', () => {
         window.clearTimeout(previewTimer);
         previewRevision++;
+        previewQuote = null;
+        subscriptionSaved = false;
+        acknowledgement.checked = false;
+        acknowledgement.disabled = true;
+        submit.textContent = 'Bekreft og lagre';
         list.replaceChildren();
         portalText(list, 'div', '', 'portal-skeleton');
         quotes.replaceChildren();
