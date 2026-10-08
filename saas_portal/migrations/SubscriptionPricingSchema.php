@@ -1,9 +1,11 @@
 <?php
+require_once __DIR__.'/SubscriptionDatesSchema.php';
 
 /** Explicit MySQL migration only; never runs on startup or during a web request. */
 final class SubscriptionPricingSchema {
     public static function install(PDO $db): void {
         if ($db->inTransaction()) throw new RuntimeException('DDL kan ikke kjøres inne i en datatransaksjon.');
+        SubscriptionDatesSchema::install($db);
         $planColumns = $db->query('SHOW COLUMNS FROM saas_subscription_plans')->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('max_users', $planColumns, true)) $db->exec('ALTER TABLE saas_subscription_plans ADD max_users INT UNSIGNED NULL');
         foreach (['plan_setup_discount','plan_monthly_discount'] as $name) {

@@ -19,7 +19,7 @@ Preserve existing encrypted credentials when no compatible encoding contract has
 
 **Why:** The portal's obsolete settings layout did not establish how the active modules decode their encrypted credentials. Writing plaintext into a column named “encrypted” would risk both broken connections and insecure storage.
 
-**How to apply:** Settings adapters may update verified non-secret fields while preserving credentials and unrelated automation/test settings. Keep encrypted credential editing in the owning module until its encoding contract is verified; never infer the format from a column name.
+**How to apply:** Settings adapters may update verified non-secret fields while preserving credentials and unrelated automation/test settings. SaaS-admin must be able to manage payment setup in the portal without company-module restrictions, but encrypted replacements must reuse the owning module's verified codec. Never infer the format from a column name or invent an incompatible ciphertext format.
 
 Separate schema compatibility from request-time database availability.
 

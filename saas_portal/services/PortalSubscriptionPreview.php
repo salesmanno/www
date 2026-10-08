@@ -187,6 +187,8 @@ final class PortalSubscriptionPreview {
                 $companies[] = $quote;
             }
             $schemaReady = !array_diff($priceColumns, $columns);
+            $dateColumns=$this->db->query('SHOW COLUMNS FROM tenant_subscriptions')->fetchAll(PDO::FETCH_COLUMN);
+            $datesReady=!array_diff(['subscription_start','due_date'],$dateColumns);
             $requiredTables = $this->db->query("SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
                 AND TABLE_NAME IN ('saas_subscription_plan_modules','saas_subscription_changes')")->fetchAll(PDO::FETCH_KEY_PAIR);
             $saveSchemaReady = count($requiredTables) === 2 && !array_filter($requiredTables, static fn($value) => strcasecmp($value, 'InnoDB') !== 0);
@@ -194,6 +196,7 @@ final class PortalSubscriptionPreview {
                 $historyColumns = $this->db->query('SHOW COLUMNS FROM saas_subscription_changes')->fetchAll(PDO::FETCH_COLUMN);
                 $saveSchemaReady = !array_diff(['old_max_users','max_users','old_setup_discount','old_monthly_discount','plan_setup_discount','plan_monthly_discount'], $historyColumns);
             }
+            $saveSchemaReady=$saveSchemaReady && $datesReady;
             $report = [
                 'success' => true, 'read_only' => true, 'apply_available' => $saveSchemaReady,
                 'save_schema_ready' => $saveSchemaReady,
@@ -205,6 +208,7 @@ final class PortalSubscriptionPreview {
             foreach ($report['companies'] as &$company) unset($company['source_subscription']);
             unset($company);
             if (!$saveSchemaReady) $report['warnings'][] = 'Lagring krever at migreringen for abonnementspriser er installert.';
+            if (!$datesReady) $report['warnings'][]='Abonnementsdatokolonnene mangler. Installer den eksplisitte migreringen før lagring.';
             if (!$withinWriteTransaction) $this->db->commit();
             return $report;
         } catch (Throwable $e) {

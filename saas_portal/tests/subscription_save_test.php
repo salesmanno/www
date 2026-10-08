@@ -241,7 +241,10 @@ PHP;
     saveExpect($discountPlan===['plan_setup_discount'=>'25.00','plan_monthly_discount'=>'10.00','price_monthly'=>'153.00'],'Discounts not stored on plan');
     $loadedDiscount=$preview->preview(['B'],null,'actor')['companies'][0];
     saveExpect($loadedDiscount['plan_setup_discount']==='25.00' && $loadedDiscount['plan_monthly_discount']==='10.00' && $loadedDiscount['setup_total']==='0.00','Discount reload/repeated setup');
-    echo "Subscription save passed: rollback, private plans, exact selections, removals, totals, quotas, idempotency, stale quotes, concurrent saves and account creates, features access.\n";
+    $dates=$db->query("SELECT subscription_start,due_date FROM tenant_subscriptions WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    saveExpect($dates['subscription_start']===PortalSubscriptionDates::today(),'Subscription start not set on successful assignment');
+    saveExpect($dates['due_date']===PortalSubscriptionDates::nextMonth($dates['subscription_start']),'Initial due date is not a clamped next month');
+    echo "Subscription save passed: rollback, private plans, exact selections, removals, totals, quotas, idempotency, stale quotes, concurrent saves and account creates, features access, initial agreement dates.\n";
 } finally {
     if ($db->inTransaction()) $db->rollBack();
     $db->exec("DROP DATABASE IF EXISTS `{$database}`");

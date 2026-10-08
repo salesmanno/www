@@ -27,6 +27,12 @@ try {
     $db->exec('CREATE TABLE economy_payment_gateways(id CHAR(36) PRIMARY KEY,company_id CHAR(36),configuration_id CHAR(36),gateway_name VARCHAR(50),is_active INT,test_mode INT,updated_at DATETIME) ENGINE=InnoDB');
     $db->exec("INSERT INTO economy_payment_gateways VALUES ('ga','A','ca','vipps',1,1,NOW()),('gb','B','cb','vipps',1,1,NOW())");
     $service = new PortalCompanySettings($db);
+    $db->exec("CREATE TABLE saas_admins(id CHAR(36) PRIMARY KEY,email VARCHAR(255),role VARCHAR(50),is_active INT) ENGINE=InnoDB");
+    $db->exec("INSERT INTO saas_admins VALUES ('actor','operator@example.test','admin',1)");
+    $savePayment=function(string $company,array $data) use ($service): void {
+        $edit=PortalBillingAccess::unlock('payment',$company,'actor',$service->paymentVersion($company));
+        $service->savePayment($company,$data+$edit+['confirmed'=>true],'actor');
+    };
     $email = $service->getEmail('A');
     checkSettings($email['layout']==='email_configs' && $email['config']['smtp_from_email']==='sender@example.test', 'Email mapping');
     checkSettings(!str_contains(json_encode($email),'encrypted-fixture'), 'Email credential leak');
@@ -41,23 +47,23 @@ try {
     checkSettings($emailRow['smtp_password_encrypted']==='encrypted-fixture' && $emailRow['automail_sales_order']==1 && $emailRow['imap_username']==='sender', 'Email preserved credentials and omitted/unrelated fields');
     rejectSettings(fn()=>$service->saveEmail('A',['smtp_port'=>'0']));
     $beforeB = $db->query("SELECT * FROM economy_configuration_data WHERE company_id='B'")->fetch(PDO::FETCH_ASSOC);
-    $service->savePayment('A',['gateway_name'=>'vipps','vipps_client_id'=>'new-client','is_active'=>'on','test_mode'=>false]);
+    $savePayment('A',['gateway_name'=>'vipps','vipps_client_id'=>'new-client','is_active'=>'on','test_mode'=>false]);
     $config = $db->query("SELECT * FROM economy_configuration_data WHERE id='ca'")->fetch(PDO::FETCH_ASSOC);
     checkSettings($config['client_id']==='new-client' && $config['test_client_id']==='test-id' && $config['client_secret_encrypted']==='secret-fixture' && $config['subscription_key']==='subscription-fixture', 'Payment preservation');
     checkSettings($config['test_mode']==0 && $db->query("SELECT test_mode FROM economy_payment_gateways WHERE id='ga'")->fetchColumn()==0, 'Flags synchronized');
     checkSettings($db->query("SELECT * FROM economy_configuration_data WHERE company_id='B'")->fetch(PDO::FETCH_ASSOC)===$beforeB, 'Company isolation');
-    rejectSettings(fn()=>$service->savePayment('A',['gateway_name'=>'vipps','vipps_subscription_key'=>'overwrite']));
+    $savePayment('A',['gateway_name'=>'vipps','vipps_subscription_key'=>'overwrite']);
+    checkSettings($db->query("SELECT subscription_key FROM economy_configuration_data WHERE id='ca'")->fetchColumn()==='overwrite','Explicit key replacement');
     $db->exec("UPDATE economy_payment_gateways SET configuration_id='cb' WHERE id='ga'");
     rejectSettings(fn()=>$service->getPayments('A'));
     $db->exec("UPDATE economy_payment_gateways SET configuration_id='ca' WHERE id='ga'");
     // Real protected HTTP endpoints, with configuration and sessions isolated in /tmp.
-    $db->exec("CREATE TABLE saas_admins(id CHAR(36) PRIMARY KEY,email VARCHAR(255),role VARCHAR(50),is_active INT) ENGINE=InnoDB");
-    $db->exec("INSERT INTO saas_admins VALUES ('actor','operator@example.test','admin',1)");
-    foreach (['config','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
-    foreach (['portal_request','company_settings_request','get_email_config','get_payment_gateways','save_email_config','save_payment_gateway','connect_email'] as $file) {
+    foreach (['config','includes','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
+    foreach (['portal_request','company_settings_request','get_email_config','get_payment_gateways','save_email_config','save_payment_gateway','connect_email','payment_edit'] as $file) {
         copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
     }
-    foreach (['PortalCompanySettings','PortalDatabase','PortalSaasIdentity'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
+    foreach (['PortalCompanySettings','PortalDatabase','PortalSaasIdentity','PortalBillingAccess','PortalBillingAudit'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
+    copy(__DIR__.'/../../includes/PaymentCredentialCipher.php',$dir.'/includes/PaymentCredentialCipher.php');
     copy(__DIR__.'/../auth/require_active.php',$dir.'/saas_portal/auth/require_active.php');
     file_put_contents($dir.'/config/database.php',"<?php function getDBConnection(){if(file_exists(__DIR__.'/outage'))throw new RuntimeException('fixture-unavailable');return new PDO(".var_export("mysql:unix_socket={$socket};dbname={$schema};charset=utf8mb4",true).",'root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);}");
     file_put_contents($dir.'/sessions/sess_settingstest','saas_admin_id|s:5:"actor";portal_csrf|s:4:"csrf";');
@@ -65,26 +71,38 @@ try {
     $port = (int)substr(strrchr(stream_socket_get_name($listener,false),':'),1);
     fclose($listener);
     $server = proc_open(['php','-d','session.save_path='.$dir.'/sessions','-S','127.0.0.1:'.$port,'-t',$dir], [0=>['pipe','r'],1=>['file',$dir.'/server.log','a'],2=>['file',$dir.'/server.log','a']],$pipes);
-    usleep(300000);
+    for ($attempt=0;$attempt<30;$attempt++) {
+        $probe=@fsockopen('127.0.0.1',$port,$probeErr,$probeMessage,0.1);
+        if ($probe) { fclose($probe); break; }
+        usleep(100000);
+    }
     $request = function(string $endpoint, ?array $data=null, bool $auth=true) use ($port): array {
         $ch = curl_init("http://127.0.0.1:{$port}/saas_portal/api/{$endpoint}.php?company_id=A");
         $headers = ['Content-Type: application/json'];
         if ($auth) $headers[]='Cookie: PHPSESSID=settingstest';
         if ($data!==null) curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($data)]);
-        curl_setopt_array($ch,[CURLOPT_HTTPHEADER=>$headers,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>5]);
+        curl_setopt_array($ch,[CURLOPT_HTTPHEADER=>$headers,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>5,CURLOPT_PROXY=>'']);
         $body = curl_exec($ch);
         $status = curl_getinfo($ch,CURLINFO_HTTP_CODE);
         curl_close($ch);
         return [$status,json_decode($body,true)];
     };
-    checkSettings($request('get_email_config',null,false)[0]===403, 'GET auth');
+    $unauthStatus=$request('get_email_config',null,false)[0];
+    if ($unauthStatus!==403) {
+        // This log belongs to an isolated fixture and contains no application credentials.
+        fwrite(STDERR,"Fixture HTTP status: {$unauthStatus}\n".file_get_contents($dir.'/server.log'));
+    }
+    checkSettings($unauthStatus===403, 'GET auth');
     checkSettings($request('save_email_config',['company_id'=>'A'])[0]===403, 'POST CSRF');
     foreach (['get_email_config','get_payment_gateways'] as $endpoint) {
         [$status,$body] = $request($endpoint);
         checkSettings($status===200 && $body['success']===true, 'HTTP settings read');
     }
     checkSettings($request('save_email_config',['company_id'=>'A','csrf_token'=>'csrf','smtp_from_name'=>'HTTP sender'])[0]===200, 'HTTP email save');
-    checkSettings($request('save_payment_gateway',['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps','vipps_client_id'=>'http-client','is_active'=>'on','test_mode'=>'on'])[0]===200, 'HTTP payment save');
+    checkSettings($request('save_payment_gateway',['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps'])[0]===403, 'HTTP locked payment save');
+    $version=$request('get_payment_gateways')[1]['version'];
+    $edit=$request('payment_edit',['company_id'=>'A','csrf_token'=>'csrf','action'=>'unlock','version'=>$version])[1];
+    checkSettings($request('save_payment_gateway',['company_id'=>'A','csrf_token'=>'csrf','gateway_name'=>'vipps','vipps_client_id'=>'http-client','is_active'=>'on','test_mode'=>false,'confirmed'=>true,'edit_token'=>$edit['edit_token'],'version'=>$edit['version']])[0]===200, 'HTTP payment save');
     checkSettings($request('connect_email',['company_id'=>'A','csrf_token'=>'csrf'])[0]===200, 'HTTP activation');
     file_put_contents($dir.'/config/outage','1');
     foreach (['get_email_config','get_payment_gateways'] as $endpoint) {
@@ -104,7 +122,7 @@ try {
     $db->exec('CREATE TABLE economy_payment_gateways(id CHAR(36),company_id CHAR(36),gateway_name VARCHAR(50),display_name VARCHAR(100),is_active INT,test_mode INT,vipps_client_id VARCHAR(255),vipps_merchant_serial_number VARCHAR(255),updated_at DATETIME) ENGINE=InnoDB');
     $db->exec("INSERT INTO economy_payment_gateways VALUES ('legacy','A','vipps','Legacy Vipps',1,1,'legacy-client','legacy-merchant',NOW())");
     checkSettings($service->getPayments('A')['gateways'][0]['vipps_client_id']==='legacy-client','Legacy payment read');
-    $service->savePayment('A',['gateway_name'=>'vipps','vipps_client_id'=>'legacy-updated','is_active'=>'on']);
+    $savePayment('A',['gateway_name'=>'vipps','vipps_client_id'=>'legacy-updated','is_active'=>false]);
     checkSettings($service->getPayments('A')['gateways'][0]['vipps_client_id']==='legacy-updated','Legacy payment save');
     echo "PASS: active and legacy schema mapping, preservation, tenant isolation, HTTP auth/CSRF, save, activation, outage and recovery.\n";
 } finally {

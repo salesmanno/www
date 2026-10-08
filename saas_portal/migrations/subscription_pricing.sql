@@ -1,6 +1,20 @@
 -- Run explicitly in the application's existing MySQL database.
 -- Creates pricing/history tables only. Does not migrate existing subscriptions or accounts.
 -- UUID reference types inherit the real parent columns' charset/collation.
+SET @date_ddl = IF(
+    EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tenant_subscriptions' AND COLUMN_NAME='subscription_start'),
+    'SELECT 1','ALTER TABLE tenant_subscriptions ADD subscription_start DATE NULL'
+);
+PREPARE subscription_date_migration FROM @date_ddl;
+EXECUTE subscription_date_migration;
+DEALLOCATE PREPARE subscription_date_migration;
+SET @date_ddl = IF(
+    EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tenant_subscriptions' AND COLUMN_NAME='due_date'),
+    'SELECT 1','ALTER TABLE tenant_subscriptions ADD due_date DATE NULL'
+);
+PREPARE subscription_date_migration FROM @date_ddl;
+EXECUTE subscription_date_migration;
+DEALLOCATE PREPARE subscription_date_migration;
 SET @quota_ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()
         AND TABLE_NAME='saas_subscription_plans' AND COLUMN_NAME='max_users'),

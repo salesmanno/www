@@ -1,3 +1,38 @@
+# Abonnementsdatoer og betalingsadministrasjon
+
+Ingen migrering kjøres automatisk ved innlogging, sidevisning eller lagring.
+Den eksisterende prisinstallereren og SQL-filen klargjør nå også nullable
+`tenant_subscriptions.subscription_start` og `due_date`. Bare datoene kan
+klargjøres eksplisitt med:
+
+```sh
+php saas_portal/migrations/install_subscription_dates.php --apply
+```
+
+Dette legger ikke til tabeller, endrer ikke eksisterende datoer og utfyller
+ikke gamle abonnementer. Første bekreftede modullagring setter manglende start
+til kalenderdatoen i Europe/Oslo og manglende forfall til én kalendermåned etter
+start, avkortet til siste gyldige dag i måneden. Senere lagring beholder datoene.
+Eksisterende betalingsperioder og faktisk betalingsstatus endres ikke.
+
+Abonnementsfanen viser lagret netto månedsbeløp. Brutto/rabattbeløp hentes fra
+lagrede modulpriser og vises bare når disse stemmer med den lagrede avtalen;
+gjeldende katalogpriser brukes ikke til å rekonstruere gamle avtaler.
+
+Betalingsredigering og datoendringer krever en aktiv SaaS-adminrolle
+(`admin`, `super_admin` eller `saas_admin`), CSRF og en bedriftsbundet
+femminutters redigeringstillatelse. `global_admin` gir ikke automatisk denne
+administrasjonsrettigheten. Eksisterende innlogginger og roller endres ikke.
+
+**Uavklart før krypterte nøkler kan erstattes:** Prosjektet inneholder ikke
+betalingsmodulens eksisterende encoder/decoder. Ingen ny krypteringsstandard
+gjettes ut fra kolonnenavn. Koble den verifiserte eksisterende encoderen inn med
+`PaymentCredentialCipher::configure($encoder)` i en felles bootstrap etter at
+helperen er lastet; tjenester kan også få samme verifiserte closure eksplisitt.
+Denne koblingen er foreløpig ikke konfigurert. Eksisterende ciphertext bevares,
+og erstatning av krypterte verdier avvises atomisk til kontrakten er kjent.
+Ikke bruk en testencoder i applikasjonen. Nøkler returneres aldri til klienten.
+
 # Abonnementspriser
 
 Kodearbeid og tester krever ikke tilgang til den faktiske databasen.

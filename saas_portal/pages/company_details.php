@@ -178,6 +178,7 @@ if (!$company) {
                 </a>
             </li>
             <li class="nav-item"><a class="nav-link" id="seo-tab" data-bs-toggle="tab" href="#seo">SEO</a></li>
+            <li class="nav-item"><a class="nav-link" id="subscription-tab" data-bs-toggle="tab" href="#subscription"><i class="bi bi-receipt-cutoff me-1"></i>Abonnement</a></li>
         </ul>
         
         <div class="tab-content">
@@ -286,6 +287,23 @@ if (!$company) {
                         <i class="bi bi-credit-card"></i> Betalingskonfigurasjon
                     </h3>
                     <p class="text-muted">Konfigurer betalingsgatewayer for <?= htmlspecialchars($company['name']) ?></p>
+
+                    <div class="portal-panel mb-4" id="paymentEditPanel">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div>
+                                <strong id="paymentLockLabel">Betalingsinnstillinger er låst</strong>
+                                <div class="small text-muted" id="paymentLockHelp">Lås opp for å gjøre en tidsbegrenset endring. Hemmelige verdier vises aldri.</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="paymentUnlockCountdown" class="small text-muted" aria-live="polite"></span>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="paymentUnlockButton" disabled>Lås opp for redigering</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="paymentCancelButton" hidden>Avbryt og lås</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="paymentCredentialWarning" class="alert alert-info mb-4" role="status" aria-live="polite">
+                        Kontrollerer om sikker lagring av betalingsnøkler er tilgjengelig…
+                    </div>
                     
                     <ul class="nav nav-pills mb-4" id="paymentGatewayTabs" role="tablist">
                         <li class="nav-item" role="presentation">
@@ -326,6 +344,14 @@ if (!$company) {
                                             <input class="form-check-input" type="checkbox" id="vipps_test_mode" name="test_mode" checked>
                                         </div>
                                     </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="vipps_credential_environment">Miljø for betalingsnøkler</label>
+                                    <select class="form-select" id="vipps_credential_environment" name="credential_environment" data-gateway-environment="vipps" disabled>
+                                        <option value="production">Produksjon</option>
+                                        <option value="test">Test</option>
+                                    </select>
+                                    <div class="form-text" data-environment-help="vipps">Testmiljø er utilgjengelig for denne leverandøren.</div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Client ID</label>
@@ -371,6 +397,14 @@ if (!$company) {
                                     </div>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label" for="stripe_credential_environment">Miljø for betalingsnøkler</label>
+                                    <select class="form-select" id="stripe_credential_environment" name="credential_environment" data-gateway-environment="stripe" disabled>
+                                        <option value="production">Produksjon</option>
+                                        <option value="test">Test</option>
+                                    </select>
+                                    <div class="form-text" data-environment-help="stripe">Testmiljø er utilgjengelig for denne leverandøren.</div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label">Public Key</label>
                                     <input type="text" class="form-control" id="stripe_public_key" name="stripe_public_key">
                                 </div>
@@ -408,6 +442,14 @@ if (!$company) {
                                             <input class="form-check-input" type="checkbox" id="paypal_test_mode" name="test_mode" checked>
                                         </div>
                                     </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="paypal_credential_environment">Miljø for betalingsnøkler</label>
+                                    <select class="form-select" id="paypal_credential_environment" name="credential_environment" data-gateway-environment="paypal" disabled>
+                                        <option value="production">Produksjon</option>
+                                        <option value="test">Test</option>
+                                    </select>
+                                    <div class="form-text" data-environment-help="paypal">Testmiljø er utilgjengelig for denne leverandøren.</div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Client ID</label>
@@ -643,6 +685,45 @@ if (!$company) {
                         <button type="submit" id="seoSaveButton" class="btn btn-primary-custom" disabled>Lagre SEO</button>
                     </form>
                     <div id="companySeoStatus" class="mt-3" role="status" aria-live="polite"></div>
+                </section>
+            </div>
+            <div class="tab-pane fade" id="subscription">
+                <section class="content-section">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                        <div>
+                            <h3 class="section-title mb-1"><i class="bi bi-receipt-cutoff me-2"></i>Abonnementsvilkår</h3>
+                            <p class="text-muted small mb-0">Avtalte kostnader og neste forfallsdato. Denne visningen informerer – den utløser ikke betaling.</p>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="subscriptionEditCountdown" class="small text-muted" aria-live="polite"></span>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="subscriptionDueUnlock" disabled>Endre forfallsdato</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="subscriptionDueCancel" hidden>Avbryt</button>
+                        </div>
+                    </div>
+                    <div id="subscriptionStatus" role="status" aria-live="polite"><div class="portal-skeleton" aria-label="Laster abonnement"></div></div>
+                    <div id="subscriptionDetails" hidden>
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Brutto per måned</div><div class="fs-5 fw-semibold mt-1" id="subscriptionGross">—</div></div></div>
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Rabatt</div><div class="fs-5 fw-semibold mt-1" id="subscriptionDiscount">—</div><div class="small text-muted" id="subscriptionDiscountAmount"></div></div></div>
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Netto per måned</div><div class="fs-5 fw-semibold mt-1" id="subscriptionNet">—</div></div></div>
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Betalingssyklus</div><div class="fs-5 fw-semibold mt-1" id="subscriptionCycle">—</div></div></div>
+                        </div>
+                        <div class="portal-panel">
+                            <h4 class="h6 mb-3">Avtaledatoer</h4>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">Abonnementsstart</dt><dd class="col-sm-8" id="subscriptionStart">Ikke oppgitt</dd>
+                                <dt class="col-sm-4">Neste forfall</dt><dd class="col-sm-8 mb-0">
+                                    <span id="subscriptionDueDisplay">Ikke oppgitt</span>
+                                    <span id="subscriptionDueCountdown" class="ms-2 small text-muted"></span>
+                                    <form id="subscriptionDueForm" class="d-flex flex-wrap gap-2 mt-3" hidden>
+                                        <label for="subscriptionDueDate" class="visually-hidden">Ny forfallsdato</label>
+                                        <input type="date" id="subscriptionDueDate" class="form-control form-control-sm" style="max-width: 220px" disabled>
+                                        <button type="submit" class="btn btn-primary-custom btn-sm" id="subscriptionDueSave" disabled>Lagre forfallsdato</button>
+                                    </form>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
                 </section>
             </div>
         </div>
@@ -1100,7 +1181,6 @@ if (!$company) {
         }
         
         let emailSettingsLoaded = false;
-        let paymentSettingsLoaded = false;
         function settingsControls(section, enabled) {
             document.querySelectorAll(`#${section} form input, #${section} form select, #${section} button[onclick]`)
                 .forEach(control => control.disabled = !enabled);
@@ -1116,7 +1196,6 @@ if (!$company) {
             });
         }
         settingsControls('email', false);
-        settingsControls('payment', false);
         function loadEmailConfig() {
             emailSettingsLoaded = false;
             settingsControls('email', false);
@@ -1263,99 +1342,6 @@ if (!$company) {
         // Laste epost-konfigurasjon når fanen åpnes
         document.getElementById('email-tab').addEventListener('shown.bs.tab', function () {
             loadEmailConfig();
-        });
-        
-        // Betalingskonfigurasjon funksjoner
-        function loadPaymentGateways() {
-            paymentSettingsLoaded = false;
-            settingsControls('payment', false);
-            fetch(`/saas_portal/api/get_payment_gateways.php?company_id=${companyId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) throw new Error(data.message || 'Kunne ikke hente betalingskonfigurasjonen.');
-                ['vipps','stripe','paypal'].forEach(gateway => document.getElementById(gateway+'ConfigForm').reset());
-                if (data.success && data.gateways) {
-                    data.gateways.forEach(gw => {
-                        if (gw.gateway_name === 'vipps') {
-                            document.getElementById('vipps_is_active').checked = gw.is_active == 1;
-                            document.getElementById('vipps_test_mode').checked = gw.test_mode == 1;
-                            document.getElementById('vipps_client_id').value = gw.vipps_client_id || '';
-                            document.getElementById('vipps_merchant_serial').value = gw.vipps_merchant_serial_number || '';
-                            document.getElementById('vipps_subscription_key').value = gw.vipps_subscription_key || '';
-                        } else if (gw.gateway_name === 'stripe') {
-                            document.getElementById('stripe_is_active').checked = gw.is_active == 1;
-                            document.getElementById('stripe_test_mode').checked = gw.test_mode == 1;
-                            document.getElementById('stripe_public_key').value = gw.stripe_public_key || '';
-                            document.getElementById('stripe_webhook_secret').value = gw.stripe_webhook_secret || '';
-                        } else if (gw.gateway_name === 'paypal') {
-                            document.getElementById('paypal_is_active').checked = gw.is_active == 1;
-                            document.getElementById('paypal_test_mode').checked = gw.test_mode == 1;
-                            document.getElementById('paypal_client_id').value = gw.paypal_client_id || '';
-                            document.getElementById('paypal_webhook_id').value = gw.paypal_webhook_id || '';
-                        }
-                    });
-                }
-                paymentSettingsLoaded = true;
-                (data.gateways || []).forEach(gw => {
-                    if (!['vipps','stripe','paypal'].includes(gw.gateway_name)) return;
-                    document.querySelectorAll(`#${gw.gateway_name}ConfigForm input, #${gw.gateway_name}ConfigForm button`)
-                        .forEach(control => control.disabled = false);
-                    const display = document.querySelector(`#${gw.gateway_name}ConfigForm [name="display_name"]`);
-                    if (display) display.value = gw.display_name || gw.gateway_name;
-                });
-                settingsSecrets(['vipps_client_secret','vipps_subscription_key','stripe_secret_key','stripe_webhook_secret','paypal_client_secret'], true);
-                document.getElementById('paymentConfigStatus').textContent =
-                    data.notice || ((data.gateways || []).length ? '' : 'Ingen betalingsleverandør finnes for firmaet. Opprett oppsettet i økonomimodulen først.');
-            })
-            .catch(err => portalFailure('paymentConfigStatus', err.message, loadPaymentGateways));
-        }
-        
-        function savePaymentGateway(gateway) {
-            if (!paymentSettingsLoaded) return;
-            let formData, displayName;
-            if (gateway === 'vipps') {
-                formData = new FormData(document.getElementById('vippsConfigForm'));
-                displayName = 'Vipps';
-            } else if (gateway === 'stripe') {
-                formData = new FormData(document.getElementById('stripeConfigForm'));
-                displayName = 'Stripe';
-            } else if (gateway === 'paypal') {
-                formData = new FormData(document.getElementById('paypalConfigForm'));
-                displayName = 'PayPal';
-            }
-            
-            formData.append('company_id', companyId);
-            formData.append('csrf_token', portalCsrf);
-            formData.append('gateway_name', gateway);
-            formData.append('display_name', displayName);
-            
-            const data = {};
-            formData.forEach((value, key) => data[key] = value);
-            
-            fetch('/saas_portal/api/save_payment_gateway.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(data => {
-                const status = document.getElementById('paymentConfigStatus');
-                if (data.success) {
-                    status.innerHTML = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> ${displayName}-konfigurasjon lagret!</div>`;
-                    setTimeout(() => status.innerHTML = '', 3000);
-                } else {
-                    status.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil: ${escapeHtml(data.message)}</div>`;
-                }
-            })
-            .catch(err => {
-                document.getElementById('paymentConfigStatus').innerHTML = 
-                    `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Feil ved lagring</div>`;
-            });
-        }
-        
-        // Laste betalingskonfigurasjon når fanen åpnes
-        document.getElementById('payment-tab').addEventListener('shown.bs.tab', function () {
-            loadPaymentGateways();
         });
         
         // DNS-administrasjon funksjoner
@@ -1562,6 +1548,7 @@ if (!$company) {
         
         // Initial loading is coordinated by company-workspace.js.
     </script>
+    <script src="/saas_portal/assets/company-billing.js"></script>
     <script src="/saas_portal/assets/brreg-staff-import.js"></script>
 </body>
 </html>

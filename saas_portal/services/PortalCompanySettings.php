@@ -1,8 +1,10 @@
 <?php
+require_once __DIR__.'/PortalBillingAccess.php';
+require_once __DIR__.'/../../includes/PaymentCredentialCipher.php';
 
 /** Adapts existing settings layouts without migrating data or exposing credentials. */
 class PortalCompanySettings {
-    public function __construct(private PDO $db) {}
+    public function __construct(private PDO $db, private ?Closure $encryptCredential = null) {}
 
     private function columns(string $table): array {
         $s = $this->db->prepare('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
@@ -161,11 +163,34 @@ class PortalCompanySettings {
                 $row['paypal_webhook_id'] = $row['gateway_name']==='paypal' ? $row['webhook_id'] : null;
                 $row['stripe_public_key'] = $row['gateway_name']==='stripe' ? $row['public_key'] : null;
                 unset($row['client_id'], $row['merchant_serial_number'], $row['public_key'], $row['webhook_id']);
+                $columns=$this->columns('economy_configuration_data');
+                $row['credential_environments']=in_array('test_client_id',$columns,true) || in_array('test_public_key',$columns,true)?['production','test']:['production'];
+                $testColumns=array_intersect($columns,['test_client_id','test_merchant_serial_number','test_public_key','test_webhook_id']);
+                $row['test_values']=[];
+                if ($testColumns) {
+                    $q=$this->db->prepare('SELECT `'.implode('`,`',$testColumns).'` FROM economy_configuration_data WHERE id=? AND company_id=?');
+                    $q->execute([$row['configuration_id'],$company]);
+                    $public=$q->fetch(PDO::FETCH_ASSOC) ?: [];
+                    $map=match($row['gateway_name']) {
+                        'vipps'=>['vipps_client_id'=>'test_client_id','vipps_merchant_serial_number'=>'test_merchant_serial_number'],
+                        'stripe'=>['stripe_public_key'=>'test_public_key'],
+                        'paypal'=>['paypal_client_id'=>'test_client_id','paypal_webhook_id'=>'test_webhook_id'],
+                        default=>[]
+                    };
+                    foreach ($map as $field=>$column) if (array_key_exists($column,$public)) $row['test_values'][$field]=$public[$column];
+                }
+            } else {
+                $row['credential_environments']=['production'];
             }
         }
         unset($row);
-        return ['gateways'=>$rows, 'credentials_readonly'=>true,
-            'notice'=>'Eksisterende hemmelige nøkler beholdes og administreres i økonomimodulen. Feltene her gjelder produksjonsoppsettet; testmiljøets legitimasjon beholdes separat.'];
+        $columns=$modern?$this->columns('economy_configuration_data'):[];
+        $environments=in_array('test_client_id',$columns,true) || in_array('test_public_key',$columns,true)?['production','test']:['production'];
+        return ['gateways'=>$rows, 'credential_environments'=>$environments,'credentials_readonly'=>false,
+            'encrypted_credentials_ready'=>$this->encryptCredential!==null || PaymentCredentialCipher::available(),
+            'version'=>$this->paymentVersion($company),
+            'notice'=>'Oppsettet er låst til du velger redigering. Tomme nøkkelfelt beholder lagrede verdier. Produksjons- og testnøkler lagres separat.'.
+                (($this->encryptCredential!==null || PaymentCredentialCipher::available())?'':' Erstatning av krypterte nøkler krever at betalingsmodulens eksisterende kryptering kobles til først.')];
     }
 
     private function flag(array $data, string $key): int {
@@ -174,44 +199,150 @@ class PortalCompanySettings {
         return in_array($value, [true,1,'1','on'], true) ? 1 : 0;
     }
 
-    public function savePayment(string $company, array $data): void {
+    public function paymentVersion(string $company): string {
+        $this->company($company);
+        $lock=$this->db->inTransaction()?' FOR UPDATE':'';
+        $query=$this->db->prepare('SELECT * FROM economy_payment_gateways WHERE company_id=? ORDER BY id'.$lock);
+        $query->execute([$company]);
+        $rows=$query->fetchAll(PDO::FETCH_ASSOC);
+        $configs=[];
+        if ($this->paymentLayout()) {
+            $query=$this->db->prepare('SELECT * FROM economy_configuration_data WHERE company_id=? ORDER BY id'.$lock);
+            $query->execute([$company]);
+            $configs=$query->fetchAll(PDO::FETCH_ASSOC);
+        }
+        return PortalBillingAccess::version([$rows,$configs]);
+    }
+
+    private function insertPayment(string $table,array $values): void {
+        $names='`'.implode('`,`',array_keys($values)).'`';
+        $this->db->prepare("INSERT INTO `{$table}` ({$names}) VALUES (".implode(',',array_fill(0,count($values),'?')).')')->execute(array_values($values));
+    }
+
+    private static function uuid(): string {
+        $h=bin2hex(random_bytes(16));
+        return substr($h,0,8).'-'.substr($h,8,4).'-4'.substr($h,13,3).'-8'.substr($h,17,3).'-'.substr($h,20);
+    }
+
+    public function savePayment(string $company, array $data, string $actor): void {
         $gateway = $data['gateway_name'] ?? '';
         if (!in_array($gateway, ['vipps','stripe','paypal'], true)) throw new InvalidArgumentException('Ugyldig betalingsleverandør.');
-        $this->rejectCredentials($data, ['vipps_client_secret','vipps_subscription_key','stripe_secret_key','stripe_webhook_secret','paypal_client_secret']);
+        PortalBillingAccess::check('payment',$company,$actor,$data);
         $this->db->beginTransaction();
         try {
             // Serialize this company's settings writers without locking other companies.
             $s = $this->db->prepare('SELECT id FROM tenant_companies WHERE id=? FOR UPDATE');
             $s->execute([$company]);
             if (!$s->fetchColumn()) throw new InvalidArgumentException('Bedriften finnes ikke.');
+            PortalBillingAccess::requireAdmin($this->db,$actor,true);
             $modern = $this->paymentLayout();
+            foreach ($modern?['economy_payment_gateways','economy_configuration_data']:['economy_payment_gateways'] as $table) {
+                $engine=$this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+                $engine->execute([$table]);
+                if (strcasecmp((string)$engine->fetchColumn(),'InnoDB')!==0) throw new InvalidArgumentException('Betalingsoppsettet krever transaksjonssikre tabeller.');
+            }
+            if (!hash_equals($this->paymentVersion($company),(string)($data['version'] ?? ''))) throw new PortalPaymentConflictException('Betalingsoppsettet er endret. Last inn og bekreft på nytt.');
             $rows = array_values(array_filter($this->getPayments($company)['gateways'], fn($r)=>$r['gateway_name']===$gateway));
-            if (!$rows) throw new InvalidArgumentException('Opprett betalingsleverandøren i økonomimodulen først.');
-            $row = $rows[0];
+            $row = $rows[0] ?? null;
             $flags = ['is_active'=>$this->flag($data,'is_active'), 'test_mode'=>$this->flag($data,'test_mode')];
             $map = match ($gateway) {
                 'vipps'=>['vipps_client_id'=>'client_id','vipps_merchant_serial_number'=>'merchant_serial_number'],
                 'stripe'=>['stripe_public_key'=>'public_key'],
                 'paypal'=>['paypal_client_id'=>'client_id','paypal_webhook_id'=>'webhook_id'],
             };
+            $environment=$data['credential_environment'] ?? 'production';
+            if (!in_array($environment,['production','test'],true)) throw new InvalidArgumentException('Ugyldig nøkkelmiljø.');
+            if (!$modern && $environment==='test') throw new InvalidArgumentException('Dette eldre oppsettet har ikke separate testnøkkelfelt.');
+            $table=$modern?'economy_configuration_data':'economy_payment_gateways';
+            $columns=$this->columns($table);
+            $prefix=$environment==='test'?'test_':'';
             $values = [];
             foreach ($map as $field=>$column) {
-                if (array_key_exists($field,$data)) $values[$modern ? $column : $field] = $this->text($data,$field);
+                $target=$modern?$prefix.$column:$field;
+                if (array_key_exists($field,$data) && !in_array($target,$columns,true)) {
+                    if ($this->text($data,$field)!=='') throw new InvalidArgumentException('Oppsettet mangler feltet for valgt nøkkelmiljø.');
+                    continue;
+                }
+                if (array_key_exists($field,$data)) $values[$target] = $this->text($data,$field);
+            }
+            $secrets=match($gateway) {
+                'vipps'=>['vipps_client_secret'=>'client_secret','vipps_subscription_key'=>'subscription_key'],
+                'stripe'=>['stripe_secret_key'=>'secret_key','stripe_webhook_secret'=>'webhook_secret'],
+                'paypal'=>['paypal_client_secret'=>'client_secret']
+            };
+            $clear=$data['clear_secrets'] ?? [];
+            if (!is_array($clear) || !array_is_list($clear) || array_diff($clear,array_keys($secrets))) throw new InvalidArgumentException('Ugyldig valg for fjerning av nøkkel.');
+            foreach ($secrets as $field=>$column) {
+                $base=$modern?$prefix.$column:$field;
+                $target=in_array($base.'_encrypted',$columns,true)?$base.'_encrypted':$base;
+                $plain=$this->text($data,$field);
+                if ($plain!=='' && in_array($field,$clear,true)) throw new InvalidArgumentException('Velg enten erstatning eller fjerning av nøkkelen.');
+                if ($plain==='' && !in_array($field,$clear,true)) continue;
+                if (!in_array($target,$columns,true)) throw new InvalidArgumentException('Oppsettet mangler nøkkelfeltet. Ingen verdier er endret.');
+                $values[$target]=in_array($field,$clear,true)?null:
+                    (str_ends_with($target,'_encrypted')?($this->encryptCredential ? ($this->encryptCredential)($plain) : PaymentCredentialCipher::encrypt($plain)):$plain);
             }
             if ($modern) {
                 // A shared configuration must not change another gateway implicitly.
-                $s = $this->db->prepare('SELECT COUNT(*) FROM economy_payment_gateways WHERE configuration_id=? AND id<>?');
-                $s->execute([$row['configuration_id'],$row['id']]);
-                if ((int)$s->fetchColumn()>0) throw new InvalidArgumentException('Delt betalingsoppsett må endres i økonomimodulen.');
-                $this->update('economy_configuration_data', $values+$flags, $row['configuration_id'], $company);
-                $this->update('economy_payment_gateways', $flags, $row['id'], $company);
+                if ($row) {
+                    $s = $this->db->prepare('SELECT COUNT(*) FROM economy_payment_gateways WHERE configuration_id=? AND id<>?');
+                    $s->execute([$row['configuration_id'],$row['id']]);
+                    if ((int)$s->fetchColumn()>0) throw new InvalidArgumentException('Delt betalingsoppsett kan ikke endres uten å avklare koblingene først.');
+                    $this->update('economy_configuration_data', $values+$flags, $row['configuration_id'], $company);
+                    $this->update('economy_payment_gateways', $flags, $row['id'], $company);
+                } else {
+                    $configuration=self::uuid();
+                    $config=$values+$flags+['id'=>$configuration,'company_id'=>$company,'gateway_type'=>$gateway,'config_name'=>ucfirst($gateway)];
+                    foreach (['created_by','updated_by'] as $column) if (in_array($column,$columns,true)) $config[$column]=$actor;
+                    $this->insertPayment('economy_configuration_data',$config);
+                    $grant=$flags+['id'=>self::uuid(),'company_id'=>$company,'configuration_id'=>$configuration,'gateway_name'=>$gateway];
+                    $gatewayColumns=$this->columns('economy_payment_gateways');
+                    if (in_array('display_name',$gatewayColumns,true)) $grant['display_name']=ucfirst($gateway);
+                    if (in_array('created_by',$gatewayColumns,true)) $grant['created_by']=$actor;
+                    $this->insertPayment('economy_payment_gateways',$grant);
+                }
             } else {
-                $this->update('economy_payment_gateways', $values+$flags, $row['id'], $company);
+                if ($row) $this->update('economy_payment_gateways', $values+$flags, $row['id'], $company);
+                else {
+                    $create=$values+$flags+['id'=>self::uuid(),'company_id'=>$company,'gateway_name'=>$gateway,'display_name'=>ucfirst($gateway)];
+                    if (in_array('created_by',$columns,true)) $create['created_by']=$actor;
+                    $this->insertPayment('economy_payment_gateways',$create);
+                }
+            }
+            if ($flags['is_active']) {
+                $q=$this->db->prepare('SELECT * FROM economy_payment_gateways WHERE company_id=? AND gateway_name=? FOR UPDATE');
+                $q->execute([$company,$gateway]);
+                $saved=$q->fetch(PDO::FETCH_ASSOC);
+                if ($modern) {
+                    $q=$this->db->prepare('SELECT * FROM economy_configuration_data WHERE id=? AND company_id=? FOR UPDATE');
+                    $q->execute([$saved['configuration_id'],$company]);
+                    $saved=$q->fetch(PDO::FETCH_ASSOC);
+                }
+                $mode=$modern && $flags['test_mode']?'test_':'';
+                $required=match($gateway) {
+                    'vipps'=>['client_id','client_secret','subscription_key','merchant_serial_number'],
+                    'stripe'=>['public_key','secret_key'],
+                    'paypal'=>['client_id','client_secret']
+                };
+                foreach ($required as $column) {
+                    $base=$modern?$mode.$column:'';
+                    if (!$modern) $base=match($column) {
+                        'merchant_serial_number'=>'vipps_merchant_serial_number',
+                        default=>$gateway.'_'.$column
+                    };
+                    $target=array_key_exists($base.'_encrypted',$saved)?$base.'_encrypted':$base;
+                    if (!isset($saved[$target]) || trim((string)$saved[$target])==='') {
+                        throw new InvalidArgumentException('Betalingsleverandøren kan ikke aktiveres før alle påkrevde nøkler for valgt miljø er satt. Ingen endringer er lagret.');
+                    }
+                }
             }
             $this->db->commit();
+            PortalBillingAccess::lock('payment');
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;
         }
     }
 }
+
+class PortalPaymentConflictException extends RuntimeException {}

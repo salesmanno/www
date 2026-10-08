@@ -55,7 +55,7 @@ Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet o
 
 **Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.
 
-**How to apply:** Brukeren valgte tilgang til alle bedrifter. Bruk en eksplisitt, serverkontrollert global rolle gjennom eksisterende SaaS-innlogging, uten ny SuperUser-innlogging i portalen. Sletting eller frakobling av en ansatt må ikke automatisk oppgradere en tidligere firmakonto til global tilgang.
+**How to apply:** Brukeren valgte tilgang til alle bedrifter. Bruk en eksplisitt, serverkontrollert global rolle gjennom eksisterende SaaS-innlogging. Brukeren gjentok: «Det er ingen super user login her, og det skal heller ikke være det.» Sletting eller frakobling av en ansatt må ikke automatisk oppgradere en tidligere firmakonto til global tilgang.
 
 Eksisterende SaaS-innlogging og eldre SaaS-roller skal fortsette å fungere uten at den nye globale kontomigreringen er kjørt.
 

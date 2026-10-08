@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/PortalSubscriptionPreview.php';
+require_once __DIR__ . '/PortalSubscriptionDates.php';
 
 class PortalSubscriptionConflictException extends RuntimeException {}
 
@@ -59,6 +60,7 @@ final class PortalSubscriptionService {
         }
         $planColumns = $this->columns('saas_subscription_plans');
         $subscriptionColumns = $this->columns('tenant_subscriptions');
+        if (array_diff(['subscription_start','due_date'],$subscriptionColumns)) throw new InvalidArgumentException('Installer abonnementsdatokolonnene før modultildeling kan lagres.');
         $grantColumns = $this->columns('tenant_company_modules');
         $this->db->beginTransaction();
         try {
@@ -92,7 +94,7 @@ final class PortalSubscriptionService {
             }
             $catalog = array_column($report['modules'],null,'id');
             $planQuery = $this->db->prepare('SELECT * FROM saas_subscription_plans WHERE id=? FOR UPDATE');
-            $subscriptionQuery = $this->db->prepare('SELECT id,plan_id FROM tenant_subscriptions WHERE company_id=? FOR UPDATE');
+            $subscriptionQuery = $this->db->prepare('SELECT * FROM tenant_subscriptions WHERE company_id=? FOR UPDATE');
             $planCount = $this->db->prepare('SELECT COUNT(*) FROM tenant_subscriptions WHERE plan_id=?');
             $snapshots = $this->db->prepare('SELECT module_id,price_monthly,price_setup,price_currency FROM saas_subscription_plan_modules WHERE plan_id=? ORDER BY module_id FOR UPDATE');
             $grantQuery = $this->db->prepare('SELECT id,is_active FROM tenant_company_modules WHERE company_id=? AND module_id=? FOR UPDATE');
@@ -148,6 +150,13 @@ final class PortalSubscriptionService {
                     }
                 }
                 $link = ['plan_id'=>$planId,'self_company_id'=>$report['issuer']['id']];
+                // Dates belong to the company's agreement, never a shared plan.
+                if (in_array('subscription_start',$subscriptionColumns,true) && empty($subscription['subscription_start'])) {
+                    $link['subscription_start']=PortalSubscriptionDates::today();
+                }
+                if (in_array('due_date',$subscriptionColumns,true) && empty($subscription['due_date'])) {
+                    $link['due_date']=PortalSubscriptionDates::nextMonth($subscription['subscription_start'] ?? $link['subscription_start'] ?? PortalSubscriptionDates::today());
+                }
                 if (in_array('updated_at',$subscriptionColumns,true)) $link['updated_at'] = $now;
                 if ($subscription) {
                     $subscriptionId = $subscription['id'];
