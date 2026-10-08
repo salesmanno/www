@@ -3,6 +3,7 @@ require_once __DIR__ . '/PortalCompanyService.php';
 require_once __DIR__ . '/PortalModuleTransitionPreview.php';
 require_once __DIR__ . '/PortalSubscriptionPricing.php';
 require_once __DIR__ . '/PortalSuperUserQuota.php';
+require_once __DIR__ . '/PortalSubscriptionCatalog.php';
 
 /** Read-only subscription setup: prepares estimates without a database cutover. */
 final class PortalSubscriptionPreview {
@@ -56,20 +57,12 @@ final class PortalSubscriptionPreview {
             if (!$issuer) throw new RuntimeException('Valgt abonnementsutsteder finnes ikke.');
             if (!(int)$issuer['is_active']) throw new RuntimeException('Valgt abonnementsutsteder er inaktiv.');
             unset($issuer['is_active']);
-            $columns = $this->db->query('SHOW COLUMNS FROM system_modules')->fetchAll(PDO::FETCH_COLUMN);
-            $priceColumns = ['price_monthly','price_setup','price_currency'];
-            $select = 'id,module_key,name,description';
-            foreach ($priceColumns as $column) {
-                $select .= in_array($column, $columns, true) ? ",`{$column}`" : ",NULL AS `{$column}`";
-            }
-            $modules = $this->db->query("SELECT {$select} FROM system_modules WHERE is_active=1 ORDER BY id" . $lock)->fetchAll(PDO::FETCH_ASSOC);
+            $catalogData = PortalSubscriptionCatalog::load($this->db, $withinWriteTransaction);
+            $modules = $catalogData['modules'];
             $catalog = array_column($modules, null, 'id');
             $byKey = [];
             foreach ($modules as $module) {
                 $key = $module['module_key'];
-                if (isset($byKey[$key]) || PortalModuleTransitionPreview::featureKeys($key) !== [$key]) {
-                    throw new RuntimeException('Modulkatalogen har ugyldige eller dupliserte modulnøkler.');
-                }
                 $byKey[$key] = $module['id'];
             }
             foreach ($moduleIds ?? [] as $id) {
@@ -100,7 +93,7 @@ final class PortalSubscriptionPreview {
                 $subscriptions = $subscriptionQuery->fetchAll(PDO::FETCH_ASSOC);
                 $subscription = count($subscriptions) === 1 ? $subscriptions[0] : null;
                 $existingIds = $legacyIds;
-                $initialIds = $legacyIds;
+                $initialIds = [];
                 $blockers = [];
                 $notes = [];
                 if (!(int)$company['is_active']) $blockers[] = 'Bedriften er inaktiv.';
@@ -125,18 +118,15 @@ final class PortalSubscriptionPreview {
                             sort($legacySorted, SORT_STRING);
                             $planUseQuery->execute([$subscription['plan_id']]);
                             $sharedPlan=(int)$planUseQuery->fetchColumn()>1;
-                            if (!$sharedPlan) {
-                                // The company's own plan is authoritative. Legacy
-                                // grants remain relevant for removal/history only,
-                                // not for selecting or pricing extra modules.
-                                $initialIds=$planIds;
-                                $existingIds=array_values(array_unique(array_merge($legacyIds,$planIds)));
-                            }
+                            // Features is authoritative even for shared plans.
+                            // Legacy rows are used only to reconcile removals and
+                            // avoid charging setup again for previously granted modules.
+                            $initialIds=$planIds;
+                            $existingIds=array_values(array_unique(array_merge($legacyIds,$planIds)));
                             if ($planIds !== $legacySorted) {
                                 $notes[]=$sharedPlan
-                                    ? 'Den delte planen avviker fra bedriftstilgangene. Bare bedriftens aktive moduler er forhåndsvalgt; valgt oppsett blir bedriftsspesifikt ved bekreftet lagring.'
+                                    ? 'Planens features bestemmer utvalget. Den delte planen kopieres til en bedriftsspesifikk plan og eldre tilganger samordnes ved bekreftet lagring.'
                                     : 'Eldre modultilganger avviker fra bedriftens egen plan. Prisene gjelder bare valgte moduler; tilgangene samordnes ved bekreftet lagring.';
-                                if ($selections===null) $blockers[] = 'Planens features og eksisterende modultilganger er ulike. Tilgangene må avklares før lagring.';
                             }
                         } catch (InvalidArgumentException | JsonException $e) {
                             $blockers[] = 'Planens features har ugyldig format.';
@@ -201,12 +191,12 @@ final class PortalSubscriptionPreview {
                 $quote['source_subscription'] = $subscription ? array_intersect_key($subscription, array_flip(['id','plan_id','self_company_id','status','billing_cycle','features','agreed_monthly','max_users','plan_setup_discount','plan_monthly_discount'])) : null;
                 $companies[] = $quote;
             }
-            $schemaReady = !array_diff($priceColumns, $columns);
+            $schemaReady = $catalogData['schema_ready'];
             $dateColumns=$this->db->query('SHOW COLUMNS FROM tenant_subscriptions')->fetchAll(PDO::FETCH_COLUMN);
             $datesReady=!array_diff(['subscription_start','due_date'],$dateColumns);
             $requiredTables = $this->db->query("SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
-                AND TABLE_NAME IN ('saas_subscription_plan_modules','saas_subscription_changes')")->fetchAll(PDO::FETCH_KEY_PAIR);
-            $saveSchemaReady = count($requiredTables) === 2 && !array_filter($requiredTables, static fn($value) => strcasecmp($value, 'InnoDB') !== 0);
+                AND TABLE_NAME='saas_subscription_changes'")->fetchAll(PDO::FETCH_KEY_PAIR);
+            $saveSchemaReady = count($requiredTables) === 1 && !array_filter($requiredTables, static fn($value) => strcasecmp($value, 'InnoDB') !== 0);
             if ($saveSchemaReady) {
                 $historyColumns = $this->db->query('SHOW COLUMNS FROM saas_subscription_changes')->fetchAll(PDO::FETCH_COLUMN);
                 $saveSchemaReady = !array_diff(['old_max_users','max_users','old_setup_discount','old_monthly_discount','plan_setup_discount','plan_monthly_discount'], $historyColumns);

@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   expect(!content.querySelector('input,button[type=submit]'),'Unexpected mutation control');
   const dialog=modal.querySelector('.modal-dialog').getBoundingClientRect();
   expect(dialog.left>=0&&dialog.right<=innerWidth+1,'Dialog overflows viewport');
-  expect(modal.querySelector('.modal-title').textContent.includes('tilgangsovergang'),'Modal title missing');
+  expect(modal.querySelector('.modal-title').textContent.includes('eldre tilganger'),'Modal title missing');
   fixtureFail=true;
   document.getElementById('moduleTransitionPreviewRefresh').click();
   await settle();

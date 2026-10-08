@@ -45,12 +45,6 @@ SET @plan_id_type = (
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='saas_subscription_plans'
       AND COLUMN_NAME='id' AND COLUMN_TYPE='char(36)'
 );
-SET @module_id_type = (
-    SELECT CONCAT('CHAR(36) CHARACTER SET ', CHARACTER_SET_NAME, ' COLLATE ', COLLATION_NAME)
-    FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_modules'
-      AND COLUMN_NAME='id' AND COLUMN_TYPE='char(36)'
-);
 SET @company_id_type = (
     SELECT CONCAT('CHAR(36) CHARACTER SET ', CHARACTER_SET_NAME, ' COLLATE ', COLLATION_NAME)
     FROM information_schema.COLUMNS
@@ -69,21 +63,6 @@ SET @actor_id_type = (
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='saas_admins'
       AND COLUMN_NAME='id' AND COLUMN_TYPE='char(36)'
 );
-
-SET @pricing_ddl = CONCAT(
-    'CREATE TABLE IF NOT EXISTS saas_subscription_plan_modules (',
-    'plan_id ', @plan_id_type, ' NOT NULL, ',
-    'module_id ', @module_id_type, ' NOT NULL, ',
-    'price_monthly DECIMAL(10,2) NULL, price_setup DECIMAL(10,2) NULL, ',
-    'price_currency CHAR(3) NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, ',
-    'PRIMARY KEY(plan_id,module_id), ',
-    'CONSTRAINT fk_subscription_pricing_plan FOREIGN KEY(plan_id) REFERENCES saas_subscription_plans(id) ON DELETE CASCADE, ',
-    'CONSTRAINT fk_subscription_pricing_module FOREIGN KEY(module_id) REFERENCES system_modules(id)',
-    ') ENGINE=InnoDB'
-);
-PREPARE subscription_pricing_migration FROM @pricing_ddl;
-EXECUTE subscription_pricing_migration;
-DEALLOCATE PREPARE subscription_pricing_migration;
 
 SET @history_ddl = CONCAT(
     'CREATE TABLE IF NOT EXISTS saas_subscription_changes (',

@@ -6,7 +6,8 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '../assets/company-billing.js'), 'utf8');
+const source = ['subscription-catalog.js', 'company-billing.js']
+    .map(file => fs.readFileSync(path.join(__dirname, '../assets', file), 'utf8')).join('\n');
 
 class MockElement {
     constructor(name = '', type = 'text', value = '') {
@@ -73,7 +74,10 @@ function makeHarness() {
         'subscriptionDueDate', 'subscriptionDueSave', 'subscriptionDueForm',
         'subscriptionDueCancel', 'subscriptionEditCountdown', 'subscriptionGross',
         'subscriptionDiscount', 'subscriptionDiscountAmount', 'subscriptionNet',
-        'subscriptionCycle', 'subscriptionStart', 'subscriptionDueDisplay', 'subscriptionDueCountdown'
+        'subscriptionCycle', 'subscriptionStart', 'subscriptionDueDisplay', 'subscriptionDueCountdown',
+        'subscriptionModules', 'subscriptionCatalogWarnings', 'subscriptionMaxUsers',
+        'subscriptionCatalogGross', 'subscriptionCatalogDiscount', 'subscriptionCatalogNet',
+        'subscriptionCatalogSetup', 'subscriptionCatalogSetupDiscount', 'subscriptionCatalogSetupNet'
     ];
     basicIds.forEach(id => { elements[id] = new MockElement(id); });
     Object.keys(gatewayFields).forEach(gateway => {
@@ -210,6 +214,41 @@ function subscription(overrides = {}) {
         ...overrides
     };
 }
+
+test('catalog shows only supplied feature modules, safe names, sums and quota separately from agreement', () => {
+    const app = makeHarness();
+    app.context.data = {can_edit: true, subscription: subscription({
+        monthly_net: '75.00', monthly_gross: null, monthly_discount_amount: null,
+        dates_schema_ready: true, max_users: 3,
+        modules: [{name: '<img onerror=alert(1)>', price_monthly: '100.00', price_setup: '200.00', price_currency: 'NOK'}],
+        catalog: {currency: 'NOK', monthly_gross: '100.00', monthly_discount_amount: '10.00',
+            monthly_net: '90.00', setup_gross: '200.00', setup_discount_amount: '50.00',
+            setup_net: '150.00', warnings: ['Katalogestimat er ikke avtalt pris.']}
+    })};
+    app.evaluate('billingRenderSubscription(data)');
+    assert.equal(app.elements.subscriptionModules.children.length, 1);
+    assert.equal(app.elements.subscriptionModules.children[0].children[0].textContent, '<img onerror=alert(1)>');
+    assert.match(app.elements.subscriptionCatalogNet.textContent, /90/);
+    assert.match(app.elements.subscriptionNet.textContent, /75/);
+    assert.equal(app.elements.subscriptionMaxUsers.textContent, '3');
+    assert.equal(app.elements.subscriptionDueUnlock.disabled, false);
+    assert.equal(app.elements.subscriptionCatalogWarnings.children.length, 1);
+});
+
+test('catalog refresh clears old modules and missing prices are not displayed as free', () => {
+    const app = makeHarness();
+    app.context.data = {subscription: subscription({
+        modules: [{name: 'Ukjent', price_monthly: null, price_setup: '0.00', price_currency: 'NOK'}],
+        catalog: {currency: 'NOK', monthly_gross: null, setup_gross: '0.00', warnings: []}
+    })};
+    app.evaluate('billingRenderSubscription(data)');
+    assert.equal(app.elements.subscriptionModules.children[0].children[1].textContent, 'Ukjent pris');
+    assert.equal(app.elements.subscriptionCatalogGross.textContent, 'Ukjent pris');
+    app.context.data.subscription.modules = [];
+    app.evaluate('billingRenderSubscription(data)');
+    assert.equal(app.elements.subscriptionModules.children.length, 1);
+    assert.match(app.elements.subscriptionModules.children[0].children[0].textContent, /Ingen moduler/);
+});
 
 test('due-date unlock requires both subscription permission and ready date schema', () => {
     const app = makeHarness();

@@ -572,7 +572,8 @@ function billingRenderSubscription(data) {
     billingSubscription = data.subscription || null;
     billingSubscriptionVersion = data.version ?? billingSubscription?.version ?? null;
     billingSubscriptionCanEdit = data.can_edit === true || data.can_edit === 1;
-    billingSubscriptionDatesReady = data.dates_schema_ready === true || data.dates_schema_ready === 1;
+    const datesReady = data.dates_schema_ready ?? billingSubscription?.dates_schema_ready;
+    billingSubscriptionDatesReady = datesReady === true || datesReady === 1;
     status.replaceChildren();
     details.hidden = true;
     billingSetDueUnlockAvailability();
@@ -585,13 +586,14 @@ function billingRenderSubscription(data) {
     }
 
     const subscription = billingSubscription;
+    billingRenderCatalog(subscription);
     const currency = subscription.currency;
     document.getElementById('subscriptionGross').textContent = billingMoney(subscription.monthly_gross, currency);
     document.getElementById('subscriptionDiscount').textContent =
         subscription.monthly_discount_percent === null || subscription.monthly_discount_percent === undefined
             ? 'Ikke oppgitt' : `${subscription.monthly_discount_percent} %`;
     document.getElementById('subscriptionDiscountAmount').textContent =
-        subscription.monthly_discount_amount == null ? 'Beløp ikke oppgitt' : billingMoney(subscription.monthly_discount_amount, currency);
+        subscription.monthly_discount_amount == null ? 'Historisk rabattgrunnlag er ukjent' : billingMoney(subscription.monthly_discount_amount, currency);
     document.getElementById('subscriptionNet').textContent = billingMoney(subscription.monthly_net, currency);
     document.getElementById('subscriptionCycle').textContent = subscription.billing_cycle || 'Ikke oppgitt';
     document.getElementById('subscriptionStart').textContent = billingDisplayDate(subscription.subscription_start);

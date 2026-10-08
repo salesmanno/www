@@ -87,7 +87,6 @@ den trenger ingen tilgang til databasen mens koden utvikles i Replit.
 
 Migreringen klargjør:
 
-- `saas_subscription_plan_modules`: bedriftens lagrede modulprisgrunnlag på planen.
 - `saas_subscription_changes`: varig historikk over bekreftet månedspris,
   engangsetablering og operasjonsnøkkel.
 - Manglende `max_users` og rabattkolonner på planen, samt tidligere/nye grenser
@@ -122,8 +121,33 @@ beregner på nytt og sammenligner med forhåndsvisningens hash.
 - Alle valgte bedrifter lagres i én transaksjon.
 - Ny innsending av samme bekreftelse returnerer tidligere lagringsresultat.
 
-Planens samlede månedspris er autoritativ. Modulprisgrunnlaget kan derfor
-avvike fra summen av en rabattert bedriftsavtale.
+Planens lagrede månedspris er den avtalte nettoprisen. Katalogprisene kan senere
+endres uten at dette endrer avtalen. Katalogestimat, katalograbatt og katalognetto
+vises derfor separat fra avtalt månedspris. Historisk brutto/rabattbeløp vises som
+ukjent når grunnlaget ikke er bevart; gjeldende katalogpriser brukes ikke til å
+fabrikere et historisk avtalegrunnlag, heller ikke ved 100 prosent rabatt.
+
+## Tabelloversikt og opprydding
+
+| Tabell | Ansvar |
+|---|---|
+| `system_modules` | Eneste katalog for modulnavn, månedspris, etableringspris og valuta. |
+| `saas_subscription_plans` | Bedriftens autoritative modulnøkler i `features`, avtalte månedspris, prosent-rabatter og `max_users`. En delt plan kopieres ved bekreftet bedriftsendring. |
+| `tenant_subscriptions` | Bedriftens kobling til planen og utstederen, status, betalingssyklus, start og forfall. |
+| `tenant_admin_modules` | Firmabrukerens egne tildelinger, begrenset av bedriftens features. |
+| `tenant_company_modules` | Eldre kompatibilitetsrader som speiles ved bekreftet lagring. De gir aldri tilgang utover features og brukes ikke til å forhåndsvelge ekstra moduler. Historiske rader kan brukes til å unngå ny etablering på tidligere tildelte moduler. |
+| `saas_subscription_changes` | Historikk over bekreftede endringer og operasjonsnøkler som hindrer dobbel registrering. Ikke en kilde for aktive katalogpriser. |
+
+`saas_subscription_plan_modules` er ikke lenger nødvendig. Ingen portalforespørsel
+leser, skriver eller krever den, og hverken SQL- eller PHP-migreringen oppretter den.
+En allerede installert tabell beholdes **helt urørt**. Ikke slett den som del av
+denne migreringen: senere fysisk opprydding krever backup, kontroll av andre
+applikasjoners avhengigheter og uttrykkelig godkjenning. Historiske priser i den
+kan eksporteres før eventuell separat sletting.
+
+Gamle bulk-endepunkter bruker samme bekreftede abonnementsflyt; enkelt-toggling
+av bedriftstilganger avvises. Den uavhengige additive tildelingsmetoden er fjernet.
+Ingen migrering eller endring i faktiske data skjer ved oppstart eller lesing.
 
 ## Rabatter
 

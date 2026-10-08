@@ -35,62 +35,6 @@ class PortalCompanyService {
         }
     }
 
-    public function grantModules($companyIds, $moduleIds, string $actor): int {
-        $companyIds = self::ids($companyIds);
-        $moduleIds = self::ids($moduleIds);
-        if (count($companyIds) * count($moduleIds) > 5000) {
-            throw new InvalidArgumentException('For mange modultildelinger samtidig. Velg færre bedrifter eller moduler.');
-        }
-        $this->requireTransactional(['tenant_companies', 'system_modules', 'tenant_company_modules']);
-        $columns = $this->columns('tenant_company_modules');
-        $this->db->beginTransaction();
-        try {
-            $company = $this->db->prepare('SELECT id FROM tenant_companies WHERE id = ? FOR UPDATE');
-            foreach ($companyIds as $id) {
-                $company->execute([$id]);
-                if (!$company->fetchColumn()) throw new InvalidArgumentException('En valgt bedrift finnes ikke lenger.');
-            }
-            $module = $this->db->prepare('SELECT id FROM system_modules WHERE id = ? AND is_active = 1 FOR UPDATE');
-            foreach ($moduleIds as $id) {
-                $module->execute([$id]);
-                if (!$module->fetchColumn()) throw new InvalidArgumentException('En valgt modul er ikke tilgjengelig.');
-            }
-            $exists = $this->db->prepare('SELECT is_active FROM tenant_company_modules WHERE company_id = ? AND module_id = ? FOR UPDATE');
-            $changed = 0;
-            foreach ($companyIds as $companyId) {
-                foreach ($moduleIds as $moduleId) {
-                    $exists->execute([$companyId, $moduleId]);
-                    $current = $exists->fetch(PDO::FETCH_ASSOC);
-                    if ($current && (int)$current['is_active'] === 1) continue;
-                    $values = ['is_active' => 1];
-                    if (in_array('assigned_by', $columns, true)) $values['assigned_by'] = $actor;
-                    foreach (['activated_at', 'granted_at'] as $timeColumn) {
-                        if (in_array($timeColumn, $columns, true)) $values[$timeColumn] = date('Y-m-d H:i:s');
-                    }
-                    if ($current) {
-                        $assignments = implode(', ', array_map(static fn($key) => "`{$key}` = ?", array_keys($values)));
-                        $stmt = $this->db->prepare("UPDATE tenant_company_modules SET {$assignments} WHERE company_id = ? AND module_id = ?");
-                        $stmt->execute(array_merge(array_values($values), [$companyId, $moduleId]));
-                    } else {
-                        $values['company_id'] = $companyId;
-                        $values['module_id'] = $moduleId;
-                        if (in_array('id', $columns, true)) $values['id'] = bin2hex(random_bytes(18));
-                        $names = '`' . implode('`, `', array_keys($values)) . '`';
-                        $marks = implode(',', array_fill(0, count($values), '?'));
-                        $stmt = $this->db->prepare("INSERT INTO tenant_company_modules ({$names}) VALUES ({$marks})");
-                        $stmt->execute(array_values($values));
-                    }
-                    $changed++;
-                }
-            }
-            $this->db->commit();
-            return $changed;
-        } catch (Throwable $e) {
-            if ($this->db->inTransaction()) $this->db->rollBack();
-            throw $e;
-        }
-    }
-
     private function company(string $companyId, bool $lock = false): void {
         if ($companyId === '' || strlen($companyId) > 36) throw new InvalidArgumentException('Ugyldig bedrift.');
         $stmt = $this->db->prepare('SELECT id FROM tenant_companies WHERE id = ?' . ($lock ? ' FOR UPDATE' : ''));

@@ -14,7 +14,7 @@ final class SubscriptionPricingSchema {
         $column = $db->prepare('SELECT COLUMN_TYPE,CHARACTER_SET_NAME,COLLATION_NAME FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
         $types = [];
-        foreach (['saas_subscription_plans','system_modules','tenant_companies','tenant_subscriptions','saas_admins'] as $table) {
+        foreach (['saas_subscription_plans','tenant_companies','tenant_subscriptions','saas_admins'] as $table) {
             $column->execute([$table,'id']);
             $meta = $column->fetch(PDO::FETCH_ASSOC);
             if (!$meta || strtolower($meta['COLUMN_TYPE']) !== 'char(36)' ||
@@ -25,21 +25,9 @@ final class SubscriptionPricingSchema {
             $types[$table] = "CHAR(36) CHARACTER SET {$meta['CHARACTER_SET_NAME']} COLLATE {$meta['COLLATION_NAME']}";
         }
         $plan = $types['saas_subscription_plans'];
-        $module = $types['system_modules'];
         $company = $types['tenant_companies'];
         $subscription = $types['tenant_subscriptions'];
         $actor = $types['saas_admins'];
-        $db->exec("CREATE TABLE IF NOT EXISTS saas_subscription_plan_modules (
-            plan_id {$plan} NOT NULL,
-            module_id {$module} NOT NULL,
-            price_monthly DECIMAL(10,2) NULL,
-            price_setup DECIMAL(10,2) NULL,
-            price_currency CHAR(3) NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY(plan_id,module_id),
-            CONSTRAINT fk_subscription_pricing_plan FOREIGN KEY(plan_id) REFERENCES saas_subscription_plans(id) ON DELETE CASCADE,
-            CONSTRAINT fk_subscription_pricing_module FOREIGN KEY(module_id) REFERENCES system_modules(id)
-        ) ENGINE=InnoDB");
         $db->exec("CREATE TABLE IF NOT EXISTS saas_subscription_changes (
             id CHAR(36) NOT NULL PRIMARY KEY,
             operation_key CHAR(64) NOT NULL,

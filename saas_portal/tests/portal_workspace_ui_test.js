@@ -73,11 +73,17 @@ window.fetch = async (input, options = {}) => {
   if (fixtureFailGrant) {data={success:false,message:'Forhåndsvisning utilgjengelig'};status=503;}
   else data={success:true,read_only:true,apply_available:false,price_schema_ready:true,issuer:{id:'issuer',name:'Salesman'},warnings:[],
    modules:fixtureModules.map(module=>({...module,module_key:module.id==='module-existing'?'customers':'quotes',price_monthly:'10.00',price_setup:'20.00',price_currency:'NOK'})),
-   companies:body.company_ids.map(id=>({company_id:id,name:id,existing_module_ids:['module-existing'],module_ids:body.selections?.[id]?.module_ids||['module-existing'],
-    new_module_ids:body.selections?.[id]?.module_ids?.filter(module=>module!=='module-existing')||[],removed_module_ids:[],
-    monthly_total:'20.00',proposed_monthly:'20.00',setup_total:'20.00',selected_setup_total:'40.00',selected_setup_net_total:'40.00',setup_gross_total:'20.00',
+   companies:body.company_ids.map(id=>{
+    const selected=body.selections?.[id]?.module_ids||['module-existing'];
+    const added=selected.filter(module=>module!=='module-existing');
+    return {company_id:id,name:id,existing_module_ids:['module-existing'],module_ids:selected,
+    new_module_ids:added,removed_module_ids:selected.includes('module-existing')?[]:['module-existing'],
+    monthly_total:(selected.length*10).toFixed(2),proposed_monthly:(selected.length*10).toFixed(2),
+    setup_total:(added.length*20).toFixed(2),selected_setup_total:(selected.length*20).toFixed(2),
+    selected_setup_net_total:(selected.length*20).toFixed(2),setup_gross_total:(added.length*20).toFixed(2),
     monthly_discount_amount:'0.00',setup_discount_amount:'0.00',plan_setup_discount:'0.00',plan_monthly_discount:'0.00',
-    max_users:10,active_users:1,currency:'NOK',missing_prices:[],blockers:[],subscription:null}))};
+    max_users:10,active_users:1,currency:'NOK',missing_prices:[],blockers:[],subscription:null};
+   })};
  }
  else if (url.pathname.endsWith('/delete_admin.php')) {
   fixtureAdmins=fixtureAdmins.filter(account => account.admin_id !== body.admin_id);
@@ -99,13 +105,26 @@ window.fetch = async (input, options = {}) => {
     else data.seo=seoSnapshot;
     } else if (fixtureFailSeo) { data={success:false,error_code:'database_unavailable',request_id:'abcd123456ef',message:'Databasen er midlertidig utilgjengelig. Lagringen kunne ikke bekreftes. Feilreferanse: abcd123456ef'}; status=503; }
    else { fixtureSeo={seo_title:body.seo_title,seo_description:body.seo_description,seo_keywords:body.seo_keywords,canonical_url:body.canonical_url}; data.message='SEO-innstillinger lagret.'; }
+ } else if (url.pathname.endsWith('/company_subscription.php')) {
+   data.can_edit=true;
+   data.subscription={id:'S1',status:'active',billing_cycle:'monthly',currency:'NOK',
+    monthly_net:'150.00',monthly_gross:null,monthly_discount_percent:'10.00',monthly_discount_amount:null,
+    max_users:4,subscription_start:'2026-10-01',due_date:'2026-11-01',today:'2026-10-30',
+    days_until_due:2,dates_schema_ready:true,version:'fixture',
+    modules:[{id:'M1',name:'Arrangement',price_monthly:'1750.00',price_setup:'500.00',price_currency:'NOK'},
+      {id:'M2',name:'Salg <tekst>',price_monthly:'50.00',price_setup:'25.00',price_currency:'NOK'}],
+    catalog:{currency:'NOK',monthly_gross:'1800.00',monthly_discount_amount:'180.00',monthly_net:'1620.00',
+      setup_gross:'525.00',setup_discount_amount:'0.00',setup_net:'525.00',warnings:[]}};
  } else if (url.pathname.endsWith('/get_email_config.php')) {
-   data.config={smtp_host:'smtp.example.test',smtp_port:587,smtp_username:'sender',smtp_from_email:'sender@example.test',smtp_from_name:'Sender',imap_host:'imap.example.test',imap_port:993,imap_username:'sender'};
-   data.credentials_readonly=true; data.notice='Hentes fra email_configs. Eksisterende passord beholdes.';
+   data.config={configuration_id:'mail-1',smtp_host:'smtp.example.test',smtp_port:587,smtp_username:'sender',smtp_from_email:'sender@example.test',smtp_from_name:'Sender',imap_host:'imap.example.test',imap_port:993,imap_username:'sender'};
+   data.configs=[{configuration_id:'mail-1'}]; data.can_edit=true; data.version=1;
+   data.credentials_readonly=false; data.encrypted_credentials_ready=false;
+   data.notice='Hentes fra email_configs. Eksisterende passord beholdes.';
    if (window.fixtureSettingsOutage) {status=503;data={success:false,message:'Databasen er midlertidig utilgjengelig. Feilreferanse: settings-fixture'};}
  } else if (url.pathname.endsWith('/get_payment_gateways.php')) {
    data.gateways=[{gateway_name:'vipps',display_name:'Custom Vipps',is_active:1,test_mode:1,vipps_client_id:'fixture-client',vipps_merchant_serial_number:'fixture-merchant'}];
-   data.credentials_readonly=true; data.notice='Eksisterende hemmelige nøkler beholdes.';
+   data.can_edit=true; data.version=1; data.credentials_readonly=false;
+   data.encrypted_credentials_ready=false; data.notice='Eksisterende hemmelige nøkler beholdes.';
    if (window.fixtureSettingsOutage) {status=503;data={success:false,message:'Databasen er midlertidig utilgjengelig. Feilreferanse: settings-fixture'};}
  }
  return {ok:status===200,status,json:async()=>data,text:async()=>JSON.stringify(data),headers:{get:()=> 'application/json'}};
@@ -114,8 +133,20 @@ window.fetch = async (input, options = {}) => {
 // Preview changes debounce at 280ms; settle just beyond that rather than
 // spending most of Chromium's virtual-time budget sleeping between actions.
 const settle = () => new Promise(resolve => setTimeout(resolve, 320));
+async function waitForFixture(predicate, message) {
+ for (let attempt=0; attempt<50; attempt++) {
+  if(predicate()) return;
+  await new Promise(resolve=>setTimeout(resolve,50));
+ }
+ throw new Error(message+'; status='+document.getElementById('companyGrantStatus')?.textContent+'; errors='+fixtureErrors.join('; '));
+}
 function expect(value, message) { if (!value) throw new Error(message); }
-function same(actual, expected, message) { expect(JSON.stringify(actual)===JSON.stringify(expected), message+'; received '+JSON.stringify(actual)); }
+function stableFixture(value) {
+ if(Array.isArray(value)) return value.map(stableFixture);
+ if(value && typeof value==='object') return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stableFixture(value[key])]));
+ return value;
+}
+function same(actual, expected, message) { expect(JSON.stringify(stableFixture(actual))===JSON.stringify(stableFixture(expected)), message+'; received '+JSON.stringify(actual)); }
 function lastRequest(endpoint) { return fixtureRequests.filter(request=>request.path.endsWith('/'+endpoint)).at(-1); }
 function action(root,label) { return Array.from(root.querySelectorAll('button')).find(button=>button.textContent.trim()===label); }
 function change(input,checked) { input.checked=checked; input.dispatchEvent(new Event('change',{bubbles:true})); }
@@ -141,6 +172,7 @@ expect(document.querySelectorAll('.company-card.selected').length===2,'Polling e
 document.getElementById('grantConfirmButton').click(); await settle();
 expect(document.getElementById('companyGrantModal').classList.contains('show'),'Grant confirmation modal did not open');
 expect(document.getElementById('companyGrantSubmit').disabled,'Grant enabled without a module selection');
+await waitForFixture(()=>document.querySelector('#companyGrantAvailable button'), 'Module editor did not finish opening');
 document.querySelector('#companyGrantAvailable button').click();
 fixtureFailGrant=true;
 await settle();
@@ -163,7 +195,7 @@ expect(document.querySelector('.company-identity').tagName==='A','Company naviga
 const terminate=document.querySelector('#activeSessionsPanel button');
 expect(document.querySelectorAll('#activeSessionsPanel .session-row').length===2,'Active sessions missing');
 terminate.click(); await settle();
-same(lastRequest('logout_user.php').payload,{admin_id:'admin-linked',session_id:'session-one',csrf_token:'fixture-csrf'},'Session termination was not targeted');
+same(lastRequest('logout_user.php').payload,{admin_id:'admin-linked',session_id:'session-one',identity_kind:'tenant',csrf_token:'fixture-csrf'},'Session termination was not targeted');
 expect(document.querySelectorAll('#activeSessionsPanel .session-row').length===1,'Terminating one session erased the other session');
 expect(fixtureSessions[0].session_id==='session-two','Wrong session terminated');
 checkNoOverflow();
@@ -192,6 +224,7 @@ action(linked,'Tildel moduler').click(); await settle();
 expect(lastRequest('get_admin_modules.php').search.includes('admin_id=admin-linked'),'Module action uses wrong account');
 expect(document.getElementById('adminModulesModal').classList.contains('show'),'Account module modal missing');
 change(document.querySelector('#adminModulesCheckboxes input[value="module-new"]'),true);
+await waitForFixture(()=>bootstrap.Modal.getInstance(document.getElementById('adminModulesModal'))?._isTransitioning===false,'Account module dialog still opening');
 document.getElementById('saveAdminModulesButton').click(); await settle();
 expect(!document.getElementById('adminModulesModal').classList.contains('show'),'Successful module save did not close modal');
 same(lastRequest('update_admin_modules.php').payload,{admin_id:'admin-linked',module_ids:['module-existing','module-new'],csrf_token:'fixture-csrf'},'Account module assignment payload incorrect');
@@ -304,33 +337,31 @@ expect(document.getElementById('smtp_from_email').value==='sender@example.test',
 expect(document.getElementById('smtp_password').disabled && document.getElementById('smtp_encryption').disabled,'Unsupported credential edits enabled');
 document.getElementById('smtp_from_name').value='Updated Sender';
 saveEmailConfig(); await settle();
-expect(lastRequest('save_email_config.php').payload.csrf_token==='fixture-csrf','Email save missing CSRF');
-expect(!('smtp_password' in lastRequest('save_email_config.php').payload),'Email password sent');
+expect(!lastRequest('save_email_config.php'),'Locked email form sent a write');
 connectEmail(); await settle();
-expect(lastRequest('connect_email.php').payload.csrf_token==='fixture-csrf','Email activation missing CSRF');
+expect(!lastRequest('connect_email.php'),'Locked email form activated an account');
 window.fixtureSettingsOutage=true;
 await loadEmailConfig(); await settle();
-expect(document.getElementById('smtp_from_name').value==='Updated Sender','Failed email read erased edited input');
+expect(document.getElementById('smtp_from_name').value!=='Updated Sender','Tampered locked email field survived reload');
 expect(document.getElementById('smtp_host').disabled,'Failed email read left save enabled');
 expect(document.getElementById('emailConfigStatus').textContent.includes('settings-fixture'),'Email failure reference invisible');
 window.fixtureSettingsOutage=false;
 await loadEmailConfig(); await settle();
-expect(!document.getElementById('smtp_host').disabled,'Email recovery failed');
+expect(document.getElementById('smtp_host').value==='smtp.example.test' && document.getElementById('smtp_host').disabled,'Email recovery failed or unlocked editing');
 document.getElementById('payment-tab').click(); await settle();
 expect(document.getElementById('vipps_client_id').value==='fixture-client','Linked payment config did not load');
 expect(document.getElementById('vipps_subscription_key').disabled,'Payment secret editable');
 expect(document.getElementById('stripe_public_key').disabled,'Missing gateway allowed editing');
 document.getElementById('vipps_client_id').value='updated-client';
 savePaymentGateway('vipps'); await settle();
-expect(lastRequest('save_payment_gateway.php').payload.csrf_token==='fixture-csrf','Payment save missing CSRF');
-expect(!('vipps_subscription_key' in lastRequest('save_payment_gateway.php').payload),'Payment secret sent');
+expect(!lastRequest('save_payment_gateway.php'),'Locked payment form sent a write');
 window.fixtureSettingsOutage=true;
 await loadPaymentGateways(); await settle();
 expect(document.getElementById('vipps_client_id').value==='updated-client','Failed payment read erased input');
 expect(document.getElementById('vipps_client_id').disabled,'Failed payment read allowed saving');
 window.fixtureSettingsOutage=false;
 await loadPaymentGateways(); await settle();
-expect(document.getElementById('vipps_client_id').value==='fixture-client' && !document.getElementById('vipps_client_id').disabled,'Payment recovery failed');
+expect(document.getElementById('vipps_client_id').value==='fixture-client' && document.getElementById('vipps_client_id').disabled,'Payment recovery failed or unlocked editing');
 document.getElementById('email-tab').click(); await settle();
 fixtureFailStaff=true;
 await loadStaff();
@@ -339,8 +370,18 @@ expect(!document.querySelector('.staff-details').hidden,'Staff failure erased ex
 fixtureFailStaff=false;
 await loadStaff();
 expect(!document.getElementById('staffLoadStatus').textContent,'Staff recovery left error');
+document.getElementById('subscription-tab').click(); await settle();
+expect(!document.getElementById('subscriptionDetails').hidden,'Subscription summary missing');
+expect(document.querySelectorAll('#subscriptionModules tr').length===2,'Feature module rows missing');
+expect(document.querySelector('#subscriptionModules tr:nth-child(2) td').textContent==='Salg <tekst>','Module name unsafe or wrong');
+expect(!document.querySelector('#subscriptionModules tekst'),'Module markup injected');
+expect(document.getElementById('subscriptionNet').textContent===billingMoney('150.00','NOK'),'Agreement replaced by catalog');
+expect(document.getElementById('subscriptionCatalogNet').textContent===billingMoney('1620.00','NOK'),'Catalog total wrong');
+expect(document.getElementById('subscriptionMaxUsers').textContent==='4','Quota missing');
+expect(!document.getElementById('subscriptionDueUnlock').disabled,'Nested date readiness not handled');
+expect(document.getElementById('subscriptionDueCountdown').textContent==='2 dager til forfall','Countdown wrong');
 checkNoOverflow();
- document.body.dataset.checks='inline employee/account expansion, account email, legacy account, refresh persistence, modules payload, user-only deletion, linked SuperUser/tampered email/guard, SEO GET failure/retry/malformed response, deduplication/stale guard, disabled pending fields, four-field save/error/empty round-trip, canonical URL and Unicode limits, staff failure/recovery';
+ document.body.dataset.checks='employee/accounts, safe module rows and current catalog totals versus agreement, nested due-date readiness, quotas, dates, payment/email restrictions, SEO and staff recovery';
 `;
 
 function fixture(page, bootstrapCss, bootstrapJs) {
@@ -366,7 +407,10 @@ function fixture(page, bootstrapCss, bootstrapJs) {
         throw new Error('Unexpected script: ' + url);
     });
     source = source.replace('<head>', `<head><base href="https://fixture.invalid/"><style>${bootstrapCss}</style><script>${setup}</script>`);
-    source = source.replace('</head>', `<style>${read('assets/portal-workspace.css')}</style></head>`);
+    // These fixtures verify behavior/layout, not Bootstrap animation timing.
+    source = source.replace('</head>', `<style>${read('assets/portal-workspace.css')}
+        .fade,.modal-dialog {transition:none!important;animation:none!important}
+    </style></head>`);
     const assertions = page === 'dashboard' ? dashboardAssertions : companyAssertions;
     source = source.replace('</body>', `<script>
 document.addEventListener('DOMContentLoaded', async () => {

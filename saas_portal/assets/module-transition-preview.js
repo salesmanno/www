@@ -22,10 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             content.replaceChildren();
             portalText(content, 'p',
-                `${report.summary.ready_company_count} av ${report.summary.company_count} bedrifter har tilknytninger klare for en kontrollert overgang.`,
+                `${report.summary.ready_company_count} av ${report.summary.company_count} bedrifter har eldre tilknytninger klare for gjennomgang.`,
                 'fw-semibold');
             portalText(content, 'p',
-                'Forslaget bevarer dagens aktive moduler. Opphevede tildelinger og deaktiverte moduler gjenåpnes ikke. Priser, abonnementsperioder, status og utsteder skal ikke endres.',
+                'Dette er en skrivebeskyttet kontroll av eldre tilgangsrader, ikke bedriftens aktive modulvalg. Planens features bestemmer tilgangen. Endringer gjøres bare gjennom bekreftet abonnementsoppsett; ingen priser, kontoer eller tilganger endres her.',
                 'small text-muted');
             const actions = {
                 create_dedicated_plan: 'Opprett bedriftsspesifikk plan',
@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 portalText(card, 'p', actions[company.proposed_action] || 'Krever avklaring', 'small mb-1');
                 if (!company.is_active) portalText(card, 'p', 'Bedriften er inaktiv og forblir inaktiv.', 'small text-muted');
                 portalText(card, 'p', company.module_names.length
-                    ? 'Aktive moduler: ' + company.module_names.join(', ')
-                    : 'Ingen aktive moduler å overføre.', 'small mb-1');
+                    ? 'Eldre aktive modulrader: ' + company.module_names.join(', ')
+                    : 'Ingen eldre aktive modulrader.', 'small mb-1');
                 if (company.proposed_features) portalText(card, 'code', company.proposed_features, 'd-block text-break small mb-2');
                 if (company.excluded_grant_count) portalText(card, 'p',
                     `${company.excluded_grant_count} opphevede eller inaktive tildelinger holdes utenfor.`, 'small text-muted');

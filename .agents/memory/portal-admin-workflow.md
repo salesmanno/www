@@ -47,6 +47,12 @@ Prisene i modulkatalogen er standardpriser, ikke en tillatelse til å endre eksi
 
 **How to apply:** Skill katalogestimat fra gjeldende avtale i visningen. Krev en uttrykkelig avklaring før eksisterende avtalte priser erstattes ved senere lagring.
 
+Ikke innfør kopier av katalogens modulpriser i egne plantabeller uten et uttrykkelig nytt behov og godkjenning.
+
+**Why:** Brukeren reagerte på dupliserte priser og ønsket opprydding fremfor flere tabeller. Dagens katalogpris og en tidligere avtalt nettopris er forskjellige opplysninger; dagens katalog kan ikke dokumentere historisk brutto eller rabattbeløp.
+
+**How to apply:** Behold ett kataloggrunnlag, vis katalogestimat adskilt fra lagret avtale, og marker manglende historisk prisgrunnlag som ukjent. Fysisk sletting av gamle tabeller er et separat, godkjent arbeid etter backup og kontroll av andre applikasjoners avhengigheter.
+
 Utvikling av abonnementsoppsett skal utføres programmatisk uten å være avhengig av tilgang til den faktiske databasen.
 
 **Why:** Brukeren presiserte «du trenger IKKE databasetilkobling for å utføre arbeidet, gjør det programmatisk uten å være avhengig av databasens tilgang».

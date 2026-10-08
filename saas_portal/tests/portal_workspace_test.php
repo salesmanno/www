@@ -26,20 +26,9 @@ try {
     $db->exec('CREATE TABLE tenant_admins (id CHAR(36) PRIMARY KEY, username VARCHAR(255), is_active BOOLEAN) ENGINE=InnoDB');
     $db->exec("INSERT INTO tenant_admins VALUES ('user','User',1)");
     $service = new PortalCompanyService($db);
-    expectPortal($service->grantModules(['A','B'], ['sales'], 'operator') === 2, 'Bulk grants');
-    expectPortal($service->grantModules(['A'], ['sales','rent'], 'operator') === 1, 'Additive grants');
-    expectPortal($service->grantModules(['A'], ['sales'], 'operator') === 0, 'Idempotent grants');
-    expectPortal($db->query("SELECT COUNT(*) FROM tenant_company_modules WHERE company_id='B'")->fetchColumn() == 1, 'Other company changed');
-    rejectPortal(fn() => $service->grantModules(['A'], ['off'], 'operator'));
-    rejectPortal(fn() => $service->grantModules(['A','missing'], ['rent'], 'operator'));
-    rejectPortal(fn() => $service->grantModules([], ['rent'], 'operator'));
-    $db->exec("CREATE TRIGGER reject_rent BEFORE INSERT ON tenant_company_modules FOR EACH ROW BEGIN IF NEW.company_id='B' AND NEW.module_id='rent' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test'; END IF; END");
-    $db->exec("UPDATE tenant_company_modules SET is_active=0 WHERE company_id='A' AND module_id='rent'");
-    rejectPortal(fn() => $service->grantModules(['A','B'], ['rent'], 'operator'));
-    expectPortal($db->query("SELECT is_active FROM tenant_company_modules WHERE company_id='A' AND module_id='rent'")->fetchColumn() == 0, 'Partial grant not rolled back');
-    $db->exec('DROP TRIGGER reject_rent');
-    $db->exec('ALTER TABLE tenant_company_modules CHANGE activated_at granted_at DATETIME');
-    expectPortal($service->grantModules(['A','B'], ['rent'], 'operator') === 2, 'Alternate timestamp layout');
+    expectPortal(!method_exists($service,'grantModules'), 'Unsafe independent grant writer remains');
+    expectPortal(str_contains(file_get_contents(__DIR__.'/../api/grant_company_modules.php'), "require __DIR__ . '/save_company_subscription.php'"), 'Legacy grant route bypasses confirmed subscription flow');
+    expectPortal(str_contains(file_get_contents(__DIR__.'/../api/toggle_company_module.php'), 'portalReply(409'), 'Legacy toggle still grants modules');
     // Match repository snapshot's module scope, required fields and foreign keys.
     $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) NOT NULL, module_id CHAR(36) NOT NULL, created_by CHAR(36) NOT NULL, seo_title VARCHAR(255), seo_description TEXT, seo_keywords TEXT, canonical_url VARCHAR(500), UNIQUE(company_id,module_id), FOREIGN KEY(company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE, FOREIGN KEY(module_id) REFERENCES system_modules(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES tenant_admins(id)) ENGINE=InnoDB');
     $db->exec("INSERT INTO tenant_website_config VALUES ('sales-config','A','sales','user','Sales SEO','Keep sales','sales','https://example.test/sales'),('rent-config','A','rent','user','Rental SEO','Keep rental','rent','https://example.test/rent')");
@@ -140,7 +129,7 @@ try {
     revokeTenantPhpSession('portalsession');
     expectPortal(isset($_SESSION['saas_admin_id']) && !isset($_SESSION['tenant_admin_id']), 'Same-browser tenant logout lost SaaS login');
     session_write_close();
-    echo "PASS bulk grants, rollback, schema variants, SEO preservation, scoped historical activity and actual session revocation.\n";
+    echo "PASS unified module write routes, SEO preservation, scoped historical activity and actual session revocation.\n";
 } finally {
     if ($db->inTransaction()) $db->rollBack();
     $db->exec("DROP DATABASE {$schema}");

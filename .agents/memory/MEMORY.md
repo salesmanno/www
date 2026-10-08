@@ -1,6 +1,6 @@
 - [Active-schema drift](active-schema-drift.md) — uploaded SQL dumps are not authoritative for which optional modules exist in the active database.
 - [Brønnøysund import scope](brreg-import-scope.md) — add missing registered role holders only; preserve manual employees and keep login accounts separate.
 - [Linked employee email](linked-employee-email.md) — require a coordinated account-email flow before unlocking email edits for staff with admin accounts.
-- [Portal administration](portal-admin-workflow.md) — shared activity/session overview, employee-linked accounts and additive company-module grants.
+- [Portal administration](portal-admin-workflow.md) — shared activity/sessions, employee-linked accounts, editable module selections and catalog versus agreement prices.
 - [Gratis arrangementer](event-pricing-policy.md) — ordinærpris 0 uten alternative priser skal tillate reservasjon uten betalingskrav.
 - [Isolated MySQL tests](isolated-mysql-tests.md) — --no-defaults does not exclude connection environment variables; force a fixture socket and an environment allowlist.

@@ -800,11 +800,35 @@ if (!$company) {
                     <div id="subscriptionStatus" role="status" aria-live="polite"><div class="portal-skeleton" aria-label="Laster abonnement"></div></div>
                     <div id="subscriptionDetails" hidden>
                         <div class="row g-3 mb-4">
-                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Brutto per måned</div><div class="fs-5 fw-semibold mt-1" id="subscriptionGross">—</div></div></div>
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Historisk avtalegrunnlag, brutto</div><div class="fs-5 fw-semibold mt-1" id="subscriptionGross">—</div></div></div>
                             <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Rabatt</div><div class="fs-5 fw-semibold mt-1" id="subscriptionDiscount">—</div><div class="small text-muted" id="subscriptionDiscountAmount"></div></div></div>
-                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Netto per måned</div><div class="fs-5 fw-semibold mt-1" id="subscriptionNet">—</div></div></div>
+                            <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Avtalt månedspris, netto</div><div class="fs-5 fw-semibold mt-1" id="subscriptionNet">—</div></div></div>
                             <div class="col-sm-6 col-lg-3"><div class="portal-panel h-100"><div class="small text-muted">Betalingssyklus</div><div class="fs-5 fw-semibold mt-1" id="subscriptionCycle">—</div></div></div>
                         </div>
+                        <section class="portal-panel mb-4" aria-labelledby="subscriptionCatalogTitle">
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                                <h4 class="h6" id="subscriptionCatalogTitle">Valgte moduler og gjeldende katalogpriser</h4>
+                                <span class="small">Maks. SuperUsers: <strong id="subscriptionMaxUsers">—</strong></span>
+                            </div>
+                            <p class="small text-muted">Prisene under er dagens katalogpriser. De endrer ikke avtalt månedspris før et nytt oppsett bekreftes og lagres.</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <caption class="visually-hidden">Modulene i bedriftens features og deres gjeldende måneds- og etableringspriser.</caption>
+                                    <thead><tr><th scope="col">Modul</th><th scope="col">Per måned</th><th scope="col">Etablering</th></tr></thead>
+                                    <tbody id="subscriptionModules"></tbody>
+                                </table>
+                            </div>
+                            <div id="subscriptionCatalogWarnings" role="status"></div>
+                            <dl class="row small mb-0">
+                                <dt class="col-sm-7">Katalogestimat per måned, brutto</dt><dd class="col-sm-5" id="subscriptionCatalogGross">—</dd>
+                                <dt class="col-sm-7">Månedsrabatt på katalogestimat</dt><dd class="col-sm-5" id="subscriptionCatalogDiscount">—</dd>
+                                <dt class="col-sm-7">Katalogestimat per måned, netto</dt><dd class="col-sm-5 fw-semibold" id="subscriptionCatalogNet">—</dd>
+                                <dt class="col-sm-7">Etableringsverdi for hele utvalget, brutto</dt><dd class="col-sm-5" id="subscriptionCatalogSetup">—</dd>
+                                <dt class="col-sm-7">Etableringsrabatt på katalogestimat</dt><dd class="col-sm-5" id="subscriptionCatalogSetupDiscount">—</dd>
+                                <dt class="col-sm-7">Etableringsverdi for hele utvalget, netto</dt><dd class="col-sm-5" id="subscriptionCatalogSetupNet">—</dd>
+                            </dl>
+                            <p class="small text-muted mb-0">Etableringsverdien er ikke et nytt betalingskrav. Ved endring beregnes ny etablering bare for moduler som legges til.</p>
+                        </section>
                         <div class="portal-panel">
                             <h4 class="h6 mb-3">Avtaledatoer</h4>
                             <dl class="row mb-0">
@@ -1482,6 +1506,7 @@ if (!$company) {
         // Initial loading is coordinated by company-workspace.js.
     </script>
     <script src="/saas_portal/assets/company-email.js"></script>
+    <script src="/saas_portal/assets/subscription-catalog.js"></script>
     <script src="/saas_portal/assets/company-billing.js"></script>
     <script src="/saas_portal/assets/brreg-staff-import.js"></script>
 </body>

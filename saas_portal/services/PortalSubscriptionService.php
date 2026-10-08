@@ -52,9 +52,9 @@ final class PortalSubscriptionService {
         if (count($companyIds)*count($moduleIds ?? []) > 5000) throw new InvalidArgumentException('For mange tildelinger samtidig.');
         if ($this->db->inTransaction()) throw new RuntimeException('Lagring krever en egen transaksjon.');
         $operation = hash('sha256', json_encode([$actor,$companyIds,$moduleIds,$selections,$quoteHash], JSON_THROW_ON_ERROR));
-        // No DDL here: both pricing tables must have been installed explicitly.
+        // No DDL here: history and agreement columns must be installed explicitly.
         $engine = $this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
-        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules','saas_subscription_plan_modules','saas_subscription_changes'] as $table) {
+        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules','saas_subscription_changes'] as $table) {
             $engine->execute([$table]);
             if (strcasecmp((string)$engine->fetchColumn(), 'InnoDB') !== 0) throw new InvalidArgumentException('Abonnementsmigreringen må installeres før lagring.');
         }
@@ -92,11 +92,9 @@ final class PortalSubscriptionService {
                     throw new InvalidArgumentException('Oppsettet for '.$company['name'].' er ikke klart. Avklar varsler og manglende priser før lagring.');
                 }
             }
-            $catalog = array_column($report['modules'],null,'id');
             $planQuery = $this->db->prepare('SELECT * FROM saas_subscription_plans WHERE id=? FOR UPDATE');
             $subscriptionQuery = $this->db->prepare('SELECT * FROM tenant_subscriptions WHERE company_id=? FOR UPDATE');
             $planCount = $this->db->prepare('SELECT COUNT(*) FROM tenant_subscriptions WHERE plan_id=?');
-            $snapshots = $this->db->prepare('SELECT module_id,price_monthly,price_setup,price_currency FROM saas_subscription_plan_modules WHERE plan_id=? ORDER BY module_id FOR UPDATE');
             $grantQuery = $this->db->prepare('SELECT id,is_active FROM tenant_company_modules WHERE company_id=? AND module_id=? FOR UPDATE');
             $now = gmdate('Y-m-d H:i:s');
             $results = [];
@@ -105,7 +103,6 @@ final class PortalSubscriptionService {
                 $subscriptionQuery->execute([$company['company_id']]);
                 $subscription = $subscriptionQuery->fetch(PDO::FETCH_ASSOC) ?: null;
                 $source = null;
-                $oldSnapshots = [];
                 $shared = false;
                 if ($subscription && $subscription['plan_id']) {
                     $planQuery->execute([$subscription['plan_id']]);
@@ -116,8 +113,6 @@ final class PortalSubscriptionService {
                         $initialSharing[$source['id']] = (int)$planCount->fetchColumn() > 1;
                     }
                     $shared = $initialSharing[$source['id']];
-                    $snapshots->execute([$source['id']]);
-                    $oldSnapshots = array_column($snapshots->fetchAll(PDO::FETCH_ASSOC),null,'module_id');
                 }
                 if (!$source || $shared) {
                     $plan = $source ?? [];
@@ -138,16 +133,6 @@ final class PortalSubscriptionService {
                     foreach (['plan_setup_discount','plan_monthly_discount'] as $field) if (in_array($field,$planColumns,true)) $updates[$field]=$company[$field];
                     if (in_array('updated_at',$planColumns,true)) $updates['updated_at'] = $now;
                     $this->update('saas_subscription_plans',$updates,$planId);
-                }
-                $this->db->prepare('DELETE FROM saas_subscription_plan_modules WHERE plan_id=?')->execute([$planId]);
-                foreach ($company['module_ids'] as $moduleId) {
-                    $price = $catalog[$moduleId];
-                    {
-                        $this->insert('saas_subscription_plan_modules',[
-                            'plan_id'=>$planId,'module_id'=>$moduleId,'price_monthly'=>$price['price_monthly'],
-                            'price_setup'=>$price['price_setup'],'price_currency'=>$price['price_currency']
-                        ]);
-                    }
                 }
                 $link = ['plan_id'=>$planId,'self_company_id'=>$report['issuer']['id']];
                 // Dates belong to the company's agreement, never a shared plan.

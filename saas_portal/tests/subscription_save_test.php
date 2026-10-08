@@ -10,7 +10,7 @@ $db = new PDO('mysql:unix_socket='.$socket,'root','',[PDO::ATTR_ERRMODE=>PDO::ER
 function saveExpect(bool $ok,string $label): void { if (!$ok) throw new RuntimeException($label); }
 function saveSnapshot(PDO $db): array {
     $result=[];
-    foreach (['saas_subscription_plans','tenant_subscriptions','tenant_company_modules','saas_subscription_plan_modules','saas_subscription_changes'] as $table) {
+    foreach (['saas_subscription_plans','tenant_subscriptions','tenant_company_modules','saas_subscription_changes'] as $table) {
         $result[$table]=$db->query("SELECT * FROM {$table} ORDER BY 1,2")->fetchAll(PDO::FETCH_ASSOC);
     }
     return $result;
@@ -21,6 +21,16 @@ function saveReject(callable $action,string $type): void {
         throw $e;
     }
     throw new RuntimeException('Invalid save accepted.');
+}
+function saveMigrateSql(string $socket,string $database): void {
+    $sqlFile=realpath(__DIR__.'/../migrations/subscription_pricing.sql');
+    $migration=proc_open(['mysql','--no-defaults','--protocol=SOCKET','--host=localhost','--socket='.$socket,'--user=root','--password=',$database],
+        [0=>['file',$sqlFile,'r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,
+        null,['PATH'=>getenv('PATH'),'HOME'=>'/tmp']);
+    if (!is_resource($migration)) throw new RuntimeException('SQL migration runner unavailable.');
+    stream_get_contents($pipes[1]);fclose($pipes[1]);
+    stream_get_contents($pipes[2]);fclose($pipes[2]);
+    saveExpect(proc_close($migration)===0,'Standalone SQL migration failed in isolated fixture.');
 }
 try {
     $db->exec("CREATE DATABASE `{$database}`");
@@ -42,15 +52,8 @@ try {
     $db->exec("INSERT INTO saas_subscription_plans VALUES ('P','Delt avtale','events',75,700,1,4,'Særvilkår','actor',NOW(),NOW())");
     $db->exec("INSERT INTO tenant_subscriptions VALUES ('S1','A','453afc7e-b0e4-11f0-a1bb-b02628506e5c','P','active','monthly','2026-01-01','2026-02-01','fixture_customer',NOW()),('S2','B','453afc7e-b0e4-11f0-a1bb-b02628506e5c','P','active','monthly','2026-01-01','2026-02-01',NULL,NOW()),('S3','C','',NULL,'active','monthly',NULL,NULL,NULL,NOW())");
     // Verify the standalone SQL can be used independently of the workspace connection.
-    $sqlFile=realpath(__DIR__.'/../migrations/subscription_pricing.sql');
     // --no-defaults alone does not ignore ambient MYSQL_HOST/MySQL credentials.
-    $migration=proc_open(['mysql','--no-defaults','--protocol=SOCKET','--host=localhost','--socket='.$socket,'--user=root','--password=',$database],
-        [0=>['file',$sqlFile,'r'],1=>['pipe','w'],2=>['pipe','w']],$migrationPipes,
-        null,['PATH'=>getenv('PATH'),'HOME'=>'/tmp']);
-    if (!is_resource($migration)) throw new RuntimeException('SQL migration runner unavailable.');
-    $migrationOutput=stream_get_contents($migrationPipes[1]);fclose($migrationPipes[1]);
-    $migrationErrors=stream_get_contents($migrationPipes[2]);fclose($migrationPipes[2]);
-    saveExpect(proc_close($migration)===0,'Standalone SQL migration failed in isolated fixture.');
+    saveMigrateSql($socket,$database);
     SubscriptionPricingSchema::install($db);
     $preview=new PortalSubscriptionPreview($db);
     $service=new PortalSubscriptionService($db);
@@ -90,7 +93,13 @@ try {
     $quoteAgain=$preview->preview(['A'],['M1'],'actor');
     saveExpect($quoteAgain['companies'][0]['proposed_monthly']==='120.00','Confirmed selection total not recalculated');
     $service->save(['A'],['M1'],$quoteAgain['quote_hash'],'actor');
-    saveExpect($db->query("SELECT price_monthly FROM saas_subscription_plan_modules WHERE plan_id='".$plans[0]."' AND module_id='M1'")->fetchColumn()==='120.00','Confirmed snapshot not updated');
+    saveExpect($db->query("SELECT price_monthly FROM saas_subscription_plans WHERE id='".$plans[0]."'")->fetchColumn()==='120.00','Confirmed catalog total not updated');
+    saveExpect((int)$db->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='saas_subscription_plan_modules'")->fetchColumn()===0,'Obsolete price-copy table created or needed');
+    // Deliberately incompatible old table: migration and runtime must leave it alone.
+    $db->exec("CREATE TABLE saas_subscription_plan_modules(marker VARCHAR(100) PRIMARY KEY) ENGINE=InnoDB");
+    $db->exec("INSERT INTO saas_subscription_plan_modules VALUES ('preserve historical data')");
+    SubscriptionPricingSchema::install($db);
+    saveMigrateSql($socket,$database);
     $selectionC=['C'=>['module_ids'=>['M1'],'max_users'=>2]];
     $quoteC=$preview->preview(['C'],null,'actor',false,$selectionC);
     $service->save(['C'],null,$quoteC['quote_hash'],'actor',$selectionC);
@@ -244,7 +253,8 @@ PHP;
     $dates=$db->query("SELECT subscription_start,due_date FROM tenant_subscriptions WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
     saveExpect($dates['subscription_start']===PortalSubscriptionDates::today(),'Subscription start not set on successful assignment');
     saveExpect($dates['due_date']===PortalSubscriptionDates::nextMonth($dates['subscription_start']),'Initial due date is not a clamped next month');
-    echo "Subscription save passed: rollback, private plans, exact selections, removals, totals, quotas, idempotency, stale quotes, concurrent saves and account creates, features access, initial agreement dates.\n";
+    saveExpect($db->query('SELECT marker FROM saas_subscription_plan_modules')->fetchColumn()==='preserve historical data','Existing obsolete table touched');
+    echo "Subscription save passed: migration parity and preservation, rollback, private plans, exact selections, removals, totals, quotas, idempotency, stale quotes, concurrent saves and account creates, features access, initial agreement dates.\n";
 } finally {
     if ($db->inTransaction()) $db->rollBack();
     $db->exec("DROP DATABASE IF EXISTS `{$database}`");
