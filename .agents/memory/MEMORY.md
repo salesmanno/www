@@ -2,3 +2,4 @@
 - [Brønnøysund import scope](brreg-import-scope.md) — add missing registered role holders only; preserve manual employees and keep login accounts separate.
 - [Linked employee email](linked-employee-email.md) — require a coordinated account-email flow before unlocking email edits for staff with admin accounts.
 - [Portal administration](portal-admin-workflow.md) — shared activity/session overview, employee-linked accounts and additive company-module grants.
+- [Gratis arrangementer](event-pricing-policy.md) — ordinærpris 0 uten alternative priser skal tillate reservasjon uten betalingskrav.

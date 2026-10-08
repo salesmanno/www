@@ -164,18 +164,93 @@ async function portalCompanyActivityLoad() {
     } finally { if (request === portalCompanyActivityRequest) feed.setAttribute('aria-busy', 'false'); }
 }
 let portalSeoInitialized = false;
-async function portalSeoLoad() {
-    if (portalSeoInitialized) return;
+let portalSeoCompanyId = '';
+let portalSeoGeneration = 0;
+let portalSeoLoadInFlight = null;
+let portalSeoSaving = false;
+const portalSeoFields = [
+    ['seoTitle', 'seo_title', 255],
+    ['seoDescription', 'seo_description', 1000],
+    ['seoKeywords', 'seo_keywords', 2000],
+    ['seoCanonicalUrl', 'canonical_url', 500]
+];
+function portalSeoSetEnabled(enabled) {
+    portalSeoFields.forEach(([id]) => { document.getElementById(id).disabled = !enabled; });
+    document.getElementById('seoSaveButton').disabled = !enabled || portalSeoSaving;
+}
+function portalSeoCanonicalIsValid(value) {
+    value = value.trim();
+    if (!value) return true;
+    if (/[\u0000-\u001f\u007f-\u009f\\\s]/u.test(value) || !/^https?:\/\//i.test(value)) return false;
+    try {
+        const authority = value.match(/^https?:\/\/([^/?#]+)/i)?.[1];
+        if (!authority || authority.includes('@')) return false;
+        const rawHost = authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0];
+        const url = new URL(value);
+        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) return false;
+        const hostname = url.hostname.toLowerCase();
+        if (hostname.startsWith('[') && hostname.endsWith(']')) return true;
+        if (hostname !== rawHost.toLowerCase()) return false;
+        if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+            return hostname.split('.').every(part => Number(part) <= 255);
+        }
+        if (hostname.length > 253) return false;
+        return hostname.split('.').every(label =>
+            label.length > 0 && label.length <= 63 &&
+            /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label)
+        );
+    } catch (_) { return false; }
+}
+function portalSeoValidationError() {
+    for (const [id, field, maximum] of portalSeoFields) {
+        const value = document.getElementById(id).value;
+        if (Array.from(value).length > maximum) {
+            return `${field === 'seo_title' ? 'SEO-tittel' : field === 'seo_description' ? 'SEO-beskrivelse' : field === 'seo_keywords' ? 'Søkeord' : 'Kanonisk URL'} kan ikke være lengre enn ${maximum} tegn.`;
+        }
+    }
+    if (!portalSeoCanonicalIsValid(document.getElementById('seoCanonicalUrl').value)) {
+        return 'Kanonisk URL må være en gyldig, absolutt HTTP- eller HTTPS-adresse uten brukernavn, mellomrom eller ugyldige tegn.';
+    }
+    return '';
+}
+function portalSeoLoad() {
+    const requestedCompanyId = String(companyId);
+    if (portalSeoInitialized && portalSeoCompanyId === requestedCompanyId) return Promise.resolve();
+    if (portalSeoLoadInFlight && portalSeoLoadInFlight.companyId === requestedCompanyId) return portalSeoLoadInFlight.promise;
+
+    const generation = ++portalSeoGeneration;
+    if (portalSeoCompanyId !== requestedCompanyId) {
+        portalSeoInitialized = false;
+        portalSeoCompanyId = '';
+    }
+    portalSeoSetEnabled(false);
     const status = document.getElementById('companySeoStatus');
     status.textContent = 'Henter SEO-innstillinger…';
-    try {
-        const data = await portalRequest('/saas_portal/api/company_seo.php?company_id=' + encodeURIComponent(companyId));
-        document.getElementById('seoTitle').value = data.seo?.seo_title || '';
-        document.getElementById('seoDescription').value = data.seo?.seo_description || '';
-        portalSeoInitialized = true;
-        document.getElementById('seoSaveButton').disabled = false;
-        status.replaceChildren();
-    } catch (error) { portalFailure('companySeoStatus', error.message, portalSeoLoad); }
+    const promise = Promise.resolve().then(async () => {
+        try {
+            const data = await portalRequest('/saas_portal/api/company_seo.php?company_id=' + encodeURIComponent(requestedCompanyId));
+            if (generation !== portalSeoGeneration || String(companyId) !== requestedCompanyId) return;
+            if (!data.seo || typeof data.seo !== 'object' ||
+                portalSeoFields.some(([, field]) => typeof data.seo[field] !== 'string')) {
+                throw new Error('SEO-innstillingene kunne ikke leses. Serveren returnerte ufullstendige data.');
+            }
+            portalSeoFields.forEach(([id, field]) => { document.getElementById(id).value = data.seo[field]; });
+            portalSeoInitialized = true;
+            portalSeoCompanyId = requestedCompanyId;
+            portalSeoSetEnabled(true);
+            status.replaceChildren();
+        } catch (error) {
+            if (generation === portalSeoGeneration && String(companyId) === requestedCompanyId) {
+                portalSeoInitialized = false;
+                portalSeoSetEnabled(false);
+                portalFailure('companySeoStatus', error.message, portalSeoLoad);
+            }
+        } finally {
+            if (portalSeoLoadInFlight && portalSeoLoadInFlight.generation === generation) portalSeoLoadInFlight = null;
+        }
+    });
+    portalSeoLoadInFlight = {companyId: requestedCompanyId, generation, promise};
+    return promise;
 }
 document.addEventListener('DOMContentLoaded', () => {
     loadStaff();
@@ -191,20 +266,39 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('companySeoForm').addEventListener('submit', async event => {
         event.preventDefault();
         const button = document.getElementById('seoSaveButton');
-        if (button.disabled || !portalSeoInitialized) return;
+        if (button.disabled || !portalSeoInitialized || portalSeoCompanyId !== String(companyId)) return;
+        const validationError = portalSeoValidationError();
+        if (validationError) {
+            portalFailure('companySeoStatus', validationError);
+            return;
+        }
         button.disabled = true;
         button.textContent = 'Lagrer…';
+        portalSeoSaving = true;
+        const requestCompanyId = String(companyId);
         try {
             const data = await portalPost('/saas_portal/api/company_seo.php', {
-                company_id: companyId, seo_title: document.getElementById('seoTitle').value,
-                seo_description: document.getElementById('seoDescription').value, csrf_token: portalCsrf
+                company_id: requestCompanyId,
+                seo_title: document.getElementById('seoTitle').value,
+                seo_description: document.getElementById('seoDescription').value,
+                seo_keywords: document.getElementById('seoKeywords').value,
+                canonical_url: document.getElementById('seoCanonicalUrl').value,
+                csrf_token: portalCsrf
             });
             const status = document.getElementById('companySeoStatus');
             status.replaceChildren();
             portalText(status, 'div', data.message || 'SEO-innstillinger lagret.', 'alert alert-success');
         } catch (error) { portalFailure('companySeoStatus', error.message); }
-        finally { button.disabled = false; button.textContent = 'Lagre SEO'; }
+        finally {
+            portalSeoSaving = false;
+            button.textContent = 'Lagre SEO';
+            portalSeoSetEnabled(portalSeoInitialized && portalSeoCompanyId === String(companyId));
+        }
     });
+    portalSeoFields.forEach(([id]) => document.getElementById(id).addEventListener('input', () => {
+        const status = document.getElementById('companySeoStatus');
+        if (status.querySelector('.alert-danger')) status.replaceChildren();
+    }));
     const image = document.getElementById('companyActivityWatermark');
     const url = portalSafeImage(companyLogoUrl);
     if (url) {

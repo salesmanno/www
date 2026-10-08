@@ -40,23 +40,73 @@ try {
     $db->exec('DROP TRIGGER reject_rent');
     $db->exec('ALTER TABLE tenant_company_modules CHANGE activated_at granted_at DATETIME');
     expectPortal($service->grantModules(['A','B'], ['rent'], 'operator') === 2, 'Alternate timestamp layout');
-    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) UNIQUE, seo_title VARCHAR(255), seo_description TEXT, is_published BOOLEAN, is_enabled BOOLEAN, display_name VARCHAR(100)) ENGINE=InnoDB');
-    $db->exec("INSERT INTO tenant_website_config VALUES ('config','A','Old','Original',1,1,'Do not change')");
+    // Match repository snapshot's module scope, required fields and foreign keys.
+    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) NOT NULL, module_id CHAR(36) NOT NULL, created_by CHAR(36) NOT NULL, seo_title VARCHAR(255), seo_description TEXT, seo_keywords TEXT, canonical_url VARCHAR(500), UNIQUE(company_id,module_id), FOREIGN KEY(company_id) REFERENCES tenant_companies(id) ON DELETE CASCADE, FOREIGN KEY(module_id) REFERENCES system_modules(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES tenant_admins(id)) ENGINE=InnoDB');
+    $db->exec("INSERT INTO tenant_website_config VALUES ('sales-config','A','sales','user','Sales SEO','Keep sales','sales','https://example.test/sales'),('rent-config','A','rent','user','Rental SEO','Keep rental','rent','https://example.test/rent')");
+    $moduleSeoSnapshot = $db->query('SELECT * FROM tenant_website_config ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    $missingSchema = function(callable $fn) {
+        try { $fn(); } catch (PortalSeoSchemaException $e) { return; }
+        throw new RuntimeException('Expected explicit company SEO schema error, never module fallback');
+    };
+    $missingSchema(fn() => $service->getSeo('A'));
+    $missingSchema(fn() => $service->saveSeo('B', 'No module row', '', '', ''));
+    $db->exec('CREATE TABLE tenant_website_general (id CHAR(36) PRIMARY KEY, company_id CHAR(36) UNIQUE, is_published BOOLEAN, is_enabled BOOLEAN, is_active BOOLEAN DEFAULT 1, display_name VARCHAR(100)) ENGINE=InnoDB');
+    // Historical general layout without SEO must fail closed, including company B
+    // which has neither a general row nor a module configuration.
+    $missingSchema(fn() => $service->getSeo('A'));
+    $missingSchema(fn() => $service->getSeo('B'));
+    $missingSchema(fn() => $service->saveSeo('B', 'No module row', '', '', ''));
+    expectPortal($db->query('SELECT * FROM tenant_website_config ORDER BY id')->fetchAll(PDO::FETCH_ASSOC) === $moduleSeoSnapshot, 'Missing schema changed module SEO');
+    expectPortal($db->query('SELECT COUNT(*) FROM tenant_website_general')->fetchColumn() == 0, 'Missing schema created settings');
+    // The user's verified active installation already has these company-level fields.
+    // Only the disposable fixture changes schema; application code never migrates it.
+    $db->exec('ALTER TABLE tenant_website_general ADD seo_title VARCHAR(255), ADD seo_description TEXT, ADD seo_keywords TEXT, ADD canonical_url VARCHAR(500)');
+    $db->exec("INSERT INTO tenant_website_general (id,company_id,is_published,is_enabled,display_name,seo_title,seo_description) VALUES ('general','A',1,1,'Do not change','Old','Original')");
     $service->saveSeo('A', 'New <title>', 'Description');
     expectPortal($service->getSeo('A')['seo_title'] === 'New <title>', 'SEO persistence');
-    $seo = $db->query("SELECT * FROM tenant_website_config WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    $seo = $db->query("SELECT * FROM tenant_website_general WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
     expectPortal($seo['is_published'] == 1 && $seo['is_enabled'] == 1 && $seo['display_name'] === 'Do not change', 'SEO altered unrelated settings');
     $service->saveSeo('B', 'Beta', '');
-    expectPortal($db->query("SELECT is_published FROM tenant_website_config WHERE company_id='B'")->fetchColumn() == 0, 'SEO unexpectedly published website');
+    expectPortal($db->query("SELECT is_published FROM tenant_website_general WHERE company_id='B'")->fetchColumn() == 0, 'SEO unexpectedly published website');
     rejectPortal(fn() => $service->saveSeo('missing', '', ''));
     rejectPortal(fn() => $service->saveSeo('A', str_repeat('x',256), ''));
     // Active installations keep per-module settings in config and SEO in general.
-    $db->exec('RENAME TABLE tenant_website_config TO tenant_website_general');
-    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36), module_id CHAR(36) NOT NULL, created_by CHAR(36) NOT NULL) ENGINE=InnoDB');
     $service->saveSeo('A', 'General title', 'General description');
     expectPortal($service->getSeo('A')['seo_title'] === 'General title', 'General-settings SEO layout');
-    expectPortal($db->query('SELECT COUNT(*) FROM tenant_website_config')->fetchColumn() == 0, 'SEO created module configuration');
+    expectPortal($db->query('SELECT * FROM tenant_website_config ORDER BY id')->fetchAll(PDO::FETCH_ASSOC) === $moduleSeoSnapshot, 'Company SEO touched module configuration');
     expectPortal($db->query("SELECT display_name FROM tenant_website_general WHERE company_id='A'")->fetchColumn() === 'Do not change', 'General settings overwritten');
+    expectPortal($db->query("SELECT is_active FROM tenant_website_general WHERE company_id='A'")->fetchColumn() == 1, 'Existing website activation changed');
+    $service->saveSeo('A', ' Ærlig <title> ', ' Råd & "beskrivelse" ', ' rådgivning, prosjekter ', ' https://example.test/side?a=1&b=2 ');
+    expectPortal($service->getSeo('A') === ['seo_title'=>'Ærlig <title>','seo_description'=>'Råd & "beskrivelse"','seo_keywords'=>'rådgivning, prosjekter','canonical_url'=>'https://example.test/side?a=1&b=2'], 'Four-field trimmed round-trip');
+    $originalSeo = $service->getSeo('A');
+    $betaSeo = $service->getSeo('B');
+    foreach (['javascript:alert(1)', '//example.test/path', 'ftp://example.test', 'https://user:pass@example.test', "https://example.test/\npath", 'https://example.test\\evil', 'not-a-url'] as $invalid) {
+        rejectPortal(fn() => $service->saveSeo('A', 'changed', '', 'changed', $invalid));
+        expectPortal($service->getSeo('A') === $originalSeo, 'Rejected URL partially changed SEO');
+    }
+    foreach ([
+        [str_repeat('æ',256),'','',''],
+        ['',str_repeat('æ',1001),'',''],
+        ['','',str_repeat('æ',2001),''],
+        ['','','','https://example.test/'.str_repeat('x',500)],
+        ['','','',[]],
+    ] as $invalid) rejectPortal(fn() => $service->saveSeo('A', ...$invalid));
+    $db->exec("CREATE TRIGGER reject_seo BEFORE UPDATE ON tenant_website_general FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test'");
+    rejectPortal(fn() => $service->saveSeo('A', 'failed', 'failed', 'failed', 'https://example.test/fail'));
+    expectPortal($service->getSeo('A') === $originalSeo, 'DB error did not preserve settings');
+    $db->exec('DROP TRIGGER reject_seo');
+    $service->saveSeo('A', '', '', '', '');
+    expectPortal($service->getSeo('A') === array_fill_keys(['seo_title','seo_description','seo_keywords','canonical_url'], ''), 'Cannot clear all overrides');
+    expectPortal($service->getSeo('B') === $betaSeo, 'SEO changed another company');
+    $db->exec("DELETE FROM tenant_website_general WHERE company_id='B'");
+    expectPortal($service->getSeo('B') === array_fill_keys(['seo_title','seo_description','seo_keywords','canonical_url'], ''), 'Missing row failed to load');
+    $service->saveSeo('B', str_repeat('æ',255), str_repeat('æ',1000), str_repeat('æ',2000), 'http://localhost/test');
+    expectPortal(mb_strlen($service->getSeo('B')['seo_title']) === 255, 'Unicode boundary or new row');
+    expectPortal($db->query("SELECT is_published FROM tenant_website_general WHERE company_id='B'")->fetchColumn() == 0, 'New row published accidentally');
+    expectPortal($db->query("SELECT is_active FROM tenant_website_general WHERE company_id='B'")->fetchColumn() == 0, 'New general settings activated website accidentally');
+    $db->exec('ALTER TABLE tenant_website_general DROP canonical_url');
+    rejectPortal(fn() => $service->getSeo('A'));
+    $db->exec('ALTER TABLE tenant_website_general ADD canonical_url VARCHAR(500)');
     foreach (['normalized', 'legacy'] as $layout) {
         $db->exec('DROP TABLE IF EXISTS audit_logs');
         $fields = $layout === 'normalized' ? 'actor_display TEXT, action_type VARCHAR(255), action_summary TEXT, created_at DATETIME'

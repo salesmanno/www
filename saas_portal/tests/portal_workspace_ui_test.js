@@ -51,6 +51,9 @@ const fixtureSessions = [
  {session_id:'session-two',tenant_admin_id:'admin-linked',username:'ingrid',admin_name:'Ingrid Lunde',company_id:'company-a',company_name:'Nordhavn & Sønner',minutes_idle:7}
 ];
 let fixtureFailGrant = false, fixtureFailStaff = false, fixtureFailSeo = false;
+let fixtureSeoGetMode = 'ok';
+let fixtureSeo = {seo_title:'Nordhavn – rådgivning',seo_description:'Lokale råd for nye prosjekter.',seo_keywords:'rådgivning, prosjekter',canonical_url:'https://nordhavn.example.test/tjenester'};
+let fixtureSeoGetDelay = 0;
 window.fetch = async (input, options = {}) => {
  const url = new URL(String(input), document.baseURI);
  const body = options.body instanceof FormData ? Object.fromEntries(options.body) : options.body ? JSON.parse(options.body) : null;
@@ -78,10 +81,23 @@ window.fetch = async (input, options = {}) => {
   const index=fixtureSessions.findIndex(session => session.session_id===body.session_id);
   if(index>=0) fixtureSessions.splice(index,1);
  } else if (url.pathname.endsWith('/company_seo.php')) {
-  if (fixtureFailSeo) { data={success:false,message:'SEO utilgjengelig'}; status=503; }
-  else if (!body) data.seo={seo_title:'Nordhavn – rådgivning',seo_description:'Lokale råd for nye prosjekter.'};
- } else if (url.pathname.endsWith('/get_email_config.php')) data.config={smtp_host:'smtp.example.test'};
- else if (url.pathname.endsWith('/get_payment_gateways.php')) data.gateways=[];
+   if (!body) {
+    const seoSnapshot={...fixtureSeo};
+    if (fixtureSeoGetDelay) await new Promise(resolve=>setTimeout(resolve,fixtureSeoGetDelay));
+     if (fixtureSeoGetMode==='fail') { data={success:false,error_code:'database_unavailable',request_id:'abcd123456ef',message:'Databasen er midlertidig utilgjengelig. Prøv igjen når forbindelsen er tilbake. Feilreferanse: abcd123456ef'}; status=503; }
+    else if (fixtureSeoGetMode==='missing') data.seo={seo_title:seoSnapshot.seo_title,seo_description:seoSnapshot.seo_description,seo_keywords:seoSnapshot.seo_keywords};
+    else data.seo=seoSnapshot;
+    } else if (fixtureFailSeo) { data={success:false,error_code:'database_unavailable',request_id:'abcd123456ef',message:'Databasen er midlertidig utilgjengelig. Lagringen kunne ikke bekreftes. Feilreferanse: abcd123456ef'}; status=503; }
+   else { fixtureSeo={seo_title:body.seo_title,seo_description:body.seo_description,seo_keywords:body.seo_keywords,canonical_url:body.canonical_url}; data.message='SEO-innstillinger lagret.'; }
+ } else if (url.pathname.endsWith('/get_email_config.php')) {
+   data.config={smtp_host:'smtp.example.test',smtp_port:587,smtp_username:'sender',smtp_from_email:'sender@example.test',smtp_from_name:'Sender',imap_host:'imap.example.test',imap_port:993,imap_username:'sender'};
+   data.credentials_readonly=true; data.notice='Hentes fra email_configs. Eksisterende passord beholdes.';
+   if (window.fixtureSettingsOutage) {status=503;data={success:false,message:'Databasen er midlertidig utilgjengelig. Feilreferanse: settings-fixture'};}
+ } else if (url.pathname.endsWith('/get_payment_gateways.php')) {
+   data.gateways=[{gateway_name:'vipps',display_name:'Custom Vipps',is_active:1,test_mode:1,vipps_client_id:'fixture-client',vipps_merchant_serial_number:'fixture-merchant'}];
+   data.credentials_readonly=true; data.notice='Eksisterende hemmelige nøkler beholdes.';
+   if (window.fixtureSettingsOutage) {status=503;data={success:false,message:'Databasen er midlertidig utilgjengelig. Feilreferanse: settings-fixture'};}
+ }
  return {ok:status===200,status,json:async()=>data,text:async()=>JSON.stringify(data),headers:{get:()=> 'application/json'}};
 };
 // A real Bootstrap modal opens its backdrop (150ms), then dialog (300ms).
@@ -189,17 +205,113 @@ portalLinkedAccountStaffId='';
 createAdmin(); await settle();
 expect(fixtureRequests.filter(request=>request.path.endsWith('/create_admin.php')).length===beforeCreates,'Unlinked account request was allowed');
 expect(document.getElementById('createAccountStatus').textContent.includes('må være koblet'),'Unlinked creation failure invisible');
-document.getElementById('seo-tab').click(); await settle();
-expect(document.getElementById('seoTitle').value==='Nordhavn – rådgivning','SEO GET did not initialize form');
-document.getElementById('seoTitle').value='Nordhavn | Prosjekter';
-document.getElementById('seoDescription').value='Råd & retning <uten markup>';
-fixtureFailSeo=true;
-submit(document.getElementById('companySeoForm')); await settle();
-expect(document.getElementById('companySeoStatus').textContent.includes('SEO utilgjengelig'),'SEO error invisible');
-expect(document.getElementById('seoTitle').value==='Nordhavn | Prosjekter','SEO failure erased edits');
-fixtureFailSeo=false;
-submit(document.getElementById('companySeoForm')); await settle();
-same(lastRequest('company_seo.php').payload,{company_id:'company-a',seo_title:'Nordhavn | Prosjekter',seo_description:'Råd & retning <uten markup>',csrf_token:'fixture-csrf'},'SEO save payload incorrect');
+ fixtureSeoGetMode='fail';
+ fixtureSeoGetDelay=40;
+ const beforeSeoLoads=fixtureRequests.filter(request=>request.path.endsWith('/company_seo.php') && request.method==='GET').length;
+ const loadOne=portalSeoLoad(), loadTwo=portalSeoLoad();
+ expect(loadOne===loadTwo,'Concurrent SEO loads were not deduplicated');
+ expect(['seoTitle','seoDescription','seoKeywords','seoCanonicalUrl'].every(id=>document.getElementById(id).disabled),'SEO fields enabled during initial load');
+ const seoPostsBeforeLoad=fixtureRequests.filter(request=>request.path.endsWith('/company_seo.php') && request.method==='POST').length;
+ submit(document.getElementById('companySeoForm'));
+ expect(fixtureRequests.filter(request=>request.path.endsWith('/company_seo.php') && request.method==='POST').length===seoPostsBeforeLoad,'SEO could save before successful load');
+ await Promise.all([loadOne,loadTwo]);
+ expect(fixtureRequests.filter(request=>request.path.endsWith('/company_seo.php') && request.method==='GET').length===beforeSeoLoads+1,'Concurrent SEO loads made multiple requests');
+  expect(document.getElementById('companySeoStatus').textContent.includes('Databasen er midlertidig utilgjengelig') && document.getElementById('companySeoStatus').textContent.includes('abcd123456ef'),'Database load error/reference invisible');
+ expect(['seoTitle','seoDescription','seoKeywords','seoCanonicalUrl'].every(id=>document.getElementById(id).disabled),'SEO fields enabled after failed load');
+ fixtureSeoGetMode='missing';
+ document.querySelector('#companySeoStatus button').click(); await settle();
+ expect(document.getElementById('companySeoStatus').textContent.includes('ufullstendige data'),'Malformed SEO response was silently accepted');
+ expect(document.getElementById('seoSaveButton').disabled && document.getElementById('seoCanonicalUrl').disabled,'Malformed response enabled SEO form');
+ fixtureSeoGetMode='ok';
+ document.querySelector('#companySeoStatus button').click(); await settle();
+ expect(document.getElementById('seoTitle').value==='Nordhavn – rådgivning','SEO GET retry did not initialize form');
+ expect(document.getElementById('seoKeywords').value==='rådgivning, prosjekter','SEO keywords did not load');
+ expect(document.getElementById('seoCanonicalUrl').value==='https://nordhavn.example.test/tjenester','Canonical URL did not load');
+
+ // A newer generation must win even when an older request resolves later.
+ portalSeoInitialized=false; portalSeoCompanyId=''; portalSeoSetEnabled(false);
+ fixtureSeoGetDelay=80; fixtureSeo.seo_title='Stale response';
+ const staleSeoLoad=portalSeoLoad();
+ await Promise.resolve();
+ portalSeoGeneration++; portalSeoLoadInFlight=null;
+ fixtureSeoGetDelay=0; fixtureSeo.seo_title='Current response';
+ const currentSeoLoad=portalSeoLoad();
+ await currentSeoLoad; await staleSeoLoad;
+ expect(document.getElementById('seoTitle').value==='Current response','Stale SEO response replaced newer data');
+ fixtureSeoGetDelay=0;
+ document.getElementById('seo-tab').click(); await settle();
+
+ document.getElementById('seoTitle').value='Nordhavn | Prosjekter';
+ document.getElementById('seoDescription').value='Råd & retning <uten markup>';
+ document.getElementById('seoKeywords').value='lokale råd, prosjekter';
+ document.getElementById('seoCanonicalUrl').value='https://www.nordhavn.example.test/prosjekter';
+ const seoValues=()=>['seoTitle','seoDescription','seoKeywords','seoCanonicalUrl'].map(id=>document.getElementById(id).value);
+ const originalSeoValues=seoValues();
+ fixtureFailSeo=true;
+ submit(document.getElementById('companySeoForm')); await settle();
+  expect(document.getElementById('companySeoStatus').textContent.includes('Lagringen kunne ikke bekreftes') && document.getElementById('companySeoStatus').textContent.includes('abcd123456ef'),'Database save error/reference invisible');
+ same(seoValues(),originalSeoValues,'SEO save error erased one or more fields');
+ fixtureFailSeo=false;
+ const seoPostCount=()=>fixtureRequests.filter(request=>request.path.endsWith('/company_seo.php') && request.method==='POST').length;
+ const beforeInvalidSeo=seoPostCount();
+ for (const invalid of ['javascript:alert(1)','https://user:pass@example.test/path','https://bad host.example/path','https://bad\\\\host.example/path']) {
+  document.getElementById('seoCanonicalUrl').value=invalid;
+  submit(document.getElementById('companySeoForm')); await settle();
+  expect(seoPostCount()===beforeInvalidSeo,'Invalid canonical URL was posted: '+invalid);
+  expect(document.getElementById('companySeoStatus').textContent.includes('Kanonisk URL'),'Invalid canonical URL error not visible');
+ }
+ document.getElementById('seoCanonicalUrl').value='https://valid.example.test/path';
+ document.getElementById('seoTitle').value='😀'.repeat(256);
+ submit(document.getElementById('companySeoForm')); await settle();
+ expect(seoPostCount()===beforeInvalidSeo && document.getElementById('companySeoStatus').textContent.includes('255'),'Unicode title limit was not enforced by code point');
+ for (const [id,maximum] of [['seoDescription',1000],['seoKeywords',2000],['seoCanonicalUrl',500]]) {
+  document.getElementById('seoTitle').value='Nordhavn | Prosjekter';
+  document.getElementById(id).value='x'.repeat(maximum+1);
+  submit(document.getElementById('companySeoForm')); await settle();
+  expect(seoPostCount()===beforeInvalidSeo,'SEO field code-point limit was not enforced for '+id);
+ }
+ document.getElementById('seoTitle').value='Nordhavn | Prosjekter';
+ document.getElementById('seoDescription').value='Råd & retning <uten markup>';
+ document.getElementById('seoKeywords').value='lokale råd, prosjekter';
+ document.getElementById('seoCanonicalUrl').value='https://www.nordhavn.example.test/prosjekter';
+ submit(document.getElementById('companySeoForm')); await settle();
+ same(lastRequest('company_seo.php').payload,{company_id:'company-a',seo_title:'Nordhavn | Prosjekter',seo_description:'Råd & retning <uten markup>',seo_keywords:'lokale råd, prosjekter',canonical_url:'https://www.nordhavn.example.test/prosjekter',csrf_token:'fixture-csrf'},'SEO save payload incorrect');
+ ['seoTitle','seoDescription','seoKeywords','seoCanonicalUrl'].forEach(id=>{document.getElementById(id).value='';});
+ submit(document.getElementById('companySeoForm')); await settle();
+ same(lastRequest('company_seo.php').payload,{company_id:'company-a',seo_title:'',seo_description:'',seo_keywords:'',canonical_url:'',csrf_token:'fixture-csrf'},'SEO empty values did not round-trip');
+document.getElementById('email-tab').click(); await settle();
+expect(document.getElementById('smtp_host').value==='smtp.example.test','Email settings did not load');
+expect(document.getElementById('smtp_from_email').value==='sender@example.test','Email sender mapping');
+expect(document.getElementById('smtp_password').disabled && document.getElementById('smtp_encryption').disabled,'Unsupported credential edits enabled');
+document.getElementById('smtp_from_name').value='Updated Sender';
+saveEmailConfig(); await settle();
+expect(lastRequest('save_email_config.php').payload.csrf_token==='fixture-csrf','Email save missing CSRF');
+expect(!('smtp_password' in lastRequest('save_email_config.php').payload),'Email password sent');
+connectEmail(); await settle();
+expect(lastRequest('connect_email.php').payload.csrf_token==='fixture-csrf','Email activation missing CSRF');
+window.fixtureSettingsOutage=true;
+await loadEmailConfig(); await settle();
+expect(document.getElementById('smtp_from_name').value==='Updated Sender','Failed email read erased edited input');
+expect(document.getElementById('smtp_host').disabled,'Failed email read left save enabled');
+expect(document.getElementById('emailConfigStatus').textContent.includes('settings-fixture'),'Email failure reference invisible');
+window.fixtureSettingsOutage=false;
+await loadEmailConfig(); await settle();
+expect(!document.getElementById('smtp_host').disabled,'Email recovery failed');
+document.getElementById('payment-tab').click(); await settle();
+expect(document.getElementById('vipps_client_id').value==='fixture-client','Linked payment config did not load');
+expect(document.getElementById('vipps_subscription_key').disabled,'Payment secret editable');
+expect(document.getElementById('stripe_public_key').disabled,'Missing gateway allowed editing');
+document.getElementById('vipps_client_id').value='updated-client';
+savePaymentGateway('vipps'); await settle();
+expect(lastRequest('save_payment_gateway.php').payload.csrf_token==='fixture-csrf','Payment save missing CSRF');
+expect(!('vipps_subscription_key' in lastRequest('save_payment_gateway.php').payload),'Payment secret sent');
+window.fixtureSettingsOutage=true;
+await loadPaymentGateways(); await settle();
+expect(document.getElementById('vipps_client_id').value==='updated-client','Failed payment read erased input');
+expect(document.getElementById('vipps_client_id').disabled,'Failed payment read allowed saving');
+window.fixtureSettingsOutage=false;
+await loadPaymentGateways(); await settle();
+expect(document.getElementById('vipps_client_id').value==='fixture-client' && !document.getElementById('vipps_client_id').disabled,'Payment recovery failed');
 document.getElementById('email-tab').click(); await settle();
 fixtureFailStaff=true;
 await loadStaff();
@@ -209,7 +321,7 @@ fixtureFailStaff=false;
 await loadStaff();
 expect(!document.getElementById('staffLoadStatus').textContent,'Staff recovery left error');
 checkNoOverflow();
-document.body.dataset.checks='inline employee/account expansion, account email, legacy account, refresh persistence, modules payload, user-only deletion, linked SuperUser/tampered email/guard, SEO save/error/retry, staff failure/recovery';
+ document.body.dataset.checks='inline employee/account expansion, account email, legacy account, refresh persistence, modules payload, user-only deletion, linked SuperUser/tampered email/guard, SEO GET failure/retry/malformed response, deduplication/stale guard, disabled pending fields, four-field save/error/empty round-trip, canonical URL and Unicode limits, staff failure/recovery';
 `;
 
 function fixture(page, bootstrapCss, bootstrapJs) {

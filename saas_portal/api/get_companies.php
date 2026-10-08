@@ -8,10 +8,12 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/PortalDatabase.php';
 
 try {
-    $db = getDBConnection();
+    $db = PortalDatabase::connect();
     $logoColumn = $db->query("SHOW COLUMNS FROM tenant_companies LIKE 'logo_url'")->fetch()
         ? 'tc.logo_url' : 'NULL AS logo_url';
     
@@ -36,7 +38,8 @@ try {
     
     echo json_encode(['success' => true, 'companies' => $companies]);
     
-} catch (Exception $e) {
-    error_log("Get companies error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Feil: ' . $e->getMessage()]);
+} catch (Throwable $e) {
+    [$status, $body] = PortalDatabase::failure($e, 'company_list', 'Kunne ikke hente firmalisten. Prøv igjen.');
+    http_response_code($status);
+    echo json_encode($body, JSON_UNESCAPED_UNICODE);
 }

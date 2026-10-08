@@ -1,5 +1,7 @@
 <?php
 
+class PortalSeoSchemaException extends RuntimeException {}
+
 /** Updates existing tenant data only; never changes users or account credentials. */
 class PortalCompanyService {
     private PDO $db;
@@ -97,47 +99,76 @@ class PortalCompanyService {
     }
 
     public static function seoTable(PDO $db): string {
-        $rows = $db->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tenant_website_general', 'tenant_website_config')
-              AND COLUMN_NAME IN ('company_id', 'seo_title', 'seo_description')")->fetchAll(PDO::FETCH_ASSOC);
-        $available = [];
-        foreach ($rows as $row) $available[$row['TABLE_NAME']][] = $row['COLUMN_NAME'];
-        // Current installations store company-level SEO in general settings.
-        // Older installations used a company-level website_config instead.
-        foreach (['tenant_website_general', 'tenant_website_config'] as $table) {
-            if (count($available[$table] ?? []) === 3) return $table;
-        }
-        throw new RuntimeException('Nettstedets SEO-felter er ikke installert.');
+        $columns = $db->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tenant_website_general'
+              AND COLUMN_NAME IN ('company_id', 'seo_title', 'seo_description', 'seo_keywords', 'canonical_url')")->fetchAll(PDO::FETCH_ASSOC);
+        // Module-specific configuration is never a source of company-level SEO.
+        // Older schema snapshots must fail explicitly, not read/update arbitrary modules.
+        if (count($columns) === 5) return 'tenant_website_general';
+        throw new PortalSeoSchemaException('Firmaets SEO-oppsett i tenant_website_general mangler nødvendige felter for tittel, beskrivelse, nøkkelord eller canonical URL.');
     }
 
     public function getSeo(string $companyId): array {
         $this->company($companyId);
         $table = self::seoTable($this->db);
-        $stmt = $this->db->prepare("SELECT seo_title, seo_description FROM `{$table}` WHERE company_id = ?");
+        $stmt = $this->db->prepare("SELECT seo_title, seo_description, seo_keywords, canonical_url FROM `{$table}` WHERE company_id = ?");
         $stmt->execute([$companyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return ['seo_title' => (string)($row['seo_title'] ?? ''), 'seo_description' => (string)($row['seo_description'] ?? '')];
+        $seo = [];
+        foreach (['seo_title', 'seo_description', 'seo_keywords', 'canonical_url'] as $field) {
+            $seo[$field] = (string)($row[$field] ?? '');
+        }
+        return $seo;
     }
 
-    public function saveSeo(string $companyId, $title, $description): void {
-        if (!is_string($title) || !is_string($description) || mb_strlen($title) > 255 || mb_strlen($description) > 1000) {
-            throw new InvalidArgumentException('SEO-tittel kan ha maks 255 tegn og beskrivelse maks 1000 tegn.');
+    public static function validCanonical(string $url): bool {
+        if ($url === '') return true;
+        if (!mb_check_encoding($url, 'UTF-8') || preg_match('/[\s\x00-\x1f\x7f-\x{009f}\\\\]/u', $url) ||
+            !preg_match('~^https?://[^/?#]+~i', $url)) return false;
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) return false;
+        $host = $parts['host'];
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return filter_var(substr($host, 1, -1), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        }
+        if (strlen($host) > 253) return false;
+        // Require canonical IPv4 notation; don't interpret abbreviated/hex IPs as DNS.
+        if (preg_match('/(?:^|\.)(?:[0-9]+|0x[0-9a-f]+)$/i', $host)) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
+        }
+        foreach (explode('.', $host) as $label) {
+            if (strlen($label) > 63 || !preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i', $label)) return false;
+        }
+        return true;
+    }
+
+    public function saveSeo(string $companyId, $title, $description, $keywords = '', $canonical = ''): void {
+        $values = ['seo_title' => $title, 'seo_description' => $description, 'seo_keywords' => $keywords, 'canonical_url' => $canonical];
+        foreach (['seo_title' => 255, 'seo_description' => 1000, 'seo_keywords' => 2000, 'canonical_url' => 500] as $field => $limit) {
+            if (!is_string($values[$field]) || !mb_check_encoding($values[$field], 'UTF-8') || mb_strlen($values[$field], 'UTF-8') > $limit) {
+                throw new InvalidArgumentException('SEO-tittel: maks 255 tegn. Beskrivelse: maks 1000 tegn. Nøkkelord: maks 2000 tegn. Canonical URL: maks 500 tegn.');
+            }
+            $values[$field] = trim($values[$field]);
+        }
+        if (!self::validCanonical($values['canonical_url'])) {
+            throw new InvalidArgumentException('Canonical URL må være en absolutt http://- eller https://adresse uten mellomrom eller brukerinformasjon, eller være tom.');
         }
         $table = self::seoTable($this->db);
         $this->requireTransactional(['tenant_companies', $table]);
         $columns = $this->columns($table);
-        $this->db->beginTransaction();
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) $this->db->beginTransaction();
         try {
             $this->company($companyId, true);
             $stmt = $this->db->prepare("SELECT id FROM `{$table}` WHERE company_id = ? FOR UPDATE");
             $stmt->execute([$companyId]);
             $existing = $stmt->fetchColumn();
             if ($existing) {
-                $stmt = $this->db->prepare("UPDATE `{$table}` SET seo_title = ?, seo_description = ? WHERE company_id = ?");
-                $stmt->execute([trim($title), trim($description), $companyId]);
+                $stmt = $this->db->prepare("UPDATE `{$table}` SET seo_title = ?, seo_description = ?, seo_keywords = ?, canonical_url = ? WHERE company_id = ?");
+                $stmt->execute(array_merge(array_values($values), [$companyId]));
             } else {
-                $values = ['id' => bin2hex(random_bytes(18)), 'company_id' => $companyId, 'seo_title' => trim($title), 'seo_description' => trim($description)];
-                foreach (['is_published', 'is_enabled'] as $flag) {
+                $values = array_merge(['id' => bin2hex(random_bytes(18)), 'company_id' => $companyId], $values);
+                foreach (['is_published', 'is_enabled', 'is_active'] as $flag) {
                     if (in_array($flag, $columns, true)) $values[$flag] = 0;
                 }
                 $names = '`' . implode('`, `', array_keys($values)) . '`';
@@ -145,9 +176,9 @@ class PortalCompanyService {
                 $stmt = $this->db->prepare("INSERT INTO `{$table}` ({$names}) VALUES ({$marks})");
                 $stmt->execute(array_values($values));
             }
-            $this->db->commit();
+            if ($ownsTransaction) $this->db->commit();
         } catch (Throwable $e) {
-            if ($this->db->inTransaction()) $this->db->rollBack();
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
             throw $e;
         }
     }

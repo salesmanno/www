@@ -1,198 +1,53 @@
 <?php
-session_start();
-header('Content-Type: application/json');
-
-if (!isset($_SESSION['tenant_admin_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Ikke autentisert']);
+if (session_status() === PHP_SESSION_NONE) session_start();
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+function websiteSettingsReply(int $status, array $body): void {
+    http_response_code($status);
+    echo json_encode($body,JSON_UNESCAPED_UNICODE);
     exit;
 }
-
+if (empty($_SESSION['tenant_admin_id']) || empty($_SESSION['company_id'])) {
+    websiteSettingsReply(403,['success'=>false,'error'=>'Ikke autentisert. Logg inn på nytt.']);
+}
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    websiteSettingsReply(405,['success'=>false,'error'=>'Lagring krever POST.']);
+}
+$raw = file_get_contents('php://input',false,null,0,65537);
+if (strlen($raw)>65536) websiteSettingsReply(413,['success'=>false,'error'=>'Forespørselen er for stor.']);
+$data = json_decode($raw,true);
+if (!is_array($data)) websiteSettingsReply(400,['success'=>false,'error'=>'Ugyldig forespørsel.']);
+if (!is_string($data['csrf_token'] ?? null) || empty($_SESSION['website_settings_csrf']) ||
+    !hash_equals($_SESSION['website_settings_csrf'],$data['csrf_token'])) {
+    websiteSettingsReply(403,['success'=>false,'error'=>'Sikkerhetskontrollen feilet. Last siden på nytt.']);
+}
 require_once __DIR__ . '/../config/database.php';
-
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/TenantSessionGuard.php';
+require_once __DIR__ . '/../includes/TenantWebsiteSettingsService.php';
 try {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
     $db = getDBConnection();
-    $db->beginTransaction();
-    
-    $companyId = $_SESSION['company_id'];
-    $adminId = $_SESSION['tenant_admin_id'];
-    
-    // Helper function to normalize boolean values
-    function normalizeBool($value) {
-        return (int)filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    $actor = (string)$_SESSION['tenant_admin_id'];
+    $company = (string)$_SESSION['company_id'];
+    $stmt = $db->prepare('SELECT ta.id FROM tenant_admins ta JOIN tenant_companies tc ON tc.id=ta.company_id WHERE ta.id=? AND ta.company_id=? AND ta.is_active=1 AND tc.is_active=1');
+    $stmt->execute([$actor,$company]);
+    if (!$stmt->fetchColumn() || !tenantSessionIsActive($db,session_id(),$actor)) {
+        websiteSettingsReply(403,['success'=>false,'error'=>'Innloggingen er utløpt eller ikke gyldig for bedriften.']);
     }
-    
-    // Helper function to validate and normalize color
-    function normalizeColor($color, $default = '#3366CC') {
-        if (empty($color)) return $default;
-        // Ensure color starts with # and is valid hex
-        $color = trim($color);
-        if (!preg_match('/^#[0-9A-F]{6}$/i', $color)) {
-            return $default;
-        }
-        return strtoupper($color);
+    $keys = array_column(getTenantAdminModules($actor),'module_key');
+    if (!array_intersect(['ditt_nettsted','website'],$keys)) {
+        websiteSettingsReply(403,['success'=>false,'error'=>'Du har ikke tilgang til nettstedsoppsettet.']);
     }
-    
-    // Update or insert tenant_website_config
-    if (isset($data['config'])) {
-        $config = $data['config'];
-        
-        // Check if config exists
-        $stmt = $db->prepare("SELECT id FROM tenant_website_config WHERE company_id = ?");
-        $stmt->execute([$companyId]);
-        $existingConfig = $stmt->fetch();
-        
-        if ($existingConfig) {
-            // Update existing
-            $stmt = $db->prepare("
-                UPDATE tenant_website_config 
-                SET is_published = ?, 
-                    is_enabled = ?,
-                    display_name = ?,
-                    seo_title = ?,
-                    seo_description = ?,
-                    updated_at = NOW()
-                WHERE company_id = ?
-            ");
-            $stmt->execute([
-                normalizeBool($config['is_published'] ?? 0),
-                normalizeBool($config['is_enabled'] ?? 0),
-                !empty($config['display_name']) ? trim($config['display_name']) : null,
-                !empty($config['seo_title']) ? trim($config['seo_title']) : null,
-                !empty($config['seo_description']) ? trim($config['seo_description']) : null,
-                $companyId
-            ]);
-        } else {
-            // Insert new
-            $configId = bin2hex(random_bytes(16));
-            $stmt = $db->prepare("
-                INSERT INTO tenant_website_config 
-                (id, company_id, is_published, is_enabled, display_name, seo_title, seo_description, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            ");
-            $stmt->execute([
-                $configId,
-                $companyId,
-                normalizeBool($config['is_published'] ?? 0),
-                normalizeBool($config['is_enabled'] ?? 0),
-                !empty($config['display_name']) ? trim($config['display_name']) : null,
-                !empty($config['seo_title']) ? trim($config['seo_title']) : null,
-                !empty($config['seo_description']) ? trim($config['seo_description']) : null
-            ]);
-        }
-    }
-    
-    // Update or insert tenant_website_general
-    if (isset($data['general'])) {
-        $general = $data['general'];
-        
-        // Check if general settings exist
-        $stmt = $db->prepare("SELECT id FROM tenant_website_general WHERE company_id = ?");
-        $stmt->execute([$companyId]);
-        $existingGeneral = $stmt->fetch();
-        
-        if ($existingGeneral) {
-            // Update existing
-            $stmt = $db->prepare("
-                UPDATE tenant_website_general 
-                SET site_title = ?,
-                    site_description = ?,
-                    primary_color = ?,
-                    secondary_color = ?,
-                    navigation_style = ?,
-                    header_layout = ?,
-                    footer_layout = ?,
-                    hero_enabled = ?,
-                    hero_title = ?,
-                    hero_description = ?,
-                    hero_button_text = ?,
-                    contact_email = ?,
-                    contact_phone = ?,
-                    contact_address = ?,
-                    google_analytics_id = ?,
-                    is_active = ?,
-                    maintenance_mode = ?,
-                    maintenance_message = ?,
-                    updated_at = NOW(),
-                    updated_by = ?
-                WHERE company_id = ?
-            ");
-            $stmt->execute([
-                !empty($general['site_title']) ? trim($general['site_title']) : null,
-                !empty($general['site_description']) ? trim($general['site_description']) : null,
-                normalizeColor($general['primary_color'] ?? '#3366CC', '#3366CC'),
-                normalizeColor($general['secondary_color'] ?? '#666666', '#666666'),
-                in_array($general['navigation_style'] ?? 'top', ['top', 'side']) ? $general['navigation_style'] : 'top',
-                in_array($general['header_layout'] ?? 'standard', ['standard', 'centered', 'minimal']) ? $general['header_layout'] : 'standard',
-                in_array($general['footer_layout'] ?? 'standard', ['standard', 'minimal', 'extended']) ? $general['footer_layout'] : 'standard',
-                normalizeBool($general['hero_enabled'] ?? 1),
-                !empty($general['hero_title']) ? trim($general['hero_title']) : null,
-                !empty($general['hero_description']) ? trim($general['hero_description']) : null,
-                !empty($general['hero_button_text']) ? trim($general['hero_button_text']) : null,
-                !empty($general['contact_email']) ? filter_var(trim($general['contact_email']), FILTER_VALIDATE_EMAIL) : null,
-                !empty($general['contact_phone']) ? trim($general['contact_phone']) : null,
-                !empty($general['contact_address']) ? trim($general['contact_address']) : null,
-                !empty($general['google_analytics_id']) ? trim($general['google_analytics_id']) : null,
-                normalizeBool($general['is_active'] ?? 1),
-                normalizeBool($general['maintenance_mode'] ?? 0),
-                !empty($general['maintenance_message']) ? trim($general['maintenance_message']) : null,
-                $adminId,
-                $companyId
-            ]);
-        } else {
-            // Insert new
-            $generalId = bin2hex(random_bytes(16));
-            $stmt = $db->prepare("
-                INSERT INTO tenant_website_general 
-                (id, company_id, site_title, site_description, primary_color, secondary_color,
-                 navigation_style, header_layout, footer_layout, hero_enabled, hero_title,
-                 hero_description, hero_button_text, contact_email, contact_phone, contact_address,
-                 google_analytics_id, is_active, maintenance_mode, maintenance_message,
-                 created_by, created_at, updated_at, updated_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)
-            ");
-            $stmt->execute([
-                $generalId,
-                $companyId,
-                !empty($general['site_title']) ? trim($general['site_title']) : null,
-                !empty($general['site_description']) ? trim($general['site_description']) : null,
-                normalizeColor($general['primary_color'] ?? '#3366CC', '#3366CC'),
-                normalizeColor($general['secondary_color'] ?? '#666666', '#666666'),
-                in_array($general['navigation_style'] ?? 'top', ['top', 'side']) ? $general['navigation_style'] : 'top',
-                in_array($general['header_layout'] ?? 'standard', ['standard', 'centered', 'minimal']) ? $general['header_layout'] : 'standard',
-                in_array($general['footer_layout'] ?? 'standard', ['standard', 'minimal', 'extended']) ? $general['footer_layout'] : 'standard',
-                normalizeBool($general['hero_enabled'] ?? 1),
-                !empty($general['hero_title']) ? trim($general['hero_title']) : null,
-                !empty($general['hero_description']) ? trim($general['hero_description']) : null,
-                !empty($general['hero_button_text']) ? trim($general['hero_button_text']) : null,
-                !empty($general['contact_email']) ? filter_var(trim($general['contact_email']), FILTER_VALIDATE_EMAIL) : null,
-                !empty($general['contact_phone']) ? trim($general['contact_phone']) : null,
-                !empty($general['contact_address']) ? trim($general['contact_address']) : null,
-                !empty($general['google_analytics_id']) ? trim($general['google_analytics_id']) : null,
-                normalizeBool($general['is_active'] ?? 1),
-                normalizeBool($general['maintenance_mode'] ?? 0),
-                !empty($general['maintenance_message']) ? trim($general['maintenance_message']) : null,
-                $adminId,
-                $adminId
-            ]);
-        }
-    }
-    
-    $db->commit();
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Websideinnstillinger oppdatert'
-    ]);
-    
-} catch (Exception $e) {
-    if (isset($db)) {
-        $db->rollBack();
-    }
-    error_log("Error updating webside data: " . $e->getMessage());
-    echo json_encode([
-        'success' => false,
-        'error' => 'Kunne ikke oppdatere websideinnstillinger: ' . $e->getMessage()
-    ]);
+    // The company is always taken from the verified session, never the payload.
+    (new TenantWebsiteSettingsService($db))->save($company,$actor,$data);
+    websiteSettingsReply(200,['success'=>true,'message'=>'Nettstedsinnstillinger er lagret.']);
+} catch (InvalidArgumentException $e) {
+    websiteSettingsReply(400,['success'=>false,'error'=>$e->getMessage()]);
+} catch (PortalSeoSchemaException $e) {
+    websiteSettingsReply(503,['success'=>false,'error'=>$e->getMessage()]);
+} catch (Throwable $e) {
+    $reference = bin2hex(random_bytes(6));
+    error_log('Website settings failed; reference='.$reference.'; type='.get_class($e).'; code='.$e->getCode());
+    websiteSettingsReply(500,['success'=>false,'error'=>'Kunne ikke lagre nettstedet. Ingen endringer er gjort. Feilreferanse: '.$reference]);
 }

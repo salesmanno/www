@@ -8,11 +8,13 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../services/PortalDatabase.php';
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
 
 try {
-    $db = getDBConnection();
+    $db = PortalDatabase::connect();
     $companyId = $_GET['company_id'] ?? null;
     if ($companyId !== null && (!is_string($companyId) || $companyId === '' || strlen($companyId) > 36)) {
         http_response_code(400);
@@ -83,10 +85,8 @@ try {
         'timestamp' => date('Y-m-d H:i:s')
     ]);
     
-} catch (Exception $e) {
-    error_log("Get active sessions error: " . $e->getMessage());
-    echo json_encode([
-        'success' => false,
-        'message' => 'Feil ved henting av aktive sessions'
-    ]);
+} catch (Throwable $e) {
+    [$status, $body] = PortalDatabase::failure($e, 'active_sessions', 'Kunne ikke hente aktive innlogginger. Prøv igjen.');
+    http_response_code($status);
+    echo json_encode($body, JSON_UNESCAPED_UNICODE);
 }

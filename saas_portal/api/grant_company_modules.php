@@ -3,8 +3,9 @@ require_once __DIR__ . '/portal_request.php';
 $data = portalPostData();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../services/PortalCompanyService.php';
+require_once __DIR__ . '/../services/PortalDatabase.php';
 try {
-    $db = getDBConnection();
+    $db = PortalDatabase::connect();
     $count = (new PortalCompanyService($db))->grantModules($data['company_ids'] ?? null, $data['module_ids'] ?? null, $_SESSION['saas_admin_id']);
     if ($count) {
         try {
@@ -19,6 +20,6 @@ try {
 } catch (InvalidArgumentException $e) {
     portalReply(400, ['success' => false, 'message' => $e->getMessage()]);
 } catch (Throwable $e) {
-    error_log('Company module grants failed.');
-    portalReply(500, ['success' => false, 'message' => 'Modultilgangene kunne ikke lagres. Ingen tilganger er endret.']);
+    [$status, $body] = PortalDatabase::failure($e, 'company_modules', 'Modultilgangene kunne ikke bekreftes.');
+    portalReply($status, $body);
 }

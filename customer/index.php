@@ -91,16 +91,18 @@ $bodyBgColor = $company['body_bg_color'] ?? '#f8f9fa';
 $fontFamily = $company['font_family'] ?? 'Arial, sans-serif';
 $siteTitle = $company['site_title'] ?? $company['name'];
 $siteDescription = $company['site_description'] ?? '';
+$seoKeywords = '';
+$canonicalUrl = '';
 // SEO overrides share the existing website settings used by tenant administrators.
 // Older installations without this optional module retain their original metadata.
 try {
     require_once __DIR__ . '/../saas_portal/services/PortalCompanyService.php';
-    $seoTable = PortalCompanyService::seoTable($db);
-    $seoStmt = $db->prepare("SELECT seo_title, seo_description FROM `{$seoTable}` WHERE company_id = ?");
-    $seoStmt->execute([$company['id']]);
-    $seo = $seoStmt->fetch(PDO::FETCH_ASSOC);
+    $seo = (new PortalCompanyService($db))->getSeo($company['id']);
     if (trim($seo['seo_title'] ?? '') !== '') $siteTitle = $seo['seo_title'];
     if (trim($seo['seo_description'] ?? '') !== '') $siteDescription = $seo['seo_description'];
+    $seoKeywords = trim($seo['seo_keywords']);
+    $candidateCanonical = trim($seo['canonical_url']);
+    if (PortalCompanyService::validCanonical($candidateCanonical)) $canonicalUrl = $candidateCanonical;
 } catch (Throwable $e) {
     error_log('Customer website: optional SEO settings unavailable.');
 }
@@ -112,6 +114,8 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($siteTitle) ?></title>
     <meta name="description" content="<?= htmlspecialchars($siteDescription) ?>">
+    <?php if ($seoKeywords !== ''): ?><meta name="keywords" content="<?= htmlspecialchars($seoKeywords, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"><?php endif; ?>
+    <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"><?php endif; ?>
     <style>
         :root {
             --primary-color: <?= htmlspecialchars($primaryColor) ?>;

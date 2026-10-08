@@ -100,14 +100,14 @@ try {
     foreach (['config', 'sessions', 'includes', 'saas_portal/api', 'saas_portal/services'] as $dir) {
         mkdir($root . '/' . $dir, 0700, true);
     }
-    foreach (['create_staff', 'update_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff', 'portal_request', 'update_admin_modules', 'grant_company_modules', 'company_seo', 'logout_user', 'get_active_sessions', 'get_activity_stream', 'get_admins'] as $file) {
+    foreach (['create_staff', 'update_staff', 'create_admin', 'delete_staff', 'delete_admin', 'get_staff', 'import_brreg_staff', 'portal_request', 'update_admin_modules', 'grant_company_modules', 'company_seo', 'logout_user', 'get_active_sessions', 'get_activity_stream', 'get_admins', 'get_companies'] as $file) {
         copy(__DIR__ . '/../api/' . $file . '.php', $root . '/saas_portal/api/' . $file . '.php');
     }
-    foreach (['BrregRoleClient', 'BrregStaffImportService', 'ActivityLogger', 'PortalCompanyService'] as $file) {
+    foreach (['BrregRoleClient', 'BrregStaffImportService', 'ActivityLogger', 'PortalCompanyService', 'PortalDatabase'] as $file) {
         copy(__DIR__ . '/../services/' . $file . '.php', $root . '/saas_portal/services/' . $file . '.php');
     }
     copy(__DIR__ . '/../../includes/TenantSessionGuard.php', $root . '/includes/TenantSessionGuard.php');
-    $connection = "<?php\nfunction getDBConnection() { static \$db; return \$db ??= new PDO(" .
+    $connection = "<?php\nfunction getDBConnection() { if(is_file(__DIR__.'/outage')) throw new RuntimeException('FAKE_PRIVATE_CONNECTION_DETAIL'); static \$db; return \$db ??= new PDO(" .
         var_export('mysql:unix_socket=' . $socket . ';dbname=' . $database . ';charset=utf8mb4', true) .
         ", 'root', '', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]); }\nfunction dbBool(\$v) { return \$v ? '1' : '0'; }\n";
     file_put_contents($root . '/config/database.php', $connection);
@@ -226,12 +226,63 @@ try {
     check(http($base,'update_admin_modules',array_merge($userGrant,['module_ids'=>['off']]))[1]['success'] === false, 'Disabled module permitted');
     check($db->query("SELECT module_id FROM tenant_admin_modules WHERE tenant_admin_id='admin'")->fetchColumn() === 'sales', 'Failed assignment lost existing permissions');
     check(http($base,'update_admin_modules',array_merge($userGrant,['module_ids'=>[]]))[1]['success'] === true, 'Cannot remove account modules');
-    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) UNIQUE, seo_title VARCHAR(255), seo_description TEXT, is_published BOOLEAN, is_enabled BOOLEAN) ENGINE=InnoDB');
-    $seo = ['company_id'=>'A','seo_title'=>'Test title','seo_description'=>'Test description','csrf_token'=>'test-portal'];
+    $db->exec('CREATE TABLE tenant_website_general (id CHAR(36) PRIMARY KEY, company_id CHAR(36) UNIQUE, seo_title VARCHAR(255), seo_description TEXT, seo_keywords TEXT, canonical_url VARCHAR(500), is_published BOOLEAN, is_enabled BOOLEAN, site_title VARCHAR(255), site_description TEXT, primary_color VARCHAR(7), secondary_color VARCHAR(7), header_bg_color VARCHAR(20), body_bg_color VARCHAR(20), font_family VARCHAR(100), footer_text TEXT) ENGINE=InnoDB');
+    $seo = ['company_id'=>'A','seo_title'=>'Test title <safe>','seo_description'=>'Test description "safe"','seo_keywords'=>'råd, "avtaler" <safe>','canonical_url'=>'https://example.test/side?a=1&b=2','csrf_token'=>'test-portal'];
+    $seoGet = function($company, $auth = true) use ($base) {
+        $ch = curl_init($base.'/saas_portal/api/company_seo.php?company_id='.rawurlencode($company));
+        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPHEADER=>$auth?['Cookie: PHPSESSID=brregtestsession']:[]]);
+        $body = curl_exec($ch); $code = curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
+        return [$code,json_decode($body,true)];
+    };
+    check($seoGet('A',false)[0] === 403, 'SEO anonymous load allowed');
+    check($seoGet('A')[0] === 200 && $seoGet('A')[1]['seo'] === array_fill_keys(['seo_title','seo_description','seo_keywords','canonical_url'], ''), 'Missing row SEO load failed');
+    check($seoGet('missing')[0] === 400, 'Missing company SEO load succeeded');
+    check(http($base,'company_seo',$seo,false)[0] === 403, 'SEO anonymous save allowed');
     check(http($base,'company_seo',array_merge($seo,['csrf_token'=>'bad']))[0] === 403, 'SEO CSRF permitted');
     check(http($base,'company_seo',$seo)[1]['success'] === true, 'SEO HTTP save failed');
-    check($db->query("SELECT seo_title FROM tenant_website_config WHERE company_id='A'")->fetchColumn() === 'Test title', 'SEO save not persisted');
+    foreach (['seo_title','seo_description','seo_keywords','canonical_url'] as $field) check($seoGet('A')[1]['seo'][$field] === $seo[$field], 'SEO field not persisted: '.$field);
+    check($seoGet('B')[1]['seo']['seo_title'] === '', 'SEO affected other company');
+    foreach (['javascript:alert(1)', 'https://user:pass@example.test', '//example.test', "https://example.test/a\nb"] as $url) {
+        check(http($base,'company_seo',array_replace($seo,['canonical_url'=>$url]))[0] === 400, 'SEO invalid canonical accepted');
+    }
+    $incompleteSeo = $seo; unset($incompleteSeo['canonical_url']);
+    check(http($base,'company_seo',$incompleteSeo)[0] === 400, 'Incomplete form silently cleared stored canonical');
+    check($seoGet('A')[1]['seo']['canonical_url'] === $seo['canonical_url'], 'Validation failure changed canonical');
+    $db->exec('ALTER TABLE tenant_website_general DROP canonical_url');
+    check($seoGet('A')[0] === 503 && $seoGet('A')[1]['error_code'] === 'seo_schema_missing', 'Missing schema error mislabeled');
+    $db->exec('ALTER TABLE tenant_website_general ADD canonical_url VARCHAR(500)');
+    check(http($base,'company_seo',$seo)[0] === 200, 'SEO schema retry failed');
+    // Render the actual public customer page against only this temporary schema.
+    mkdir($root.'/customer',0700);
+    copy(__DIR__.'/../../customer/index.php',$root.'/customer/index.php');
+    $db->exec('ALTER TABLE tenant_companies ADD subdomain_active BOOLEAN DEFAULT 1');
     $db->exec('ALTER TABLE tenant_companies ADD subdomain VARCHAR(100)');
+    $db->exec("UPDATE tenant_companies SET subdomain='alpha' WHERE id='A'");
+    $customer = function() use ($base) {
+        $ch = curl_init($base.'/customer/index.php');
+        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPHEADER=>['Host: alpha.salesman.no']]);
+        $body = curl_exec($ch);$code=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
+        return [$code,$body];
+    };
+    $publicSeo = $customer();
+    check($publicSeo[0] === 200, 'Public customer rendering failed');
+    check(str_contains($publicSeo[1], '<title>Test title &lt;safe&gt;</title>'), 'Public title not escaped/applied');
+    check(str_contains($publicSeo[1], 'content="Test description &quot;safe&quot;"'), 'Public description not escaped/applied');
+    check(str_contains($publicSeo[1], 'content="råd, &quot;avtaler&quot; &lt;safe&gt;"'), 'Public keywords not escaped/applied');
+    check(str_contains($publicSeo[1], 'rel="canonical" href="https://example.test/side?a=1&amp;b=2"'), 'Public canonical not escaped/applied');
+    $emptySeo = array_replace($seo,['seo_title'=>'','seo_description'=>'','seo_keywords'=>'','canonical_url'=>'']);
+    check(http($base,'company_seo',$emptySeo)[0] === 200, 'Clearing SEO failed');
+    $publicSeo = $customer();
+    check(!str_contains($publicSeo[1], 'name="keywords"') && !str_contains($publicSeo[1], 'rel="canonical"'), 'Empty SEO overrides still emitted');
+    check(str_contains($publicSeo[1], '<title>Test Company</title>'), 'Empty title did not restore original metadata');
+    $db->exec("UPDATE tenant_website_general SET canonical_url='javascript:alert(1)' WHERE company_id='A'");
+    check(!str_contains($customer()[1], 'rel="canonical"'), 'Unsafe historical canonical emitted');
+    $db->exec('RENAME TABLE tenant_companies TO temporarily_unavailable_companies');
+    $databaseFailure = $seoGet('A');
+    check($databaseFailure[0] === 500 && $databaseFailure[1]['error_code'] === 'seo_unavailable' &&
+        !empty($databaseFailure[1]['request_id']) && !str_contains(json_encode($databaseFailure[1]), 'SQLSTATE'), 'Database error exposes internals or lacks reference');
+    $db->exec('RENAME TABLE temporarily_unavailable_companies TO tenant_companies');
+    check($seoGet('A')[0] === 200, 'Retry after database error failed');
     $db->exec('ALTER TABLE tenant_admins ADD last_login DATETIME');
     $db->exec('CREATE TABLE tenant_admin_sessions (id CHAR(36) PRIMARY KEY, tenant_admin_id CHAR(36), session_id VARCHAR(128), is_active BOOLEAN, login_at DATETIME, logout_at DATETIME, last_activity DATETIME, ip_address VARCHAR(45)) ENGINE=InnoDB');
     $db->exec("INSERT INTO tenant_admin_sessions VALUES ('1','admin','targetsession',1,NOW(),NULL,NOW(),NULL),('two','admin','othersession',1,NOW(),NULL,NOW(),NULL)");
@@ -251,6 +302,104 @@ try {
     curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Cookie: PHPSESSID=brregtestsession']]);
     $adminsResponse = json_decode(curl_exec($ch),true); curl_close($ch);
     check($adminsResponse['success'] === true && array_key_exists('tenant_staff_id',$adminsResponse['admins'][0]), 'Account-to-employee mapping missing');
+    // Exercise the legacy editor against the same company SEO and module-scoped
+    // config constraints, with real tenant-session and CSRF checks.
+    mkdir($root.'/api',0700);
+    mkdir($root.'/pages',0700);
+    $db->exec('ALTER TABLE tenant_companies ADD is_active BOOLEAN DEFAULT 1');
+    copy(__DIR__.'/../../api/update_webside_data.php',$root.'/api/update_webside_data.php');
+    copy(__DIR__.'/../../pages/ditt_nettsted.php',$root.'/pages/ditt_nettsted.php');
+    copy(__DIR__.'/../../includes/TenantWebsiteSettingsService.php',$root.'/includes/TenantWebsiteSettingsService.php');
+    copy(__DIR__.'/../../includes/functions.php',$root.'/includes/functions.php');
+    $db->exec("ALTER TABLE system_modules ADD module_key VARCHAR(100), ADD name VARCHAR(100), ADD description TEXT, ADD icon VARCHAR(100), ADD created_at DATETIME");
+    $db->exec("INSERT INTO system_modules (id,is_active,module_key,name) VALUES ('website',1,'website','Website')");
+    $db->exec("INSERT INTO tenant_admin_modules (id,tenant_admin_id,module_id,granted_at) VALUES ('website-grant','admin','website',NOW())");
+    $db->exec('CREATE TABLE tenant_website_config (id CHAR(36) PRIMARY KEY, company_id CHAR(36) NOT NULL, module_id CHAR(36) NOT NULL, created_by CHAR(36) NOT NULL, is_enabled BOOLEAN DEFAULT 1, is_published BOOLEAN DEFAULT 1, display_name VARCHAR(255), seo_title VARCHAR(255), seo_description TEXT, seo_keywords TEXT, canonical_url VARCHAR(500), updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(company_id,module_id), FOREIGN KEY(module_id) REFERENCES system_modules(id), FOREIGN KEY(created_by) REFERENCES tenant_admins(id)) ENGINE=InnoDB');
+    $db->exec("INSERT INTO tenant_website_config (id,company_id,module_id,created_by,seo_title) VALUES ('sales-config','A','sales','admin','Keep module SEO'),('other-company','B','website','admin','Other company SEO')");
+    $db->exec("INSERT INTO tenant_admin_sessions VALUES ('legacy','admin','brregtestsession',1,NOW(),NULL,NOW(),NULL)");
+    session_id('brregtestsession'); session_start();
+    $_SESSION['tenant_admin_id']='admin';$_SESSION['company_id']='A';$_SESSION['website_settings_csrf']='legacy-csrf';
+    session_write_close();
+    $legacyHttp = function($payload = null, $authenticated = true) use ($base) {
+        $ch = curl_init($base.'/api/update_webside_data.php');
+        $headers = $authenticated ? ['Cookie: PHPSESSID=brregtestsession'] : [];
+        if ($payload !== null) {
+            curl_setopt($ch,CURLOPT_POST,true);
+            curl_setopt($ch,CURLOPT_POSTFIELDS,json_encode($payload));
+            $headers[]='Content-Type: application/json';
+        }
+        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPHEADER=>$headers]);
+        $body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
+        return [$status,json_decode($body,true)];
+    };
+    $legacyPayload=['csrf_token'=>'legacy-csrf','config'=>['seo_title'=>'Shared <SEO>','seo_description'=>'Shared description','seo_keywords'=>'shared, keywords','canonical_url'=>'https://example.test/shared'],'general'=>['site_title'=>'Original site']];
+    check($legacyHttp($legacyPayload,false)[0]===403,'Anonymous legacy save allowed');
+    check($legacyHttp()[0]===405,'GET legacy save allowed');
+    check($legacyHttp(array_replace($legacyPayload,['csrf_token'=>'bad']))[0]===403,'Legacy CSRF allowed');
+    $moduleBefore=$db->query('SELECT * FROM tenant_website_config ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    check($legacyHttp($legacyPayload)[0]===200,'Legacy SEO save failed');
+    foreach ($legacyPayload['config'] as $key=>$value) check($seoGet('A')[1]['seo'][$key]===$value,'Legacy and SaaS SEO differ: '.$key);
+    check($db->query('SELECT * FROM tenant_website_config ORDER BY id')->fetchAll(PDO::FETCH_ASSOC)===$moduleBefore,'Company SEO changed a module row');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['seo_title'=>'Partial']])[0]===200,'Partial legacy save failed');
+    check($seoGet('A')[1]['seo']['seo_keywords']==='shared, keywords','Partial save erased omitted SEO');
+    $before=$seoGet('A')[1]['seo'];
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['seo_title'=>'conflict'],'general'=>['seo_title'=>'different']])[0]===400,'Conflicting SEO accepted');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['is_published'=>0]])[0]===400,'Unscoped module update allowed');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['module_id'=>'sales','is_published'=>0]])[0]===400,'Unassigned module update allowed');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['seo_title'=>'rollback'],'general'=>['header_layout'=>'centered']])[0]===400,'Absent general column accepted');
+    check($seoGet('A')[1]['seo']===$before,'Mixed save did not roll back SEO');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','company_id'=>'B','general'=>['seo_title'=>'Own company']])[0]===200,'Session-scoped save failed');
+    check($seoGet('B')[1]['seo']['seo_title']==='','Client company parameter escaped session scope');
+    check($legacyHttp(['csrf_token'=>'legacy-csrf','config'=>['module_id'=>'website','display_name'=>'Site']])[0]===200,'Required module references were not filled on creation');
+    check($db->query("SELECT created_by FROM tenant_website_config WHERE company_id='A' AND module_id='website'")->fetchColumn()==='admin','Wrong module creator');
+    check($db->query("SELECT is_published FROM tenant_website_config WHERE company_id='A' AND module_id='website'")->fetchColumn()==0,'Implicit module creation published website');
+    check($db->query("SELECT seo_title FROM tenant_website_config WHERE id='sales-config'")->fetchColumn()==='Keep module SEO','Sibling module SEO overwritten');
+    $page = curl_init($base.'/pages/ditt_nettsted.php');
+    curl_setopt_array($page,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Cookie: PHPSESSID=brregtestsession']]);
+    $legacyPage=curl_exec($page);curl_close($page);
+    check(str_contains($legacyPage,'Own company') && str_contains($legacyPage,'shared, keywords') && str_contains($legacyPage,'https://example.test/shared'),'Legacy page not reading all company SEO');
+    check(!str_contains($legacyPage,'Keep module SEO'),'Legacy page shows module SEO as company SEO');
+    $db->exec("DELETE FROM tenant_website_config WHERE company_id='A' AND module_id='website'");
+    $page = curl_init($base.'/pages/ditt_nettsted.php');
+    curl_setopt_array($page,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Cookie: PHPSESSID=brregtestsession']]);
+    $legacyPage=curl_exec($page);curl_close($page);
+    check(str_contains($legacyPage,'Own company') && str_contains($legacyPage,'shared, keywords'),'Missing module row hid company SEO');
+    $db->exec("UPDATE tenant_companies SET is_active=0 WHERE id='A'");
+    check($legacyHttp($legacyPayload)[0]===403,'Inactive company allowed legacy save');
+    $db->exec("UPDATE tenant_companies SET is_active=1 WHERE id='A'");
+    $db->exec("UPDATE system_modules SET is_active=0 WHERE id='website'");
+    check($legacyHttp($legacyPayload)[0]===403,'Unavailable website module allowed legacy save');
+    $db->exec("UPDATE system_modules SET is_active=1 WHERE id='website'");
+    $db->exec("UPDATE tenant_admin_sessions SET is_active=0 WHERE id='legacy'");
+    check($legacyHttp($legacyPayload)[0]===403,'Ended tenant session allowed legacy save');
+    echo "Legacy editor shared SEO, scoped modules, sparse updates, atomic rollback, read-only display and tenant auth/CSRF passed.\n";
+    $beforeOutage=$db->query('SELECT * FROM tenant_website_general ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    file_put_contents($root.'/config/outage','temporary fixture outage');
+    check($seoGet('A',false)[0]===403,'Database outage bypassed SEO authentication');
+    check(http($base,'company_seo',array_replace($seo,['csrf_token'=>'bad']))[0]===403,'Database outage bypassed CSRF');
+    $outageResponses = [
+        $seoGet('A'),
+        http($base,'company_seo',$seo),
+        http($base,'get_companies'),
+        http($base,'get_active_sessions'),
+        http($base,'get_activity_stream'),
+        http($base,'grant_company_modules',['company_ids'=>['A'],'module_ids'=>['website'],'csrf_token'=>'test-portal']),
+    ];
+    foreach ($outageResponses as [$status,$response]) {
+        check($status===503 && $response['success']===false && $response['error_code']==='database_unavailable','Unavailable database not identified consistently');
+        check(preg_match('/^[a-f0-9]{12}$/D',$response['request_id'])===1,'Unavailable response missing reference');
+        check(!str_contains(json_encode($response),'FAKE_PRIVATE_CONNECTION_DETAIL'),'Connection details leaked to client');
+        check(str_contains(file_get_contents($root.'/server.log'),$response['request_id']),'Reference missing from HTTP server log');
+    }
+    check(!str_contains(file_get_contents($root.'/server.log'),'FAKE_PRIVATE_CONNECTION_DETAIL'),'Connection exception message logged');
+    check($db->query('SELECT * FROM tenant_website_general ORDER BY id')->fetchAll(PDO::FETCH_ASSOC)===$beforeOutage,'Failed save modified website data');
+    unlink($root.'/config/outage');
+    check($seoGet('A')[0]===200,'SEO load did not recover');
+    check(http($base,'company_seo',$seo)[0]===200,'SEO save did not recover');
+    foreach (['seo_title','seo_description','seo_keywords','canonical_url'] as $field) {
+        check($seoGet('A')[1]['seo'][$field]===$seo[$field],'Recovered save lost field: '.$field);
+    }
+    echo "Database outage HTTP status, auth/CSRF, safe diagnostics, data preservation and SEO load/save recovery passed.\n";
     echo "MySQL import, employee/account CRUD, bulk/user modules, SEO, activity, exact-session termination and auth/CSRF checks passed.\n";
 } finally {
     if (is_resource($server)) {

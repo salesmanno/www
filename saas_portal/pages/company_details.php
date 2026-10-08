@@ -265,6 +265,7 @@ if (!$company) {
                     </form>
                     
                     <div id="emailConnectionStatus" class="mt-3 alert" style="display: none;"></div>
+                    <div id="emailConfigNotice" class="text-muted small mt-3"></div>
                     <div id="emailConfigStatus" class="mt-3"></div>
                 </div>
             </div>
@@ -607,10 +608,28 @@ if (!$company) {
             <div class="tab-pane fade" id="seo">
                 <section class="content-section">
                     <h3 class="section-title">Synlighet i søk</h3>
-                    <p class="text-muted small">Tittel og beskrivelse som brukes av søkemotorer.</p>
-                    <form id="companySeoForm">
-                        <div class="mb-3"><label for="seoTitle" class="form-label">SEO-tittel</label><input type="text" id="seoTitle" name="seo_title" class="form-control" maxlength="255"></div>
-                        <div class="mb-3"><label for="seoDescription" class="form-label">SEO-beskrivelse</label><textarea id="seoDescription" name="seo_description" class="form-control" rows="4" maxlength="1000"></textarea></div>
+                    <p class="text-muted small">Disse feltene styrer metadata på bedriftens offentlige side. Søkeord er valgfrie og gir ingen garanti for rangering.</p>
+                    <form id="companySeoForm" novalidate>
+                        <div class="mb-3">
+                            <label for="seoTitle" class="form-label">SEO-tittel</label>
+                            <input type="text" id="seoTitle" name="seo_title" class="form-control" maxlength="510" aria-describedby="seoTitleHelp" disabled>
+                            <div id="seoTitleHelp" class="form-text">Maks 255 tegn.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="seoDescription" class="form-label">SEO-beskrivelse</label>
+                            <textarea id="seoDescription" name="seo_description" class="form-control" rows="4" maxlength="2000" aria-describedby="seoDescriptionHelp" disabled></textarea>
+                            <div id="seoDescriptionHelp" class="form-text">Maks 1 000 tegn.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="seoKeywords" class="form-label">Søkeord</label>
+                            <input type="text" id="seoKeywords" name="seo_keywords" class="form-control" maxlength="4000" aria-describedby="seoKeywordsHelp" disabled>
+                            <div id="seoKeywordsHelp" class="form-text">Skill søkeord med komma. Maks 2 000 tegn. Søkeord garanterer ikke bedre rangering.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="seoCanonicalUrl" class="form-label">Kanonisk URL</label>
+                            <input type="url" id="seoCanonicalUrl" name="canonical_url" class="form-control" maxlength="1000" aria-describedby="seoCanonicalUrlHelp" disabled>
+                            <div id="seoCanonicalUrlHelp" class="form-text">Valgfritt. Bruk en absolutt HTTP- eller HTTPS-adresse. Tøm feltet for å fjerne overstyringen. Maks 500 tegn.</div>
+                        </div>
                         <button type="submit" id="seoSaveButton" class="btn btn-primary-custom" disabled>Lagre SEO</button>
                     </form>
                     <div id="companySeoStatus" class="mt-3" role="status" aria-live="polite"></div>
@@ -1070,7 +1089,27 @@ if (!$company) {
             return div.innerHTML;
         }
         
+        let emailSettingsLoaded = false;
+        let paymentSettingsLoaded = false;
+        function settingsControls(section, enabled) {
+            document.querySelectorAll(`#${section} form input, #${section} form select, #${section} button[onclick]`)
+                .forEach(control => control.disabled = !enabled);
+        }
+        function settingsSecrets(ids, disabled) {
+            ids.forEach(id => {
+                const input = document.getElementById(id);
+                input.disabled = disabled;
+                if (disabled) {
+                    input.value = '';
+                    input.placeholder = 'Beholdes – administreres i tilhørende modul';
+                }
+            });
+        }
+        settingsControls('email', false);
+        settingsControls('payment', false);
         function loadEmailConfig() {
+            emailSettingsLoaded = false;
+            settingsControls('email', false);
             fetch(`/saas_portal/api/get_email_config.php?company_id=${companyId}`)
             .then(r => r.json())
             .then(data => {
@@ -1089,13 +1128,24 @@ if (!$company) {
                     document.getElementById('imap_encryption').value = config.imap_encryption || 'ssl';
                     document.getElementById('imap_username').value = config.imap_username || '';
                 }
+                emailSettingsLoaded = true;
+                settingsControls('email', !!data.config);
+                settingsSecrets(['smtp_password','imap_password'], !data.config || !!data.credentials_readonly);
+                ['smtp_encryption','imap_encryption'].forEach(id => {
+                    document.getElementById(id).disabled = !data.config || !!data.credentials_readonly;
+                });
+                document.getElementById('emailConfigNotice').textContent = data.notice || '';
+                document.getElementById('connectEmailBtn').innerHTML = '<i class="bi bi-link-45deg"></i> Aktiver e-post';
+                document.getElementById('emailConfigStatus').textContent = data.config ? '' : 'Ingen e-postkonto finnes for firmaet. Opprett kontoen i e-postmodulen først.';
             })
             .catch(err => portalFailure('emailConfigStatus', err.message, loadEmailConfig));
         }
         
         function saveEmailConfig() {
+            if (!emailSettingsLoaded) return;
             const formData = new FormData(document.getElementById('emailConfigForm'));
             formData.append('company_id', companyId);
+            formData.append('csrf_token', portalCsrf);
             
             const data = {};
             formData.forEach((value, key) => data[key] = value);
@@ -1160,6 +1210,7 @@ if (!$company) {
         }
         
         function connectEmail() {
+            if (!emailSettingsLoaded) return;
             const statusDiv = document.getElementById('emailConnectionStatus');
             const btn = document.getElementById('connectEmailBtn');
             
@@ -1171,7 +1222,7 @@ if (!$company) {
             fetch('/saas_portal/api/connect_email.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ company_id: companyId })
+                body: JSON.stringify({ company_id: companyId, csrf_token: portalCsrf })
             })
             .then(r => r.json())
             .then(data => {
@@ -1179,7 +1230,7 @@ if (!$company) {
                 if (data.success) {
                     statusDiv.className = 'mt-3 alert alert-success';
                     statusDiv.innerHTML = `
-                        <i class="bi bi-check-circle-fill"></i> <strong>Email koblet opp!</strong><br>
+                        <i class="bi bi-check-circle-fill"></i> <strong>E-postoppsett aktivert</strong><br>
                         <small>${escapeHtml(data.message)}</small>
                     `;
                     setTimeout(() => {
@@ -1197,6 +1248,8 @@ if (!$company) {
             });
         }
         
+        // The initially active tab does not emit shown.bs.tab.
+        loadEmailConfig();
         // Laste epost-konfigurasjon når fanen åpnes
         document.getElementById('email-tab').addEventListener('shown.bs.tab', function () {
             loadEmailConfig();
@@ -1204,10 +1257,13 @@ if (!$company) {
         
         // Betalingskonfigurasjon funksjoner
         function loadPaymentGateways() {
+            paymentSettingsLoaded = false;
+            settingsControls('payment', false);
             fetch(`/saas_portal/api/get_payment_gateways.php?company_id=${companyId}`)
             .then(r => r.json())
             .then(data => {
                 if (!data.success) throw new Error(data.message || 'Kunne ikke hente betalingskonfigurasjonen.');
+                ['vipps','stripe','paypal'].forEach(gateway => document.getElementById(gateway+'ConfigForm').reset());
                 if (data.success && data.gateways) {
                     data.gateways.forEach(gw => {
                         if (gw.gateway_name === 'vipps') {
@@ -1229,11 +1285,23 @@ if (!$company) {
                         }
                     });
                 }
+                paymentSettingsLoaded = true;
+                (data.gateways || []).forEach(gw => {
+                    if (!['vipps','stripe','paypal'].includes(gw.gateway_name)) return;
+                    document.querySelectorAll(`#${gw.gateway_name}ConfigForm input, #${gw.gateway_name}ConfigForm button`)
+                        .forEach(control => control.disabled = false);
+                    const display = document.querySelector(`#${gw.gateway_name}ConfigForm [name="display_name"]`);
+                    if (display) display.value = gw.display_name || gw.gateway_name;
+                });
+                settingsSecrets(['vipps_client_secret','vipps_subscription_key','stripe_secret_key','stripe_webhook_secret','paypal_client_secret'], true);
+                document.getElementById('paymentConfigStatus').textContent =
+                    data.notice || ((data.gateways || []).length ? '' : 'Ingen betalingsleverandør finnes for firmaet. Opprett oppsettet i økonomimodulen først.');
             })
             .catch(err => portalFailure('paymentConfigStatus', err.message, loadPaymentGateways));
         }
         
         function savePaymentGateway(gateway) {
+            if (!paymentSettingsLoaded) return;
             let formData, displayName;
             if (gateway === 'vipps') {
                 formData = new FormData(document.getElementById('vippsConfigForm'));
@@ -1247,6 +1315,7 @@ if (!$company) {
             }
             
             formData.append('company_id', companyId);
+            formData.append('csrf_token', portalCsrf);
             formData.append('gateway_name', gateway);
             formData.append('display_name', displayName);
             

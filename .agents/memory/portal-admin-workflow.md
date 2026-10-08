@@ -27,3 +27,9 @@ Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet o
 
 **How to apply:** Brukeren valgte tilgang til alle bedrifter. Bruk en eksplisitt, serverkontrollert global rolle gjennom eksisterende SaaS-innlogging, uten ny SuperUser-innlogging i portalen. Sletting eller frakobling av en ansatt må ikke automatisk oppgradere en tidligere firmakonto til global tilgang.
 
+Aktivitetsfeeder skal vise lesbare setninger om aktør, handling og arrangement eller betaling, med detaljer ved hover og gamle/nye verdier ved endringer. Alle feeder og øktbokser skal oppdateres løpende; aktive økter skal ha sanntidsnedtelling, og påloggede ansatte skal ha grønt lys på bedriftssiden.
+
+**Why:** Brukeren beskrev feeden som uleselig og ønsket å se hva kunder og SuperUsers faktisk gjør, uten manuell oppdatering.
+
+**How to apply:** Bevar denne presentasjonen på både oversikten og bedriftssiden. Detaljer må også være tilgjengelige med tastatur og berøring, og begrenses til relevante tillatte data, ikke rå audit- eller autentiseringsdata.
+

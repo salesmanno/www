@@ -33,8 +33,13 @@ if (isset($_SESSION['website_unlocked']) && isset($_SESSION['website_unlock_time
 }
 
 if ($db) {
-    // Check if website config exists
-    $stmt = $db->prepare("SELECT * FROM tenant_website_config WHERE company_id = ?");
+    // Read only the website module config, never an arbitrary module row.
+    $stmt = $db->prepare("
+        SELECT twc.*
+        FROM tenant_website_config twc
+        JOIN system_modules sm ON twc.module_id = sm.id
+        WHERE twc.company_id = ? AND sm.module_key = 'website'
+    ");
     $stmt->execute([$companyId]);
     $currentSettings = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -253,20 +258,6 @@ if ($db) {
                     </div>
                     <?php endif; ?>
                     
-                    <?php if (!empty($currentSettings['seo_title'])): ?>
-                    <div class="mb-3">
-                        <label class="form-label">SEO Tittel</label>
-                        <p class="form-control-plaintext"><?= htmlspecialchars($currentSettings['seo_title']) ?></p>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <?php if (!empty($currentSettings['seo_description'])): ?>
-                    <div class="mb-3">
-                        <label class="form-label">SEO Beskrivelse</label>
-                        <p class="form-control-plaintext"><?= htmlspecialchars($currentSettings['seo_description']) ?></p>
-                    </div>
-                    <?php endif; ?>
-                    
                     <div class="mb-3">
                         <label class="form-label">Sist oppdatert</label>
                         <p class="form-control-plaintext">
@@ -279,6 +270,28 @@ if ($db) {
                                 <strong>Ingen nettside konfigurert ennå.</strong> Kontakt systemadministrator for å sette opp nettside for din bedrift.
                             </div>
                         <?php endif; ?>
+                    </div>
+                </div>
+
+                <div class="config-card mt-4">
+                    <h4 class="mb-4"><i class="bi bi-search me-2"></i>Søkemotoroptimalisering</h4>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SEO-tittel</label>
+                            <p class="form-control-plaintext"><?= htmlspecialchars((string)($websiteGeneral['seo_title'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SEO-beskrivelse</label>
+                            <p class="form-control-plaintext"><?= htmlspecialchars((string)($websiteGeneral['seo_description'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SEO-nøkkelord</label>
+                            <p class="form-control-plaintext"><?= htmlspecialchars((string)($websiteGeneral['seo_keywords'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Kanonisk URL</label>
+                            <p class="form-control-plaintext"><?= htmlspecialchars((string)($websiteGeneral['canonical_url'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
                     </div>
                 </div>
                 

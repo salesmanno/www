@@ -9,11 +9,13 @@ if (!isset($_SESSION['saas_admin_id'])) {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../services/ActivityLogger.php';
+require_once __DIR__ . '/../services/PortalDatabase.php';
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
 
 try {
-    $db = getDBConnection();
+    $db = PortalDatabase::connect();
     $logger = new ActivityLogger($db);
     
     // Parametere
@@ -41,14 +43,8 @@ try {
         'timestamp' => date('Y-m-d H:i:s')
     ]);
     
-} catch (Exception $e) {
-    error_log("Get activity stream error: " . $e->getMessage());
-    $isDatabaseUnavailable = strpos($e->getMessage(), 'DATABASE TILKOBLINGSFEIL') !== false;
-    http_response_code($isDatabaseUnavailable ? 503 : 500);
-    echo json_encode([
-        'success' => false,
-        'message' => $isDatabaseUnavailable
-            ? 'Databasetilkoblingen er utilgjengelig. Prøv igjen senere.'
-            : 'Kunne ikke hente aktivitetsloggen. Prøv igjen.'
-    ]);
+} catch (Throwable $e) {
+    [$status, $body] = PortalDatabase::failure($e, 'activity_stream', 'Kunne ikke hente aktivitetsloggen. Prøv igjen.');
+    http_response_code($status);
+    echo json_encode($body, JSON_UNESCAPED_UNICODE);
 }

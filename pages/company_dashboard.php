@@ -8,6 +8,11 @@ if (!isset($_SESSION['tenant_admin_id'])) {
     exit;
 }
 
+if (empty($_SESSION['website_settings_csrf'])) {
+    $_SESSION['website_settings_csrf'] = bin2hex(random_bytes(32));
+}
+$websiteSettingsCsrf = $_SESSION['website_settings_csrf'];
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/session_manager.php';
@@ -1017,7 +1022,9 @@ try {
             const general = {};
             
             formData.forEach((value, key) => {
-                if (key.startsWith('config_')) {
+                if (key === 'module_id') {
+                    config.module_id = value;
+                } else if (key.startsWith('config_')) {
                     const fieldName = key.replace('config_', '');
                     config[fieldName] = value;
                 } else if (key.startsWith('general_')) {
@@ -1036,7 +1043,11 @@ try {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ config, general })
+                    body: JSON.stringify({
+                        csrf_token: <?= json_encode($websiteSettingsCsrf, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>,
+                        config,
+                        general
+                    })
                 });
                 
                 const result = await response.json();
