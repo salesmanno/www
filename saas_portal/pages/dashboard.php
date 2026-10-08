@@ -418,10 +418,33 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     </div>
     
     <div class="modal fade" id="companyGrantModal" tabindex="-1" aria-labelledby="companyGrantTitle">
-        <div class="modal-dialog"><div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title" id="companyGrantTitle">Tildel moduler til valgte bedrifter</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
-            <div class="modal-body"><p id="companyGrantSummary" class="text-muted"></p><div id="companyGrantStatus" role="status"></div><div id="companyGrantModules"></div></div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled>Bekreft tildeling</button></div>
+        <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><div><h2 class="modal-title h5 mb-1" id="companyGrantTitle">Gjennomgå moduler og abonnement</h2><p class="small mb-0 text-white-50">Forhåndsvisning – ingen tilganger eller abonnementer endres.</p></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Lukk"></button></div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2" role="note">Dette er et katalogestimat, ikke en aktivert bestilling. Eksisterende tilganger beholdes.</div>
+                <p id="companyGrantSummary" class="text-muted mb-3"></p>
+                <div id="companyGrantStatus" role="status" aria-live="polite"></div>
+                <div class="row g-3 align-items-start">
+                    <section class="col-12 col-lg-7" aria-labelledby="companyGrantModulesTitle">
+                        <div class="d-flex justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantModulesTitle" class="h6 mb-0">Modulkatalog</h3><span class="small text-muted">Velg eventuelle moduler å inkludere i estimatet</span></div>
+                        <div id="companyGrantModules" aria-busy="false"></div>
+                    </section>
+                    <section class="col-12 col-lg-5" aria-labelledby="companyGrantSetupTitle">
+                        <div class="rounded border p-3 h-100" style="background:#f5f8f3">
+                            <div class="small text-uppercase fw-semibold text-muted mb-1">Oppsett</div>
+                            <h3 id="companyGrantSetupTitle" class="h6">Fakturautsteder</h3>
+                            <div id="companyGrantIssuer" class="mb-3">Henter fakturainformasjon …</div>
+                            <div class="small text-muted">Engangsbeløp for nye moduler vises separat fra månedlig pris.</div>
+                        </div>
+                    </section>
+                </div>
+                <section class="mt-4" aria-labelledby="companyGrantCompaniesTitle">
+                    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2"><h3 id="companyGrantCompaniesTitle" class="h6 mb-0">Pris per bedrift</h3><span class="small text-muted">Beregnet fra katalogen; gjeldende avtale vises separat</span></div>
+                    <div id="companyGrantCompanyQuotes"></div>
+                </section>
+                <div id="companyGrantWarnings" class="mt-3"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button><button type="button" class="btn btn-primary-custom" id="companyGrantSubmit" disabled aria-describedby="companyGrantSubmitNote">Tildeling ikke aktivert</button><span id="companyGrantSubmitNote" class="small text-muted w-100 text-end">Endringer kan ikke lagres fra denne forhåndsvisningen.</span></div>
         </div></div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -68,7 +68,13 @@ window.fetch = async (input, options = {}) => {
  else if (url.pathname.endsWith('/get_company_modules.php') || url.pathname.endsWith('/get_admin_modules.php')) data.modules=fixtureModules;
  else if (url.pathname.endsWith('/get_active_sessions.php')) data.sessions=fixtureSessions;
  else if (url.pathname.endsWith('/get_activity_stream.php')) { data.activities=[{action_type:'login',actor_display:'Ingrid Lunde',action_summary:'Logget inn',company_name:'Nordhavn & Sønner',subdomain:'nordhavn',created_at:'2026-10-07T12:10:00'}]; data.action_types=['login','company_seo_updated']; }
- else if (url.pathname.endsWith('/grant_company_modules.php') && fixtureFailGrant) { data={success:false,message:'Tildeling utilgjengelig'}; status=503; }
+ else if (url.pathname.endsWith('/preview_company_subscription.php')) {
+  if (fixtureFailGrant) {data={success:false,message:'Forhåndsvisning utilgjengelig'};status=503;}
+  else data={success:true,read_only:true,apply_available:false,price_schema_ready:true,issuer:{id:'issuer',name:'Salesman'},warnings:[],
+   modules:fixtureModules.map(module=>({...module,module_key:module.id==='module-existing'?'customers':'quotes',price_monthly:'10.00',price_setup:'20.00',price_currency:'NOK'})),
+   companies:body.company_ids.map(id=>({company_id:id,name:id,module_ids:body.module_ids,new_module_ids:body.module_ids,
+    monthly_total:'20.00',setup_total:'20.00',currency:'NOK',missing_prices:[],blockers:[],subscription:null}))};
+ }
  else if (url.pathname.endsWith('/delete_admin.php')) {
   fixtureAdmins=fixtureAdmins.filter(account => account.admin_id !== body.admin_id);
   const staff=fixtureStaff.find(staff => staff.id==='staff-linked');
@@ -131,15 +137,18 @@ expect(document.getElementById('companyGrantModal').classList.contains('show'),'
 expect(document.getElementById('companyGrantSubmit').disabled,'Grant enabled without a module selection');
 change(document.querySelector('#companyGrantModules input[value="module-new"]'),true);
 fixtureFailGrant=true;
-document.getElementById('companyGrantSubmit').click(); await settle();
-expect(document.getElementById('companyGrantStatus').textContent.includes('Tildeling utilgjengelig'),'Grant failure not visible');
-expect(portalSelectedCompanies.size===2,'Failed grant erased company selection');
-expect(document.querySelector('#companyGrantModules input[value="module-new"]').checked,'Failed grant erased module selection');
+await settle();
+expect(document.getElementById('companyGrantStatus').textContent.includes('Forhåndsvisning utilgjengelig'),'Preview failure not visible');
+expect(portalSelectedCompanies.size===2,'Failed preview erased company selection');
+expect(document.querySelector('#companyGrantModules input[value="module-new"]').checked,'Failed preview erased module selection');
 fixtureFailGrant=false;
-document.getElementById('companyGrantSubmit').click(); await settle();
-same(lastRequest('grant_company_modules.php').payload,{company_ids:['company-a','company-b'],module_ids:['module-new'],csrf_token:'fixture-csrf'},'Add-only grant payload incorrect');
-expect(!('remove_module_ids' in lastRequest('grant_company_modules.php').payload),'Grant sent a removal operation');
-expect(!portalGrantMode && portalSelectedCompanies.size===0,'Successful grant did not exit selection mode');
+document.querySelector('#companyGrantStatus button').click(); await settle();
+same(lastRequest('preview_company_subscription.php').payload,{company_ids:['company-a','company-b'],module_ids:['module-new'],csrf_token:'fixture-csrf'},'Preview payload incorrect');
+expect(!lastRequest('grant_company_modules.php'),'Preview granted real access');
+expect(document.getElementById('companyGrantSubmit').disabled,'Preview enabled actual saving');
+bootstrap.Modal.getInstance(document.getElementById('companyGrantModal')).hide();await settle();
+document.getElementById('grantModeButton').click();
+expect(!portalGrantMode && portalSelectedCompanies.size===0,'Cancel did not exit selection mode');
 expect(document.querySelector('.company-identity').tagName==='A','Company navigation not restored');
 const terminate=document.querySelector('#activeSessionsPanel button');
 expect(document.querySelectorAll('#activeSessionsPanel .session-row').length===2,'Active sessions missing');
@@ -148,7 +157,7 @@ same(lastRequest('logout_user.php').payload,{admin_id:'admin-linked',session_id:
 expect(document.querySelectorAll('#activeSessionsPanel .session-row').length===1,'Terminating one session erased the other session');
 expect(fixtureSessions[0].session_id==='session-two','Wrong session terminated');
 checkNoOverflow();
-document.body.dataset.checks='company navigation, safe text/logo, multi-selection, polling persistence, grant failure/retry/payload, targeted session termination';
+document.body.dataset.checks='company navigation, safe text/logo, multi-selection, polling persistence, subscription preview failure/retry/payload, targeted session termination';
 `;
 
 const companyAssertions = `

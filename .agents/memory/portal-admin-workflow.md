@@ -33,6 +33,12 @@ Abonnementsoppsett skal vises som en kolonne på skjermen ved modultildeling. Be
 
 **How to apply:** Vis løpende månedsbeløp og engangsetablering separat i modultildelingsflyten.
 
+Prisene i modulkatalogen er standardpriser, ikke en tillatelse til å endre eksisterende avtalte abonnementspriser.
+
+**Why:** Bedriftsspesifikke avtaler kan ha rabatter eller andre vilkår. En ny katalogberegning må ikke umerkelig erstatte disse.
+
+**How to apply:** Skill katalogestimat fra gjeldende avtale i visningen. Krev en uttrykkelig avklaring før eksisterende avtalte priser erstattes ved senere lagring.
+
 Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet og skal ikke ha firmaets modulrestriksjoner.
 
 **Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.
