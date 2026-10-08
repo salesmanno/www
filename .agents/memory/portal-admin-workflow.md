@@ -27,6 +27,12 @@ Abonnementsutsteder for bedriftene skal være Salesman fra `self_company`, ikke 
 
 **How to apply:** Bruk denne utstederen ved klargjøring av abonnementstilknytninger. Selve valget er ikke en godkjenning av endringer i faktiske data.
 
+Abonnementsoppsett skal vises som en kolonne på skjermen ved modultildeling. Beregningen skal omfatte månedspris, ikke bare etablering eller én modulpris.
+
+**Why:** Brukeren valgte «På skjermen ved modultildeling» og presiserte behovet for månedspris.
+
+**How to apply:** Vis løpende månedsbeløp og engangsetablering separat i modultildelingsflyten.
+
 Adminbrukere uten ansattilknytning er ment som globale brukere utenfor firmaet og skal ikke ha firmaets modulrestriksjoner.
 
 **Why:** Brukeren presiserte dette som unntak fra features-grensen for firma-SuperUsers.
