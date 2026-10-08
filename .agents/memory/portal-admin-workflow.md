@@ -69,3 +69,15 @@ Aktivitetsfeeder skal vise lesbare setninger om aktør, handling og arrangement 
 
 **How to apply:** Bevar denne presentasjonen på både oversikten og bedriftssiden. Detaljer må også være tilgjengelige med tastatur og berøring, og begrenses til relevante tillatte data, ikke rå audit- eller autentiseringsdata.
 
+Betalingsløsninger skal kunne opprettes og administreres i SaaS-portalen uavhengig av bedriftens moduler, bare av SaaS-admins. Redigering skal beskyttes mot utilsiktede endringer.
+
+**Why:** Brukeren presiserte at dette er høyeste administrasjonsnivå og at oppsett ikke skal henvises til økonomimodulen.
+
+**How to apply:** Skill rett til betalingsadministrasjon fra global tilgang til bedrifter/moduler. Behold maskering av hemmeligheter, men ikke bruk maskering som grunn til å nekte autorisert opprettelse eller erstatning.
+
+Bedriftssiden skal ha egen fane ved SEO for månedlig beløp og månedsrabatt, med forfallsnedtelling og abonnementsstart ved lagring av modultildeling.
+
+**Why:** Brukeren ba om samlet oversikt over disse abonnementsvilkårene i bedriftens oppsettsområde.
+
+**How to apply:** Gjenbruk eksisterende abonnementsinfrastruktur og skill lagrede avtalevilkår fra prisforhåndsvisning. Videreføring av globale SuperUsers skal foretrekke eksisterende roller, rettigheter og innlogging fremfor flere nye tabeller.
+
