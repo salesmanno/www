@@ -4,3 +4,4 @@
 - [Portal administration](portal-admin-workflow.md) — shared activity/sessions, employee-linked accounts, editable module selections and catalog versus agreement prices.
 - [Gratis arrangementer](event-pricing-policy.md) — ordinærpris 0 uten alternative priser skal tillate reservasjon uten betalingskrav.
 - [Isolated MySQL tests](isolated-mysql-tests.md) — --no-defaults does not exclude connection environment variables; force a fixture socket and an environment allowlist.
+- [Rental custom fields](rental-custom-fields.md) — rental/customer field definitions belong in the existing dynamic form system, not a rental-specific settings table.
