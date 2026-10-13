@@ -56,11 +56,12 @@ final class PortalSubscriptionService {
         $engine = $this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
         foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules','saas_subscription_changes'] as $table) {
             $engine->execute([$table]);
-            if (strcasecmp((string)$engine->fetchColumn(), 'InnoDB') !== 0) throw new InvalidArgumentException('Abonnementsmigreringen må installeres før lagring.');
+            if (strcasecmp((string)$engine->fetchColumn(), 'InnoDB') !== 0) throw new InvalidArgumentException('Lagring krever at '.$table.' finnes og bruker InnoDB. Ingen databaseendring kjøres automatisk.');
         }
         $planColumns = $this->columns('saas_subscription_plans');
         $subscriptionColumns = $this->columns('tenant_subscriptions');
-        if (array_diff(['subscription_start','due_date'],$subscriptionColumns)) throw new InvalidArgumentException('Installer abonnementsdatokolonnene før modultildeling kan lagres.');
+        $missingDateColumns = array_values(array_diff(['subscription_start','due_date'],$subscriptionColumns));
+        if ($missingDateColumns) throw new InvalidArgumentException('Manglende datofelt i tenant_subscriptions: '.implode(', ', $missingDateColumns).'. Klargjør abonnementsdatoene med php saas_portal/migrations/install_subscription_dates.php --apply.');
         $grantColumns = $this->columns('tenant_company_modules');
         $this->db->beginTransaction();
         try {
@@ -83,7 +84,8 @@ final class PortalSubscriptionService {
                 return ['success'=>true,'replayed'=>true,'companies'=>$saved,'message'=>'Abonnementsoppsettet var allerede lagret. Ingen ny etablering er registrert.'];
             }
             $report = (new PortalSubscriptionPreview($this->db))->preview($companyIds,$moduleIds,$actor,true,$selections);
-            if (!$report['apply_available'] || !$report['price_schema_ready']) throw new InvalidArgumentException('Prisoppsettet er ikke klart for lagring.');
+            if (!$report['apply_available']) throw new InvalidArgumentException(implode(' ', $report['warnings']) ?: 'Abonnementsskjemaet er ikke klart for lagring.');
+            if (!$report['price_schema_ready']) throw new InvalidArgumentException('Modulprisene i system_modules er ikke klare for lagring.');
             if (!hash_equals($report['quote_hash'], $quoteHash)) {
                 throw new PortalSubscriptionConflictException('Pris eller tilgang har endret seg siden forhåndsvisningen. Oppdater oppsettet og bekreft på nytt.');
             }

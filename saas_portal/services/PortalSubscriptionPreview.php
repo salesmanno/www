@@ -193,18 +193,22 @@ final class PortalSubscriptionPreview {
             }
             $schemaReady = $catalogData['schema_ready'];
             $dateColumns=$this->db->query('SHOW COLUMNS FROM tenant_subscriptions')->fetchAll(PDO::FETCH_COLUMN);
-            $datesReady=!array_diff(['subscription_start','due_date'],$dateColumns);
+            $missingDateColumns=array_values(array_diff(['subscription_start','due_date'],$dateColumns));
+            $datesReady=!$missingDateColumns;
             $requiredTables = $this->db->query("SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
                 AND TABLE_NAME='saas_subscription_changes'")->fetchAll(PDO::FETCH_KEY_PAIR);
-            $saveSchemaReady = count($requiredTables) === 1 && !array_filter($requiredTables, static fn($value) => strcasecmp($value, 'InnoDB') !== 0);
-            if ($saveSchemaReady) {
+            $historySchemaReady = count($requiredTables) === 1 && !array_filter($requiredTables, static fn($value) => strcasecmp($value, 'InnoDB') !== 0);
+            $missingHistoryColumns = [];
+            if ($historySchemaReady) {
                 $historyColumns = $this->db->query('SHOW COLUMNS FROM saas_subscription_changes')->fetchAll(PDO::FETCH_COLUMN);
-                $saveSchemaReady = !array_diff(['old_max_users','max_users','old_setup_discount','old_monthly_discount','plan_setup_discount','plan_monthly_discount'], $historyColumns);
+                $missingHistoryColumns = array_values(array_diff(['old_max_users','max_users','old_setup_discount','old_monthly_discount','plan_setup_discount','plan_monthly_discount'], $historyColumns));
+                $historySchemaReady = !$missingHistoryColumns;
             }
-            $saveSchemaReady=$saveSchemaReady && $datesReady;
+            $saveSchemaReady=$historySchemaReady && $datesReady;
             $report = [
                 'success' => true, 'read_only' => true, 'apply_available' => $saveSchemaReady,
                 'save_schema_ready' => $saveSchemaReady,
+                'history_schema_ready' => $historySchemaReady, 'dates_schema_ready' => $datesReady,
                 'pricing_basis' => 'catalog_estimate', 'issuer' => $issuer,
                 'price_schema_ready' => $schemaReady, 'modules' => $modules, 'companies' => $companies,
                 'warnings' => $schemaReady ? [] : ['Priskolonnene mangler helt eller delvis i system_modules. Manglende priser behandles ikke som gratis.']
@@ -212,8 +216,11 @@ final class PortalSubscriptionPreview {
             $report['quote_hash'] = hash('sha256', json_encode([$actor,$companyIds,$moduleIds,$selections,$report], JSON_THROW_ON_ERROR));
             foreach ($report['companies'] as &$company) unset($company['source_subscription']);
             unset($company);
-            if (!$saveSchemaReady) $report['warnings'][] = 'Lagring krever at migreringen for abonnementspriser er installert.';
-            if (!$datesReady) $report['warnings'][]='Abonnementsdatokolonnene mangler. Installer den eksplisitte migreringen før lagring.';
+            if (!$historySchemaReady) {
+                $detail = $missingHistoryColumns ? ' Manglende historikkfelt: '.implode(', ', $missingHistoryColumns).'.' : ' Tabellen mangler eller bruker ikke InnoDB.';
+                $report['warnings'][] = 'Endringshistorikken i saas_subscription_changes er ikke klar for lagring.'.$detail.' Gjeldende priser og rabatter lagres i saas_subscription_plans. Historikkskjemaet klargjøres med php saas_portal/migrations/install_subscription_pricing.php --apply.';
+            }
+            if (!$datesReady) $report['warnings'][]='Manglende datofelt i tenant_subscriptions: '.implode(', ', $missingDateColumns).'. Dette gjelder bedriftens abonnementsdatoer, ikke planprisen. Klargjør feltene med php saas_portal/migrations/install_subscription_dates.php --apply.';
             if (!$withinWriteTransaction) $this->db->commit();
             return $report;
         } catch (Throwable $e) {
