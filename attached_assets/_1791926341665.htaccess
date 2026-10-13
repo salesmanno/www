@@ -1,0 +1,11 @@
+RewriteEngine On
+RewriteBase /public/
+
+# Rewrite company-specific URLs to their folders
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ $1/index.php [L]
+
+# Handle assets
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^assets/(.*)$ assets/$1 [L]

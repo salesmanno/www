@@ -4,6 +4,7 @@ DirectoryIndex index.php index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^saas-portal/?$ /saas_portal/login.php [R=302,L]
     RewriteRule ^(?:\.git|\.agents|\.local|\.cache|\.config)(?:/|$) - [F,L]
 </IfModule>
 

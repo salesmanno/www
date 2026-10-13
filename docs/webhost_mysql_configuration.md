@@ -51,3 +51,16 @@ A generic HTTP 500 is not proof of a bad database password. Check the webhost
 error log for PHP errors, missing helper files, PHP version or Apache directives.
 PHP 8 is required by this project. Authentication logs only the exception type
 and driver code, not addresses, credentials or raw driver messages.
+
+## Which .htaccess belongs where?
+
+The root `.htaccess` belongs beside the project's root `index.php`, not inside
+`public`. The separate `public/.htaccess` belongs inside `public`.
+Do not copy a file with `RewriteBase /public/` into the webroot. Do not rewrite
+missing assets to the same asset path: Apache can repeat the rewrite until it
+returns HTTP 500. Existing company directories need only `DirectoryIndex`.
+
+Keep a backup of the host's existing configuration before replacement. If it
+contains unrelated host rules, merge the corrected routing rather than deleting
+those rules. The uploaded old file had no database credentials or PHP environment
+configuration; it cannot establish whether the host has the MySQL settings.

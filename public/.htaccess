@@ -1,11 +1,6 @@
-RewriteEngine On
-RewriteBase /public/
+Options -Indexes
+DirectoryIndex index.php index.html
 
-# Rewrite company-specific URLs to their folders
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^([a-zA-Z0-9_-]+)/?$ $1/index.php [L]
-
-# Handle assets
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^assets/(.*)$ assets/$1 [L]
+# Existing company directories are handled by DirectoryIndex.
+# No asset rewrite: missing files must return 404, not rewrite to themselves.
+# No RewriteBase: these rules remain valid when the public directory is moved.
