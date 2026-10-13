@@ -132,6 +132,7 @@
             if (isset($_GET['error'])):
                 $error_msg = 'Ukjent feil';
                 switch($_GET['error']) {
+                    case 'database_configuration': $error_msg = 'Databaseoppsettet på serveren mangler eller er ugyldig. Kontakt systemadministratoren for å konfigurere tilkoblingen.'; break;
                     case 'system_error': $error_msg = 'Innloggingen kunne ikke fullføres på grunn av en systemfeil. Prøv igjen. Hvis feilen vedvarer, må databaseforbindelsen kontrolleres.'; break;
                     case 'invalid_request': $error_msg = 'Ugyldig innloggingsforespørsel. Prøv igjen.'; break;
                     case 'invalid_credentials': $error_msg = 'Ugyldig e-post eller passord'; break;

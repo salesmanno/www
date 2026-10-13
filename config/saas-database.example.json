@@ -1,0 +1,7 @@
+{
+    "host": "SETT_INN_DATABASEVERT",
+    "database": "SETT_INN_DATABASENAVN",
+    "user": "SETT_INN_DATABASEBRUKER",
+    "password": "SETT_INN_DATABASEPASSORD",
+    "port": 3306
+}

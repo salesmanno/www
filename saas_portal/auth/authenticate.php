@@ -70,6 +70,11 @@ try {
     header('Location: /saas_portal/pages/dashboard.php');
     exit;
     
+} catch (MysqlConfigurationException $e) {
+    foreach (array_keys($_SESSION) as $key) if (str_starts_with($key,'saas_')) unset($_SESSION[$key]);
+    error_log('SaaS admin login failed: database configuration missing or invalid.');
+    header('Location: /saas_portal/login.php?error=database_configuration');
+    exit;
 } catch (Exception $e) {
     foreach (array_keys($_SESSION) as $key) if (str_starts_with($key,'saas_')) unset($_SESSION[$key]);
     error_log('SaaS admin login failed.');

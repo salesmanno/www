@@ -6,6 +6,11 @@ node_modules/
 .env
 .env.local
 
+# Private database configuration; only the placeholder example may be committed
+.saas-database.json
+.saas-database.json.*
+database.local.php
+
 # Log files
 *.log
 logs/
