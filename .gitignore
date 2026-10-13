@@ -6,11 +6,6 @@ node_modules/
 .env
 .env.local
 
-# Private database configuration; only the placeholder example may be committed
-.saas-database.json
-.saas-database.json.*
-database.local.php
-
 # Log files
 *.log
 logs/
@@ -51,17 +46,3 @@ package-lock.json
 
 # Cache
 cache/
-
-# Local Replit runtime state and tool caches (not project configuration)
-/.cache/
-/.local/state/
-
-# Local browser profiles and editor runtime
-/.config/chromium/
-/.config/chromium-headless/
-/.config/.vscode-server/
-
-# Generated build and test output
-/generated-artifacts/
-/test-results/
-/playwright-report/
