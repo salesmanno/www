@@ -139,10 +139,15 @@ try {
     $quote=$overview->get('A')['subscription'];
     billingAssert($quote['catalog']['monthly_gross']===null && $quote['catalog']['warnings'],'Invalid catalog price accepted');
     $db->exec("UPDATE system_modules SET price_monthly=1750 WHERE id='M1'");
+    $db->exec("UPDATE saas_subscription_plans SET subscription_start='2026-09-01',due_date='2026-11-01' WHERE id='P'");
+    $db->exec("INSERT INTO tenant_subscriptions VALUES ('S2','B','P','issuer','active','monthly')");
     $quote=$overview->get('A')['subscription'];
+    billingAssert($quote['subscription_start']==='2026-09-01' && $quote['due_date']==='2026-11-01','Dates not read from plan');
     $dataEdit=PortalBillingAccess::unlock('subscription','A','admin',$quote['version'])+['confirmed'=>true];
     $overview->saveDue('A',['due_date'=>'2026-10-31']+$dataEdit,'admin');
     billingAssert($overview->get('A')['subscription']['due_date']==='2026-10-31','Due save failed');
+    billingAssert($overview->get('B')['subscription']['due_date']==='2026-11-01','Editing due date modified another company sharing the plan');
+    billingAssert($db->query("SELECT due_date FROM saas_subscription_plans WHERE id='P'")->fetchColumn()==='2026-11-01','Shared source date changed');
     billingAssert(!isset($_SESSION['billing_edits']['subscription']),'Due save did not relock');
     billingAssert(PortalSubscriptionDates::nextMonth('2024-01-31')==='2024-02-29','Leap month');
     billingAssert(PortalSubscriptionDates::nextMonth('2026-01-31')==='2026-02-28','Month end');

@@ -10,7 +10,7 @@ $db = new PDO('mysql:unix_socket='.$socket,'root','',[PDO::ATTR_ERRMODE=>PDO::ER
 function saveExpect(bool $ok,string $label): void { if (!$ok) throw new RuntimeException($label); }
 function saveSnapshot(PDO $db): array {
     $result=[];
-    foreach (['saas_subscription_plans','tenant_subscriptions','tenant_company_modules','saas_subscription_changes'] as $table) {
+    foreach (['saas_subscription_plans','tenant_subscriptions','tenant_company_modules'] as $table) {
         $result[$table]=$db->query("SELECT * FROM {$table} ORDER BY 1,2")->fetchAll(PDO::FETCH_ASSOC);
     }
     return $result;
@@ -66,7 +66,7 @@ try {
     saveReject(fn()=>$service->save(['A','B'],['M1','M2'],$quote['quote_hash'],'actor'),PortalSubscriptionConflictException::class);
     saveExpect(saveSnapshot($db)===$stale,'Stale quote mutated data');
     $db->exec("UPDATE system_modules SET price_monthly=50 WHERE id='M2'");
-    $db->exec("CREATE TRIGGER fail_second_subscription BEFORE INSERT ON saas_subscription_changes FOR EACH ROW
+    $db->exec("CREATE TRIGGER fail_second_subscription BEFORE UPDATE ON tenant_subscriptions FOR EACH ROW
         BEGIN IF NEW.company_id='B' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='fixture failure'; END IF; END");
     saveReject(fn()=>$service->save(['A','B'],['M1','M2'],$quote['quote_hash'],'actor'),PDOException::class);
     saveExpect(saveSnapshot($db)===$original,'Bulk failure partially committed');
@@ -86,8 +86,8 @@ try {
     saveExpect($db->query("SELECT config FROM tenant_company_modules WHERE id='G1'")->fetchColumn()==='{"retained":true}','Module config overwritten');
     saveExpect($db->query("SELECT deactivated_at FROM tenant_company_modules WHERE id='G2'")->fetchColumn()===null,'Reactivation timestamp not cleared');
     $after=saveSnapshot($db);
-    $replay=$service->save(['A','B'],['M1','M2'],$quote['quote_hash'],'actor');
-    saveExpect($replay['replayed'] && saveSnapshot($db)===$after,'Replay charged or granted twice');
+    saveReject(fn()=>$service->save(['A','B'],['M1','M2'],$quote['quote_hash'],'actor'),PortalSubscriptionConflictException::class);
+    saveExpect(saveSnapshot($db)===$after,'Retry of a stale quote must not change data');
     saveReject(fn()=>$service->save(['A'],['M2'],$quote['quote_hash'],'inactive'),PortalPreviewAuthorizationException::class);
     $db->exec("UPDATE system_modules SET price_monthly=120 WHERE id='M1'");
     $quoteAgain=$preview->preview(['A'],['M1'],'actor');
@@ -107,7 +107,7 @@ try {
     $selectionD=['D'=>['module_ids'=>['M4'],'max_users'=>0]];
     $quoteD=$preview->preview(['D'],null,'actor',false,$selectionD);
     $service->save(['D'],null,$quoteD['quote_hash'],'actor',$selectionD);
-    saveExpect($db->query("SELECT price_monthly FROM saas_subscription_changes WHERE company_id='D'")->fetchColumn()==='0.00','Free module not supported');
+    saveExpect($db->query("SELECT p.price_monthly FROM saas_subscription_plans p JOIN tenant_subscriptions s ON s.plan_id=p.id WHERE s.company_id='D'")->fetchColumn()==='0.00','Free module not supported');
     saveExpect($db->query("SELECT current_period_end>current_period_start FROM tenant_subscriptions WHERE company_id='D'")->fetchColumn()===1,'New period not initialized');
     $db->exec("UPDATE system_modules SET price_monthly=NULL WHERE id='M2'");
     $bad=$preview->preview(['B'],['M2'],'actor');
@@ -156,7 +156,7 @@ PHP;
         sort($outcomes);
         saveExpect($outcomes===['CONFLICT','SAVED'],'Two concurrent quotes were both applied');
         saveExpect((int)$db->query("SELECT COUNT(*) FROM tenant_subscriptions WHERE company_id='Q'")->fetchColumn()===1,'Concurrent duplicate subscription');
-        saveExpect((int)$db->query("SELECT COUNT(*) FROM saas_subscription_changes WHERE company_id='Q'")->fetchColumn()===1,'Concurrent duplicate setup history');
+        saveExpect((int)$db->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='saas_subscription_changes'")->fetchColumn()===0,'Save must not create or require subscription history');
     } finally {
         if ($db->inTransaction()) $db->rollBack();
         foreach ($processes as [$process,$pipes]) {
@@ -250,11 +250,16 @@ PHP;
     saveExpect($discountPlan===['plan_setup_discount'=>'25.00','plan_monthly_discount'=>'10.00','price_monthly'=>'153.00'],'Discounts not stored on plan');
     $loadedDiscount=$preview->preview(['B'],null,'actor')['companies'][0];
     saveExpect($loadedDiscount['plan_setup_discount']==='25.00' && $loadedDiscount['plan_monthly_discount']==='10.00' && $loadedDiscount['setup_total']==='0.00','Discount reload/repeated setup');
-    $dates=$db->query("SELECT subscription_start,due_date FROM tenant_subscriptions WHERE company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    $dates=$db->query("SELECT p.subscription_start,p.due_date FROM saas_subscription_plans p JOIN tenant_subscriptions s ON s.plan_id=p.id WHERE s.company_id='A'")->fetch(PDO::FETCH_ASSOC);
     saveExpect($dates['subscription_start']===PortalSubscriptionDates::today(),'Subscription start not set on successful assignment');
     saveExpect($dates['due_date']===PortalSubscriptionDates::nextMonth($dates['subscription_start']),'Initial due date is not a clamped next month');
+    $db->exec("UPDATE saas_subscription_plans p JOIN tenant_subscriptions s ON s.plan_id=p.id SET p.subscription_start='2025-12-15',p.due_date='2026-12-15' WHERE s.company_id='A'");
+    $preserveQuote=$preview->preview(['A'],null,'actor',false,['A'=>['module_ids'=>['M1'],'max_users'=>4]]);
+    $service->save(['A'],null,$preserveQuote['quote_hash'],'actor',['A'=>['module_ids'=>['M1'],'max_users'=>4]]);
+    $preservedDates=$db->query("SELECT p.subscription_start,p.due_date FROM saas_subscription_plans p JOIN tenant_subscriptions s ON s.plan_id=p.id WHERE s.company_id='A'")->fetch(PDO::FETCH_ASSOC);
+    saveExpect($preservedDates===['subscription_start'=>'2025-12-15','due_date'=>'2026-12-15'],'Module save overwrote existing plan dates');
     saveExpect($db->query('SELECT marker FROM saas_subscription_plan_modules')->fetchColumn()==='preserve historical data','Existing obsolete table touched');
-    echo "Subscription save passed: migration parity and preservation, rollback, private plans, exact selections, removals, totals, quotas, idempotency, stale quotes, concurrent saves and account creates, features access, initial agreement dates.\n";
+    echo "Subscription save passed: migration parity and preservation, rollback, private plans, exact selections, removals, totals, quotas, safe retries, stale quotes, concurrent saves and account creates, features access, plan dates without change history.\n";
 } finally {
     if ($db->inTransaction()) $db->rollBack();
     $db->exec("DROP DATABASE IF EXISTS `{$database}`");

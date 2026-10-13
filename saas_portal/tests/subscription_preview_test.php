@@ -51,9 +51,8 @@ try {
     $before = subscriptionSnapshot($db);
     $report = $service->preview(['B','A'], ['M1','M2','M2'], 'actor');
     subscriptionExpect($report['read_only'] && !$report['apply_available'] && $report['issuer']['name'] === 'Salesman', 'Issuer and read-only contract');
-    subscriptionExpect(!$report['history_schema_ready'] && !$report['dates_schema_ready'], 'History and date readiness must be reported separately');
-    subscriptionExpect(str_contains(implode(' ', $report['warnings']), 'saas_subscription_changes') && str_contains(implode(' ', $report['warnings']), 'tenant_subscriptions'), 'Schema warnings must name the actual missing tables');
-    subscriptionExpect(!str_contains(implode(' ', $report['warnings']), 'Lagring krever at migreringen for abonnementspriser er installert.'), 'Missing history must not be described as missing plan prices');
+    subscriptionExpect(!$report['dates_schema_ready'], 'Missing plan dates must be detected');
+    subscriptionExpect(count($report['warnings'])===1 && $report['warnings'][0]==='Abonnementsdatoene er ikke konfigurert.', 'Missing dates should have one concise warning');
     foreach ($report['companies'] as $company) {
         subscriptionExpect($company['monthly_total'] === '150.00' && $company['setup_total'] === '25.00', 'Company totals');
         subscriptionExpect($company['proposed_monthly'] === '150.00', 'Exact selection replaces agreed price only on confirmation');
@@ -88,19 +87,14 @@ try {
     subscriptionExpect(count($service->preview(['C'], [], 'actor')['companies'][0]['blockers']) >= 2, 'Multiple subscriptions not blocked');
     SubscriptionDatesSchema::install($db);
     $datesOnly = $service->preview(['A'], null, 'actor');
-    subscriptionExpect($datesOnly['dates_schema_ready'] && !$datesOnly['history_schema_ready'] && !$datesOnly['apply_available'], 'Date columns must not bypass missing history');
-    subscriptionExpect(!str_contains(implode(' ', $datesOnly['warnings']), 'Manglende datofelt'), 'Installed date columns must not produce a date warning');
+    subscriptionExpect($datesOnly['dates_schema_ready'] && $datesOnly['apply_available'] && !$datesOnly['warnings'], 'Plan dates must allow saving without a history table or tenant date columns');
     SubscriptionPricingSchema::install($db);
     $ready = $service->preview(['A'], null, 'actor');
-    subscriptionExpect($ready['history_schema_ready'] && $ready['dates_schema_ready'] && $ready['apply_available'], 'Installed history and dates must allow saving');
+    subscriptionExpect($ready['dates_schema_ready'] && $ready['apply_available'], 'Plan dates must allow saving');
     subscriptionExpect($ready['warnings'] === [], 'Complete schema must not require another migration');
-    $db->exec('ALTER TABLE tenant_subscriptions DROP COLUMN due_date');
-    $historyOnly = $service->preview(['A'], null, 'actor');
-    subscriptionExpect($historyOnly['history_schema_ready'] && !$historyOnly['dates_schema_ready'] && !$historyOnly['apply_available'], 'History must not bypass missing dates');
-    subscriptionExpect(count($historyOnly['warnings']) === 1 && str_contains($historyOnly['warnings'][0], 'tenant_subscriptions: due_date.'), 'A missing date must not be reported as missing history or plan pricing');
-    $db->exec('ALTER TABLE saas_subscription_changes DROP COLUMN old_monthly_discount');
+    $db->exec('ALTER TABLE saas_subscription_plans DROP COLUMN due_date');
     $partial = $service->preview(['A'], null, 'actor');
-    subscriptionExpect(!$partial['history_schema_ready'] && str_contains(implode(' ', $partial['warnings']), 'Manglende historikkfelt: old_monthly_discount.'), 'Incomplete history must identify the exact missing field');
+    subscriptionExpect(!$partial['dates_schema_ready'] && !$partial['apply_available'] && count($partial['warnings'])===1, 'Missing plan dates must still prevent an incomplete save');
     $db->beginTransaction();
     try { $service->preview(['A'], [], 'actor'); throw new LogicException('Caller transaction accepted'); }
     catch (RuntimeException $e) { subscriptionExpect($db->inTransaction(), 'Caller transaction rolled back'); }

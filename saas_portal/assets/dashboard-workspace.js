@@ -153,11 +153,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return raw.replace('.', ',');
     }
     function priceNode(parent, label, value, currency) {
-        const row = portalText(parent, 'div', '', 'd-flex justify-content-between gap-3 small py-1');
+        const row = portalText(parent, 'div', '', 'd-flex justify-content-between gap-3 small py-1 subscription-price-row');
         portalText(row, 'span', label, 'text-muted');
         const amount = portalText(row, 'strong', decimalText(value), 'text-end');
         if (currency) amount.appendChild(document.createTextNode(' ' + String(currency)));
         return row;
+    }
+    function moneyCents(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const match = String(value).trim().match(/^([+-]?)(\d+)(?:[.,](\d{1,2}))?$/);
+        if (!match) return null;
+        const whole = Number(match[2]);
+        const fraction = Number((match[3] || '').padEnd(2, '0'));
+        const cents = whole * 100 + fraction;
+        if (!Number.isSafeInteger(cents)) return null;
+        return match[1] === '-' ? -cents : cents;
+    }
+    function moneyFromCents(cents) {
+        if (!Number.isSafeInteger(cents)) return null;
+        const absolute = Math.abs(cents);
+        return `${cents < 0 ? '-' : ''}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`;
     }
     function companyCurrency(id) {
         const company = portalCompanies.find(item => String(item.id) === String(id));
@@ -264,26 +279,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusText = stateLabels[String(subscription.status || '').toLowerCase()] || subscription.status || 'Status ikke oppgitt';
             const cycleText = cycleLabels[String(subscription.billing_cycle || '').toLowerCase()] || subscription.billing_cycle || 'Ikke oppgitt';
             statusRow.textContent = `Eksisterende abonnement: ${statusText} · ${cycleText}`;
-            if (subscription.plan_name) portalText(card, 'div', 'Avtalt plan: ' + subscription.plan_name, 'small mb-1');
-            priceNode(card, 'Gjeldende avtalt månedspris', subscription.agreed_monthly, subscription.currency);
         } else {
             portalText(card, 'div', 'Ingen eksisterende abonnement registrert.', 'small text-muted mb-1');
         }
-        portalText(card, 'div', 'Katalogestimat etter valgte moduler', 'small fw-semibold mt-2');
-        const chosen = new Set((company.module_ids || []).map(String));
-        portalText(card, 'div', `${chosen.size} valgte moduler`, 'small text-muted mb-1');
-        catalogModules.filter(module => chosen.has(String(module.id))).forEach(module => {
-            priceNode(card, `${module.name || 'Modul'} · per måned`, module.price_monthly, module.price_currency);
-            priceNode(card, `${module.name || 'Modul'} · etablering`, module.price_setup, module.price_currency);
-        });
-        priceNode(card, 'Månedlig modulpakke, brutto', company.monthly_total, company.currency);
-        priceNode(card, 'Månedsrabatt', company.monthly_discount_amount, company.currency);
-        priceNode(card, 'Månedspris etter rabatt', company.proposed_monthly, company.currency);
-        priceNode(card, 'Etablering for alle valgte moduler, brutto', company.selected_setup_total, company.currency);
-        priceNode(card, 'Etablering for alle valgte moduler, netto', company.selected_setup_net_total, company.currency);
-        priceNode(card, 'Nytt oppsett, brutto', company.setup_gross_total, company.currency);
-        priceNode(card, 'Rabatt på nytt oppsett', company.setup_discount_amount, company.currency);
-        priceNode(card, 'Oppstart som forfaller nå, netto', company.setup_total, company.currency);
+        const setupCents = moneyCents(company.setup_total);
+        const monthlyCents = moneyCents(company.proposed_monthly);
+        const total = setupCents === null || monthlyCents === null
+            ? null : moneyFromCents(setupCents + monthlyCents);
+        priceNode(card, 'Etablering', company.setup_total, company.currency);
+        priceNode(card, 'Månedlig', company.proposed_monthly, company.currency);
+        const totalRow = priceNode(card, 'Total', total, company.currency);
+        totalRow.title = 'Etablering + én månedlig betaling';
         if (Array.isArray(company.removed_module_ids) && company.removed_module_ids.length) {
             portalText(card, 'div', `${company.removed_module_ids.length} eksisterende ${company.removed_module_ids.length === 1 ? 'modul fjernes' : 'moduler fjernes'} fra tilgangen.`, 'small text-warning-emphasis mt-2');
         }
@@ -298,10 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Array.isArray(company.blockers) && company.blockers.length) {
             const blocked = portalText(card, 'ul', '', 'small text-danger mt-2 mb-0 ps-3');
             company.blockers.forEach(reason => portalText(blocked, 'li', reason));
-        }
-        if (Array.isArray(company.notes) && company.notes.length) {
-            const notes = portalText(card, 'ul', '', 'small text-muted mt-2 mb-0 ps-3');
-            company.notes.forEach(note => portalText(notes, 'li', note));
         }
     }
     function clearQuoteContent() {

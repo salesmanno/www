@@ -51,17 +51,15 @@ final class PortalSubscriptionService {
         }
         if (count($companyIds)*count($moduleIds ?? []) > 5000) throw new InvalidArgumentException('For mange tildelinger samtidig.');
         if ($this->db->inTransaction()) throw new RuntimeException('Lagring krever en egen transaksjon.');
-        $operation = hash('sha256', json_encode([$actor,$companyIds,$moduleIds,$selections,$quoteHash], JSON_THROW_ON_ERROR));
-        // No DDL here: history and agreement columns must be installed explicitly.
+        // No DDL or separate change-history table is needed during a save.
         $engine = $this->db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
-        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules','saas_subscription_changes'] as $table) {
+        foreach (['saas_admins','self_company','tenant_companies','system_modules','tenant_subscriptions','saas_subscription_plans','tenant_company_modules','tenant_admins','tenant_admin_modules'] as $table) {
             $engine->execute([$table]);
             if (strcasecmp((string)$engine->fetchColumn(), 'InnoDB') !== 0) throw new InvalidArgumentException('Lagring krever at '.$table.' finnes og bruker InnoDB. Ingen databaseendring kjøres automatisk.');
         }
         $planColumns = $this->columns('saas_subscription_plans');
         $subscriptionColumns = $this->columns('tenant_subscriptions');
-        $missingDateColumns = array_values(array_diff(['subscription_start','due_date'],$subscriptionColumns));
-        if ($missingDateColumns) throw new InvalidArgumentException('Manglende datofelt i tenant_subscriptions: '.implode(', ', $missingDateColumns).'. Klargjør abonnementsdatoene med php saas_portal/migrations/install_subscription_dates.php --apply.');
+        if (array_diff(['subscription_start','due_date'],$planColumns)) throw new InvalidArgumentException('Abonnementsdatoene er ikke konfigurert.');
         $grantColumns = $this->columns('tenant_company_modules');
         $this->db->beginTransaction();
         try {
@@ -75,14 +73,6 @@ final class PortalSubscriptionService {
             $auth = $this->db->prepare('SELECT id FROM saas_admins WHERE id=? AND is_active=1 FOR UPDATE');
             $auth->execute([$actor]);
             if (!$auth->fetchColumn()) throw new PortalPreviewAuthorizationException('Ikke autorisert.');
-            $prior = $this->db->prepare('SELECT company_id,plan_id,price_monthly,setup_total,price_currency,max_users FROM saas_subscription_changes WHERE operation_key=? ORDER BY company_id FOR UPDATE');
-            $prior->execute([$operation]);
-            $saved = $prior->fetchAll(PDO::FETCH_ASSOC);
-            if ($saved) {
-                if (array_column($saved,'company_id') !== $companyIds) throw new RuntimeException('Ufullstendig tidligere abonnementsendring.');
-                $this->db->commit();
-                return ['success'=>true,'replayed'=>true,'companies'=>$saved,'message'=>'Abonnementsoppsettet var allerede lagret. Ingen ny etablering er registrert.'];
-            }
             $report = (new PortalSubscriptionPreview($this->db))->preview($companyIds,$moduleIds,$actor,true,$selections);
             if (!$report['apply_available']) throw new InvalidArgumentException(implode(' ', $report['warnings']) ?: 'Abonnementsskjemaet er ikke klart for lagring.');
             if (!$report['price_schema_ready']) throw new InvalidArgumentException('Modulprisene i system_modules er ikke klare for lagring.');
@@ -116,8 +106,11 @@ final class PortalSubscriptionService {
                     }
                     $shared = $initialSharing[$source['id']];
                 }
+                $dates = ['subscription_start'=>$source['subscription_start'] ?? PortalSubscriptionDates::today()];
+                $dates['due_date'] = $source['due_date'] ?? PortalSubscriptionDates::nextMonth($dates['subscription_start']);
                 if (!$source || $shared) {
                     $plan = $source ?? [];
+                    $plan = array_replace($plan, $dates);
                     $plan['id'] = self::uuid();
                     $plan['name'] = mb_substr($company['name'].' – abonnement',0,100);
                     $plan['features'] = $company['features'];
@@ -132,18 +125,12 @@ final class PortalSubscriptionService {
                 } else {
                     $planId = $source['id'];
                     $updates = ['features'=>$company['features'],'price_monthly'=>$company['proposed_monthly'],'max_users'=>$company['max_users']];
+                    $updates += $dates;
                     foreach (['plan_setup_discount','plan_monthly_discount'] as $field) if (in_array($field,$planColumns,true)) $updates[$field]=$company[$field];
                     if (in_array('updated_at',$planColumns,true)) $updates['updated_at'] = $now;
                     $this->update('saas_subscription_plans',$updates,$planId);
                 }
                 $link = ['plan_id'=>$planId,'self_company_id'=>$report['issuer']['id']];
-                // Dates belong to the company's agreement, never a shared plan.
-                if (in_array('subscription_start',$subscriptionColumns,true) && empty($subscription['subscription_start'])) {
-                    $link['subscription_start']=PortalSubscriptionDates::today();
-                }
-                if (in_array('due_date',$subscriptionColumns,true) && empty($subscription['due_date'])) {
-                    $link['due_date']=PortalSubscriptionDates::nextMonth($subscription['subscription_start'] ?? $link['subscription_start'] ?? PortalSubscriptionDates::today());
-                }
                 if (in_array('updated_at',$subscriptionColumns,true)) $link['updated_at'] = $now;
                 if ($subscription) {
                     $subscriptionId = $subscription['id'];
@@ -183,18 +170,6 @@ final class PortalSubscriptionService {
                     if ($grant) $this->update('tenant_company_modules',$values,$grant['id']);
                     else $this->insert('tenant_company_modules',$values+['id'=>self::uuid(),'company_id'=>$company['company_id'],'module_id'=>$moduleId]);
                 }
-                $this->insert('saas_subscription_changes',[
-                    'id'=>self::uuid(),'operation_key'=>$operation,'company_id'=>$company['company_id'],
-                    'subscription_id'=>$subscriptionId,'plan_id'=>$planId,'created_by'=>$actor,
-                    'requested_module_ids'=>json_encode($company['module_ids'],JSON_THROW_ON_ERROR),'features'=>$company['features'],
-                    'old_monthly'=>$company['subscription']['agreed_monthly'] ?? null,
-                    'price_monthly'=>$company['proposed_monthly'],'setup_total'=>$company['setup_total'],
-                    'old_max_users'=>$company['subscription']['max_users'] ?? null,'max_users'=>$company['max_users'],
-                    'old_setup_discount'=>$company['subscription']['plan_setup_discount'] ?? null,
-                    'old_monthly_discount'=>$company['subscription']['plan_monthly_discount'] ?? null,
-                    'plan_setup_discount'=>$company['plan_setup_discount'],'plan_monthly_discount'=>$company['plan_monthly_discount'],
-                    'price_currency'=>$company['currency']
-                ]);
                 $results[] = ['company_id'=>$company['company_id'],'plan_id'=>$planId,'price_monthly'=>$company['proposed_monthly'],'setup_total'=>$company['setup_total'],'price_currency'=>$company['currency'],'max_users'=>$company['max_users']];
             }
             $this->db->commit();

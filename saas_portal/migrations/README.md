@@ -2,7 +2,7 @@
 
 Ingen migrering kjøres automatisk ved innlogging, sidevisning eller lagring.
 Den eksisterende prisinstallereren og SQL-filen klargjør nå også nullable
-`tenant_subscriptions.subscription_start` og `due_date`. Bare datoene kan
+`saas_subscription_plans.subscription_start` og `due_date`. Bare datoene kan
 klargjøres eksplisitt med:
 
 ```sh
@@ -82,20 +82,17 @@ php saas_portal/migrations/install_subscription_pricing.php --apply
 ```
 
 Alternativt kan `subscription_pricing.sql` kjøres direkte i en MySQL-klient.
-SQL-filen tilpasser selv fremmednøkkelkolonnene til eksisterende metadata;
-den trenger ingen tilgang til databasen mens koden utvikles i Replit.
+SQL-filen klargjør bare manglende kolonner på eksisterende plantabell.
+Ingen nye tabeller opprettes.
 
 Migreringen klargjør:
 
-- `saas_subscription_changes`: varig historikk over bekreftet månedspris,
-  engangsetablering og operasjonsnøkkel.
-- Manglende `max_users` og rabattkolonner på planen, samt tidligere/nye grenser
-  og rabatter i endringshistorikken. Eksisterende kolonner og verdier beholdes.
+- Manglende `max_users`, rabattkolonner, `subscription_start` og `due_date`
+  på `saas_subscription_plans`. Eksisterende kolonner og verdier beholdes.
 
 Eksisterende planer, abonnementer, kontoer og modultilganger masseendres ikke.
 Migreringen kjøres ikke ved serverstart eller fra nettforespørsler.
-ID-kolonnenes tegnsett og kollasjon hentes programmatisk fra eksisterende
-referansetabeller, slik at fremmednøkler blir kompatible.
+Eksisterende historikktabeller beholdes urørt, men kreves ikke for lagring.
 
 `system_modules` må allerede ha `price_monthly`, `price_setup` og `price_currency`.
 Manglende pris er ikke gratis; gratis settes eksplisitt til `0.00`.
@@ -109,17 +106,19 @@ beregner på nytt og sammenligner med forhåndsvisningens hash.
 - En delt plan kopieres uten å endre de andre bedriftenes vilkår.
 - Dagens moduler forhåndsvelges. Det bekreftede utvalget erstatter features,
   inkludert fravalg og tomt utvalg. Ingen ansatte, kontoer eller moduldata slettes.
-- Sluttpris er summen av de valgte modulenes månedspriser. Tidligere avtalepris
-  vises separat og erstattes bare etter uttrykkelig bekreftelse.
-- Samlet etableringsverdi og etablering som tilkommer nå vises separat.
+- Sluttpris er summen av de valgte modulenes månedspriser etter rabatt.
+  Tidligere avtalepris erstattes bare etter uttrykkelig bekreftelse.
+- Prisoversikten har tre linjer: Etablering (nye moduler etter rabatt),
+  Månedlig (etter rabatt), og Total (etablering pluss én måned).
 - `max_users` lagres på den bedriftsspesifikke planen. Null er ukjent og sperrer
   nye kontoer frem til oppsett; 0 tillater ingen aktive SuperUsers. Grensen kan
   ikke senkes under dagens aktive firmakontoer. Kontoopprettelse og planendring
   låser samme bedrift for å hindre samtidighetsfeil.
-- Etablering registreres bare for nye moduler og trekkes ikke automatisk.
+- Etablering beregnes bare for nye moduler og trekkes ikke automatisk.
 - Abonnementsperioder, betalingsreferanser og øvrige eksisterende vilkår beholdes.
 - Alle valgte bedrifter lagres i én transaksjon.
-- Ny innsending av samme bekreftelse returnerer tidligere lagringsresultat.
+- Gamle prisforhåndsvisninger avvises etter en endring. Låsing og transaksjoner
+  hindrer doble abonnementer ved samtidig lagring, uten en egen historikktabell.
 
 Planens lagrede månedspris er den avtalte nettoprisen. Katalogprisene kan senere
 endres uten at dette endrer avtalen. Katalogestimat, katalograbatt og katalognetto
@@ -132,11 +131,11 @@ fabrikere et historisk avtalegrunnlag, heller ikke ved 100 prosent rabatt.
 | Tabell | Ansvar |
 |---|---|
 | `system_modules` | Eneste katalog for modulnavn, månedspris, etableringspris og valuta. |
-| `saas_subscription_plans` | Bedriftens autoritative modulnøkler i `features`, avtalte månedspris, prosent-rabatter og `max_users`. En delt plan kopieres ved bekreftet bedriftsendring. |
-| `tenant_subscriptions` | Bedriftens kobling til planen og utstederen, status, betalingssyklus, start og forfall. |
+| `saas_subscription_plans` | Bedriftens autoritative modulnøkler i `features`, avtalte månedspris, prosent-rabatter, `max_users`, abonnementsstart og forfall. En delt plan kopieres ved bekreftet bedriftsendring eller individuell datoendring. |
+| `tenant_subscriptions` | Bedriftens kobling til planen og utstederen, status og betalingssyklus. |
 | `tenant_admin_modules` | Firmabrukerens egne tildelinger, begrenset av bedriftens features. |
 | `tenant_company_modules` | Eldre kompatibilitetsrader som speiles ved bekreftet lagring. De gir aldri tilgang utover features og brukes ikke til å forhåndsvelge ekstra moduler. Historiske rader kan brukes til å unngå ny etablering på tidligere tildelte moduler. |
-| `saas_subscription_changes` | Historikk over bekreftede endringer og operasjonsnøkler som hindrer dobbel registrering. Ikke en kilde for aktive katalogpriser. |
+| `saas_subscription_changes` | Eventuell eldre historikk beholdes urørt. Portalen oppretter, leser eller skriver ikke denne tabellen og krever den ikke for lagring. |
 
 `saas_subscription_plan_modules` er ikke lenger nødvendig. Ingen portalforespørsel
 leser, skriver eller krever den, og hverken SQL- eller PHP-migreringen oppretter den.

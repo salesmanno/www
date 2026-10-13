@@ -61,8 +61,8 @@ final class PortalSubscriptionOverview {
         }
         $catalogNet = PortalSubscriptionPricing::discounted($quote['monthly_total'],$percent);
         $catalogSetupNet = PortalSubscriptionPricing::discounted($quote['selected_setup_total'],$setupPercent);
-        $start=$row['subscription_start'] ?? null;
-        $due=$row['due_date'] ?? null;
+        $start=$plan['subscription_start'] ?? null;
+        $due=$plan['due_date'] ?? null;
         $today=PortalSubscriptionDates::today();
         return ['subscription'=>[
             'id'=>$row['id'],'status'=>$row['status'],'billing_cycle'=>$row['billing_cycle'],
@@ -81,7 +81,7 @@ final class PortalSubscriptionOverview {
             'subscription_start'=>$start,'due_date'=>$due,'today'=>$today,
             'days_until_due'=>$due?PortalSubscriptionDates::days($today,$due):null,
             'version'=>PortalBillingAccess::version([$row,$plan]),
-            'dates_schema_ready'=>array_key_exists('subscription_start',$row) && array_key_exists('due_date',$row)
+            'dates_schema_ready'=>array_key_exists('subscription_start',$plan) && array_key_exists('due_date',$plan)
         ]];
     }
 
@@ -101,13 +101,27 @@ final class PortalSubscriptionOverview {
             PortalBillingAccess::requireAdmin($this->db,$actor,true);
             $rows=$this->rows($company,true);
             if (!$rows) throw new InvalidArgumentException('Bedriften har ikke et abonnement.');
-            $q=$this->db->prepare('SELECT id FROM saas_subscription_plans WHERE id=? FOR UPDATE');
+            $q=$this->db->prepare('SELECT * FROM saas_subscription_plans WHERE id=? FOR UPDATE');
             $q->execute([$rows[0]['plan_id']]);
+            $plan=$q->fetch(PDO::FETCH_ASSOC);
             $current=$this->get($company)['subscription'];
-            if (!$current['dates_schema_ready']) throw new InvalidArgumentException('Installer abonnementsdatokolonnene før datoen kan lagres.');
+            if (!$current['dates_schema_ready']) throw new InvalidArgumentException('Abonnementsdatoene er ikke konfigurert.');
             if (!hash_equals($current['version'],$data['version'])) throw new PortalPaymentConflictException('Abonnementet er endret. Last inn og bekreft på nytt.');
-            $q=$this->db->prepare('UPDATE tenant_subscriptions SET due_date=? WHERE id=? AND company_id=?');
-            $q->execute([$due,$rows[0]['id'],$company]);
+            $q=$this->db->prepare('SELECT COUNT(*) FROM tenant_subscriptions WHERE plan_id=?');
+            $q->execute([$plan['id']]);
+            if ((int)$q->fetchColumn()>1) {
+                // Isolate this company's dates before editing a formerly shared plan.
+                $plan['id']=$this->db->query('SELECT UUID()')->fetchColumn();
+                $plan['due_date']=$due;
+                $names='`'.implode('`,`',array_keys($plan)).'`';
+                $marks=implode(',',array_fill(0,count($plan),'?'));
+                $this->db->prepare("INSERT INTO saas_subscription_plans ({$names}) VALUES ({$marks})")->execute(array_values($plan));
+                $q=$this->db->prepare('UPDATE tenant_subscriptions SET plan_id=? WHERE id=? AND company_id=?');
+                $q->execute([$plan['id'],$rows[0]['id'],$company]);
+            } else {
+                $q=$this->db->prepare('UPDATE saas_subscription_plans SET due_date=? WHERE id=?');
+                $q->execute([$due,$plan['id']]);
+            }
             $this->db->commit();
             PortalBillingAccess::lock('subscription');
         } catch (Throwable $e) {

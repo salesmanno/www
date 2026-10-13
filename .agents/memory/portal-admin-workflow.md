@@ -89,3 +89,15 @@ Bedriftssiden skal ha egen fane ved SEO for månedlig beløp og månedsrabatt, m
 
 **How to apply:** Gjenbruk eksisterende abonnementsinfrastruktur og skill lagrede avtalevilkår fra prisforhåndsvisning. Videreføring av globale SuperUsers skal foretrekke eksisterende roller, rettigheter og innlogging fremfor flere nye tabeller.
 
+Abonnementsdatoene `due_date` og `subscription_start` skal ligge i `saas_subscription_plans`. En egen abonnementsendringshistorikk skal ikke være et krav for lagring.
+
+**Why:** Brukeren presiserte at datoene allerede finnes i plantabellen og reagerte på krav om historikk og tekniske migreringsmeldinger.
+
+**How to apply:** Bruk plantabellen konsekvent ved lesing og lagring av datoer. Bedriftsvise endringer må ikke endre andre bedrifter som tidligere delte plan. Ikke slett eldre historikk som del av en koderetting.
+
+Prisoversikten ved modultildeling skal ha tre linjer: «Etablering», «Månedlig» og «Total» (etablering pluss månedsbeløpet).
+
+**Why:** Brukeren ba om denne enkle oppsummeringen fremfor mange prislinjer og teknisk clutter.
+
+**How to apply:** Vis summer etter rabatter. Behold nødvendige valideringsmeldinger korte og relevante; ikke fyll normalvisningen med tabellnavn eller migreringskommandoer.
+

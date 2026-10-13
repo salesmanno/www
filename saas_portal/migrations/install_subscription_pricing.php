@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/SubscriptionPricingSchema.php';
 try {
     SubscriptionPricingSchema::install(getDBConnection());
-    echo "Subscription pricing tables installed. No existing subscriptions or module grants changed.\n";
+    echo "Subscription plan columns prepared. No new tables, existing subscriptions or module grants changed.\n";
 } catch (Throwable $error) {
     // Do not print connection strings, credentials, or raw database exceptions.
     fwrite(STDERR, "Subscription pricing migration failed: ".get_class($error).". Existing subscriptions were not migrated.\n");
