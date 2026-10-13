@@ -2,7 +2,7 @@ modules = ["php", "php-8.2", "python-3.11", "python3", "nodejs-20", "postgresql-
 
 [nix]
 channel = "stable-24_05"
-packages = ["php82Extensions.zip", "imagemagick", "php82Extensions.imap", "mysql80", "php82Extensions.pdo_pgsql", "php82Extensions.pgsql"]
+packages = ["php82Extensions.zip", "imagemagick", "php82Extensions.imap", "mysql80", "php82Extensions.pdo_pgsql", "php82Extensions.pgsql", "nano"]
 
 [workflows]
 runButton = "Project"
