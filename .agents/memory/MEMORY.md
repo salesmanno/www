@@ -1,5 +1,6 @@
 - [Active-schema drift](active-schema-drift.md) — uploaded SQL dumps are not authoritative for which optional modules exist in the active database.
 - [MySQL host format](mysql-host-format.md) — existing host configuration may be a URL; preserve this compatibility when changing shared connections.
+- [External webhost](external-webhost.md) — local Replit checks do not verify salesman.no; diagnose the actual host before declaring login fixed.
 - [Brønnøysund import scope](brreg-import-scope.md) — add missing registered role holders only; preserve manual employees and keep login accounts separate.
 - [Linked employee email](linked-employee-email.md) — require a coordinated account-email flow before unlocking email edits for staff with admin accounts.
 - [Portal administration](portal-admin-workflow.md) — shared activity/sessions, employee-linked accounts, editable module selections and catalog versus agreement prices.

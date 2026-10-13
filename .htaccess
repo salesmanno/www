@@ -1,0 +1,13 @@
+# Do not expose project directories when no index exists.
+Options -Indexes
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:\.git|\.agents|\.local|\.cache|\.config)(?:/|$) - [F,L]
+</IfModule>
+
+# Source configuration and project metadata are never public downloads.
+<FilesMatch "^\.|(?:\.sql|\.log|\.lock)$|^(?:composer|package)\.json$|^replit\.md$">
+    Require all denied
+</FilesMatch>

@@ -12,13 +12,10 @@ define('DB_CHARSET', 'utf8mb4');
 function getDBConnection() {
     static $conn = null;
     if ($conn !== null) return $conn;
-    $settings = mysqlConnectionSettings([
-        'host' => DB_HOST, 'database' => DB_NAME, 'user' => DB_USER,
-        'password' => getenv('MYSQL_PASSWORD'), 'port' => getenv('MYSQL_PORT') ?: '',
-    ]);
+    $settings = mysqlConnectionSettings(mysqlRuntimeSettings());
     try {
         $dsn = 'mysql:host=' . $settings['host'] . ';port=' . $settings['port'] . ';dbname=' . $settings['database'] . ';charset=' . DB_CHARSET;
-        $conn = new PDO($dsn, DB_USER, DB_PASS, [
+        $conn = new PDO($dsn, $settings['user'], $settings['password'], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,

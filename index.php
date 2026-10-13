@@ -1,4 +1,10 @@
 <?php
+// Also handle a project mounted at the legacy hyphenated portal URL.
+$entryPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($entryPath === '/saas-portal/' || $entryPath === '/saas-portal') {
+    header('Location: /saas_portal/login.php', true, 302);
+    exit;
+}
 // Subdomain detection og routing
 $host = $_SERVER['HTTP_HOST'] ?? '';
 

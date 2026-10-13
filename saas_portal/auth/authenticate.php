@@ -1,10 +1,6 @@
 <?php
 session_start();
 
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__.'/../services/PortalSaasIdentity.php';
-require_once __DIR__.'/../services/PortalGlobalUsers.php';
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /saas_portal/login.php?error=invalid_request');
     exit;
@@ -19,6 +15,9 @@ if (empty($email) || empty($password)) {
 }
 
 try {
+    require_once __DIR__ . '/../../config/database.php';
+    require_once __DIR__.'/../services/PortalSaasIdentity.php';
+    require_once __DIR__.'/../services/PortalGlobalUsers.php';
     $db = getDBConnection();
     
     $stmt = $db->prepare("
@@ -70,9 +69,11 @@ try {
     header('Location: /saas_portal/pages/dashboard.php');
     exit;
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
     foreach (array_keys($_SESSION) as $key) if (str_starts_with($key,'saas_')) unset($_SESSION[$key]);
-    error_log('SaaS admin login failed.');
+    $cause = $e->getPrevious() ?: $e;
+    $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$cause->getCode());
+    error_log('SaaS admin login failed: ' . get_class($cause) . ' code=' . $code);
     header('Location: /saas_portal/login.php?error=system_error');
     exit;
 }

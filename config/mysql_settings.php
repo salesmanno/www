@@ -1,6 +1,52 @@
 <?php
 
 /**
+ * Webhosts may not provide the Replit environment. A host-managed PHP
+ * configuration outside the document root is supported instead.
+ */
+function mysqlRuntimeSettings(): array {
+    $names = [
+        'host' => 'MYSQL_HOST', 'database' => 'MYSQL_DATABASE',
+        'user' => 'MYSQL_USER', 'password' => 'MYSQL_PASSWORD', 'port' => 'MYSQL_PORT',
+    ];
+    $settings = [];
+    foreach ($names as $key => $name) {
+        $settings[$key] = getenv($name);
+    }
+    if ($settings['host'] !== false && $settings['database'] !== false &&
+        $settings['user'] !== false && $settings['password'] !== false) {
+        return $settings;
+    }
+    $explicitPath = getenv('MYSQL_CONFIG_FILE');
+    $path = $explicitPath ?: dirname(__DIR__, 2) . '/salesman-private/mysql.php';
+    if (!is_file($path)) {
+        if ($explicitPath) throw new RuntimeException('Privat MySQL-konfigurasjon mangler.');
+        return $settings;
+    }
+    $private = mysqlPrivateSettings($path, $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__));
+    foreach ($names as $key => $name) {
+        if ($settings[$key] === false && array_key_exists($key, $private)) {
+            $settings[$key] = $private[$key];
+        }
+    }
+    return $settings;
+}
+
+function mysqlPrivateSettings(string $path, string $documentRoot): array {
+    $real = realpath($path);
+    $root = realpath($documentRoot);
+    if ($real === false || !is_readable($real) || $root === false ||
+        $real === $root || str_starts_with($real, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+        throw new RuntimeException('Privat MySQL-konfigurasjon må ligge utenfor webroten.');
+    }
+    $settings = (static function ($file) { return require $file; })($real);
+    if (!is_array($settings)) {
+        throw new RuntimeException('Privat MySQL-konfigurasjon er ugyldig.');
+    }
+    return $settings;
+}
+
+/**
  * Accept a hostname or a host URL without changing stored secrets.
  * Never include supplied settings in error messages.
  */
