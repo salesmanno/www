@@ -108,13 +108,15 @@ beregner på nytt og sammenligner med forhåndsvisningens hash.
   inkludert fravalg og tomt utvalg. Ingen ansatte, kontoer eller moduldata slettes.
 - Sluttpris er summen av de valgte modulenes månedspriser etter rabatt.
   Tidligere avtalepris erstattes bare etter uttrykkelig bekreftelse.
-- Prisoversikten har tre linjer: Etablering (nye moduler etter rabatt),
+- Prisoversikten har tre linjer: Etablering (alle valgte moduler etter rabatt),
   Månedlig (etter rabatt), og Total (etablering pluss én måned).
 - `max_users` lagres på den bedriftsspesifikke planen. Null er ukjent og sperrer
   nye kontoer frem til oppsett; 0 tillater ingen aktive SuperUsers. Grensen kan
   ikke senkes under dagens aktive firmakontoer. Kontoopprettelse og planendring
   låser samme bedrift for å hindre samtidighetsfeil.
 - Etablering beregnes bare for nye moduler og trekkes ikke automatisk.
+  Dette er et separat internt beløp; prisoversikten viser hele pakkens
+  etableringsverdi og er ikke en betalingsordre.
 - Abonnementsperioder, betalingsreferanser og øvrige eksisterende vilkår beholdes.
 - Alle valgte bedrifter lagres i én transaksjon.
 - Gamle prisforhåndsvisninger avvises etter en endring. Låsing og transaksjoner

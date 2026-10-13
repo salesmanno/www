@@ -46,6 +46,8 @@ try {
     $_SERVER['REQUEST_METHOD'] = 'POST';
     [$status,$body] = PortalDatabase::failure($e,'company_seo','Generic fallback');
     databaseCheck($status === 503 && !str_contains($body['message'],'Ingen endringer'), 'Unknown commit outcome falsely claimed rollback');
+    [$previewStatus,$previewBody] = PortalDatabase::failure($e,'subscription_preview','Generic fallback');
+    databaseCheck($previewStatus===503 && str_contains($previewBody['message'],'Prisene kunne ikke hentes') && !str_contains($previewBody['message'],'Lagringen kunne ikke bekreftes'), 'Read-only preview must not report an uncertain save');
     $content = file_get_contents($log);
     foreach (['FAKE_PRIVATE','FAKE_SQL','FAKE_SCHEMA'] as $marker) {
         databaseCheck(!str_contains($content,$marker),'Sensitive exception message logged');

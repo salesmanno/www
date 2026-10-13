@@ -101,3 +101,9 @@ Prisoversikten ved modultildeling skal ha tre linjer: «Etablering», «Månedli
 
 **How to apply:** Vis summer etter rabatter. Behold nødvendige valideringsmeldinger korte og relevante; ikke fyll normalvisningen med tabellnavn eller migreringskommandoer.
 
+Etableringslinjen i prisoversikten skal vise etableringsverdien for hele det valgte modulutvalget, også moduler bedriften allerede har.
+
+**Why:** Brukeren ba om sluttsum for valgte moduler og påpekte at etablering fortsatt ikke fremkom da oversikten bare viste nye modulers etablering.
+
+**How to apply:** Skill pakkeoversikten fra eventuell etablering som faktisk tilkommer nå. Ikke bruk oversiktens fulle etableringsverdi til å belaste eksisterende moduler på nytt.
+

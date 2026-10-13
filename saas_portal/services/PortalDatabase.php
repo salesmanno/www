@@ -40,12 +40,14 @@ class PortalDatabase {
         error_log('Portal request failed: ' . json_encode($diagnostic));
         // Connection loss during a commit can leave the outcome uncertain.
         // Never claim rollback or automatically replay a mutation in that case.
-        $message = $unavailable
+        $message = $unavailable && $operation === 'subscription_preview'
+            ? 'Prisene kunne ikke hentes. Databaseforbindelsen er utilgjengelig.'
+            : ($unavailable
             ? 'Databasen er midlertidig utilgjengelig. '
                 . (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
                     ? 'Lagringen kunne ikke bekreftes. Kontroller lagret oppsett når forbindelsen er tilbake før du prøver igjen.'
                     : 'Prøv igjen når forbindelsen er tilbake.')
-            : $fallback;
+            : $fallback);
         return [$unavailable ? 503 : 500, [
             'success' => false,
             'error_code' => $unavailable ? 'database_unavailable' : $code,

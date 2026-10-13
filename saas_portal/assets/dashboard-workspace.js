@@ -282,11 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             portalText(card, 'div', 'Ingen eksisterende abonnement registrert.', 'small text-muted mb-1');
         }
-        const setupCents = moneyCents(company.setup_total);
+        const setupCents = moneyCents(company.selected_setup_net_total);
         const monthlyCents = moneyCents(company.proposed_monthly);
         const total = setupCents === null || monthlyCents === null
             ? null : moneyFromCents(setupCents + monthlyCents);
-        priceNode(card, 'Etablering', company.setup_total, company.currency);
+        priceNode(card, 'Etablering', company.selected_setup_net_total, company.currency);
         priceNode(card, 'Månedlig', company.proposed_monthly, company.currency);
         const totalRow = priceNode(card, 'Total', total, company.currency);
         totalRow.title = 'Etablering + én månedlig betaling';

@@ -16,6 +16,7 @@ window.setInterval=()=>0;
 window.addEventListener('error',event=>{window.testError=event.message+': '+event.filename+':'+event.lineno;});
 const portalCsrf='test-csrf';
 let fixtureFail=false;
+let fixtureDatabaseUnavailable=false;
 let fixtureMissing=false;
 let fixtureSlow=false;
 let fixtureSaveFail=false;
@@ -39,7 +40,7 @@ async function portalPost(url,body){
  }
  const slow=fixtureSlow;fixtureSlow=false;
  if(slow) await new Promise(resolve=>setTimeout(resolve,1200));
- if(fixtureFail)throw new Error('Midlertidig utilgjengelig');
+  if(fixtureFail)throw new Error(fixtureDatabaseUnavailable?'Databasen er midlertidig utilgjengelig':'Midlertidig utilgjengelig');
   const ids=body.company_ids.map(String);
   const base={A:['M1'],B:['M2']};
    const limits={A:0,B:null};
@@ -62,7 +63,7 @@ async function portalPost(url,body){
     const setupGross=newly.reduce((sum,moduleId)=>sum+setupOf(moduleId),0);
     return {company_id:id,name:id==='A'?'Alpha':'Beta',existing_module_ids:id==='A'?['M1','M2']:base[id],module_ids:fixtureWrongSelection&&id==='A'?['M1','M2']:chosen,new_module_ids:newly,removed_module_ids:removed,
       monthly_total:monthly.toFixed(2),monthly_discount_amount:monthlyDiscountAmount.toFixed(2),proposed_monthly:fixtureMissing&&chosen.includes('M2')?null:(monthly-monthlyDiscountAmount).toFixed(2),
-     selected_setup_total:fullSetup.toFixed(2),selected_setup_net_total:(fullSetup-selectedSetupDiscountAmount).toFixed(2),
+      selected_setup_total:fullSetup.toFixed(2),selected_setup_net_total:fixtureMissing&&chosen.includes('M2')?null:(fullSetup-selectedSetupDiscountAmount).toFixed(2),
       setup_gross_total:setupGross.toFixed(2),setup_discount_amount:setupDiscountAmount.toFixed(2),setup_total:fixtureMissing&&chosen.includes('M2')?null:(setupGross-setupDiscountAmount).toFixed(2),
      ...(window.testUnchanged&&!selection?{}:{plan_monthly_discount:selection?.plan_monthly_discount??'0.00',plan_setup_discount:selection?.plan_setup_discount??'0.00'}),
      currency:'NOK',max_users:selection&&Object.hasOwn(selection,'max_users')?selection.max_users:limits[id],active_users:active,
@@ -108,15 +109,15 @@ document.addEventListener('DOMContentLoaded',async()=>{
    }
    const alpha=quotes.querySelector('article');
    expect(priceRows(alpha).length===3&&priceRows(alpha).map(row=>row.firstElementChild.textContent).join('|')==='Etablering|Månedlig|Total','Summary did not contain exactly the three requested price rows');
-   expect(rowValue(alpha,'Etablering')==='0,00 NOK'&&rowValue(alpha,'Månedlig')==='100,00 NOK'&&rowValue(alpha,'Total')==='100,00 NOK','Initial setup/monthly/total amounts were wrong');
-   expect(!quotes.textContent.includes('75,00')&&!quotes.textContent.includes('Avtalt plan')&&!quotes.textContent.includes('Katalogestimat'),'Old agreement/catalog price detail remained in the summary');
+    expect(rowValue(alpha,'Etablering')==='200,00 NOK'&&rowValue(alpha,'Månedlig')==='100,00 NOK'&&rowValue(alpha,'Total')==='300,00 NOK','Existing selected-module setup/monthly/total amounts were wrong');
+    expect(!quotes.textContent.includes('Avtalt plan')&&!quotes.textContent.includes('Katalogestimat'),'Old agreement/catalog price detail remained in the summary');
    expect(!quotes.textContent.includes('bedriftsspesifikk plan'),'Plan-preparation note was displayed in the summary');
   expect(document.getElementById('companyGrantIssuer').textContent.includes('Salesman'),'Issuer missing');
    expect(calls[0].body.selections===undefined&&calls[0].body.module_ids===undefined,'Initial preview must load stored selections');
    expect(document.getElementById('companyGrantSelected').textContent.includes('Arrangement'),'Initial existing module was not preloaded');
     expect(document.getElementById('companyGrantActiveUsers').textContent.includes('0 aktive'),'Zero active user count missing');
     expect(document.getElementById('companyGrantMaxUsers').value==='0','Preloaded max_users=0 was replaced');
-    expect(!quotes.textContent.includes('200,00'),'Existing module setup was incorrectly shown as new establishment');
+     expect(quotes.textContent.includes('200,00 NOK'),'Existing selected-module setup was omitted from establishment');
    const switcher=document.getElementById('companyGrantCompanySwitcher');
    const selected=document.getElementById('companyGrantSelected');
    const selectedModule=()=>selected.querySelector('button');
@@ -176,10 +177,19 @@ document.addEventListener('DOMContentLoaded',async()=>{
     expect(quotes.textContent.includes('1750,00'),'Gross monthly amount missing before discount');
     const monthlyDiscount=document.getElementById('companyGrantMonthlyDiscount');
     const setupDiscount=document.getElementById('companyGrantSetupDiscount');
+     fixtureFail=true;fixtureDatabaseUnavailable=true;
+     monthlyDiscount.value='1.00';monthlyDiscount.dispatchEvent(new Event('input'));await settle();
+     expect(quotes.textContent===''&&submit.disabled,'Database-unavailable preview left stale prices or enabled saving');
+     expect(document.getElementById('companyGrantStatus').textContent.includes('Databasen er midlertidig utilgjengelig')&&document.querySelector('#companyGrantStatus button'),'Database-unavailable error or retry action missing');
+     expect(selected.textContent.includes('Arrangement')&&selected.textContent.includes('Salg'),'Database-unavailable preview erased selected modules');
+     fixtureFail=false;fixtureDatabaseUnavailable=false;
+     document.querySelector('#companyGrantStatus button').click();await settle();
+     expect(selected.textContent.includes('Arrangement')&&selected.textContent.includes('Salg')&&submit.disabled,'Retry did not preserve selected modules or keep saving gated');
+     monthlyDiscount.value='0.00';monthlyDiscount.dispatchEvent(new Event('input'));await settle();
     monthlyDiscount.value='10.00';monthlyDiscount.dispatchEvent(new Event('input'));await settle();
-     expect(rowValue(quotes.querySelector('article'),'Månedlig')==='1575,00 NOK'&&rowValue(quotes.querySelector('article'),'Total')==='1600,00 NOK','Ten percent monthly discount did not reduce the monthly summary to 1575');
+      expect(rowValue(quotes.querySelector('article'),'Etablering')==='225,00 NOK'&&rowValue(quotes.querySelector('article'),'Månedlig')==='1575,00 NOK'&&rowValue(quotes.querySelector('article'),'Total')==='1800,00 NOK','Ten percent monthly discount did not preserve selected setup and reduce monthly to 1575');
     setupDiscount.value='10.00';setupDiscount.dispatchEvent(new Event('input'));await settle();
-     expect(rowValue(quotes.querySelector('article'),'Etablering')==='22,50 NOK'&&rowValue(quotes.querySelector('article'),'Månedlig')==='1575,00 NOK'&&rowValue(quotes.querySelector('article'),'Total')==='1597,50 NOK','Discounted setup plus monthly amount was not summed exactly in cents');
+      expect(rowValue(quotes.querySelector('article'),'Etablering')==='202,50 NOK'&&rowValue(quotes.querySelector('article'),'Månedlig')==='1575,00 NOK'&&rowValue(quotes.querySelector('article'),'Total')==='1777,50 NOK','Discounted setup across all selected modules plus monthly amount was not summed exactly in cents');
     switcher.value='B';switcher.dispatchEvent(new Event('change'));
     expect(monthlyDiscount.value==='0.00'&&setupDiscount.value==='0.00','Discount settings leaked between companies');
     monthlyDiscount.value='2.50';monthlyDiscount.dispatchEvent(new Event('input'));await settle();

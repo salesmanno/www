@@ -21,7 +21,7 @@ try {
                 $company['company_id'],$_SESSION['saas_admin_id'],'System','company_modules_updated',
                 'lagret abonnement og modultilgang',null,$company,30
             );
-        } catch (Throwable $e) { error_log('Subscription saved: activity logging failed; durable subscription history retained.'); }
+        } catch (Throwable $e) { error_log('Subscription saved: activity logging failed; subscription changes committed.'); }
     }
     portalReply(200,$result);
 } catch (PortalPreviewAuthorizationException $e) {
