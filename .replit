@@ -28,6 +28,15 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
+[[workflows.workflow]]
+name = "WWWorkflow"
+mode = "sequential"
+author = 15553469
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git init && git config user.email \"replit@example.com\" && git config user.name \"Replit Workflow\" && git remote remove origin 2>/dev/null; git remote add origin https://${MY_PERSONAL_TOKEN}@${TARGET_REPO} && git add . && git commit -m \"Lagret før pull\" --allow-empty && git pull origin main --rebase --allow-unrelated-histories -X theirs && git push -u origin main"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
