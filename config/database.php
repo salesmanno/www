@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/mysql_settings.php';
+
 // Use the existing MySQL configuration supplied to the process, never credentials in source.
 define('DB_HOST', getenv('MYSQL_HOST') ?: '');
 define('DB_NAME', getenv('MYSQL_DATABASE') ?: '');
@@ -10,16 +12,12 @@ define('DB_CHARSET', 'utf8mb4');
 function getDBConnection() {
     static $conn = null;
     if ($conn !== null) return $conn;
-    if (DB_HOST === '' || DB_NAME === '' || DB_USER === '' || getenv('MYSQL_PASSWORD') === false) {
-        throw new RuntimeException('MySQL-innstillingene er ikke konfigurert.');
-    }
-    $port = getenv('MYSQL_PORT') ?: '3306';
-    if (!ctype_digit($port) || (int)$port < 1 || (int)$port > 65535 ||
-        preg_match('/[;\x00-\x1f]/', DB_HOST . DB_NAME)) {
-        throw new RuntimeException('MySQL-innstillingene er ugyldige.');
-    }
+    $settings = mysqlConnectionSettings([
+        'host' => DB_HOST, 'database' => DB_NAME, 'user' => DB_USER,
+        'password' => getenv('MYSQL_PASSWORD'), 'port' => getenv('MYSQL_PORT') ?: '',
+    ]);
     try {
-        $dsn = 'mysql:host=' . DB_HOST . ';port=' . $port . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET;
+        $dsn = 'mysql:host=' . $settings['host'] . ';port=' . $settings['port'] . ';dbname=' . $settings['database'] . ';charset=' . DB_CHARSET;
         $conn = new PDO($dsn, DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

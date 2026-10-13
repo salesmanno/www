@@ -132,6 +132,8 @@
             if (isset($_GET['error'])):
                 $error_msg = 'Ukjent feil';
                 switch($_GET['error']) {
+                    case 'system_error': $error_msg = 'Innloggingen kunne ikke fullføres på grunn av en systemfeil. Prøv igjen. Hvis feilen vedvarer, må databaseforbindelsen kontrolleres.'; break;
+                    case 'invalid_request': $error_msg = 'Ugyldig innloggingsforespørsel. Prøv igjen.'; break;
                     case 'invalid_credentials': $error_msg = 'Ugyldig e-post eller passord'; break;
                     case 'not_authorized': $error_msg = 'Ingen tilgang'; break;
                     case 'inactive': $error_msg = 'Kontoen er inaktivert'; break;
