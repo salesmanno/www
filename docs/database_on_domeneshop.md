@@ -20,6 +20,8 @@ Eksisterende `MYSQL_HOST`, `MYSQL_DATABASE`, `MYSQL_USER` og `MYSQL_PASSWORD` br
 
 Miljøvariablene har prioritet. Hvis noen av de fire nødvendige innstillingene er satt, må alle fire være satt; koden blander aldri hemmeligheter fra forskjellige konfigurasjonskilder eller prøver en annen database etter tilkoblingsfeil. En `.env`-fil blir ikke automatisk lastet.
 
+Hvis tilkoblingen til et vertsnavn feiler med en nettverksfeil, forsøkes én IPv4-adresse hentet fra DNS for samme vert, med uendret port, database og innloggingsopplysninger. Dette gjelder bare opprettelsen av forbindelsen; autentiseringsfeil, SQL og lagring gjentas aldri.
+
 ## Kontroll
 
 - «Databaseoppsettet … mangler eller er ugyldig»: sjekk plassering, filrettigheter, JSON-format og at alle feltene er fylt inn. Ikke publiser filinnholdet.

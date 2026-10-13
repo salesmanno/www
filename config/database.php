@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/mysql_configuration.php';
+require_once __DIR__ . '/mysql_connector.php';
 
 // Actual credentials come from the environment or a private file outside the web root.
 define('DB_CHARSET', 'utf8mb4');
@@ -18,13 +19,7 @@ function getDBConnection() {
         if (!defined($constant)) define($constant, $settings[$key]);
     }
     try {
-        $dsn = 'mysql:host=' . $settings['host'] . ';port=' . $settings['port'] . ';dbname=' . $settings['database'] . ';charset=' . DB_CHARSET;
-        $conn = new PDO($dsn, $settings['user'], $settings['password'], [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-            PDO::ATTR_TIMEOUT => 5,
-        ]);
+        $conn = connectConfiguredMysql($settings);
     } catch (PDOException $e) {
         // Do not log connection addresses, usernames, credentials or raw driver messages.
         error_log('MySQL connection unavailable.');
