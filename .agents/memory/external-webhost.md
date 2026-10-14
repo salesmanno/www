@@ -26,3 +26,9 @@ For GitHub Actions deployments, the workflow directory must be exactly `.github/
 **Why:** A case-variant directory was ignored by GitHub Actions, and an older successful FTP run was initially mistaken for verification of a later commit.
 
 **How to apply:** Check registered workflows and the latest run metadata before attributing a deployment to a push. Compare the run's commit SHA and retrieve the failing step log before diagnosing an FTP transfer failure.
+
+Treat an FTP "FIN packet unexpectedly" error as evidence of a closed connection, not proof of a database failure or a specific server timeout.
+
+**Why:** The deployment failed while creating dependency directories. The timing suggested a no-transfer timeout, but the supplied log did not include a server reply confirming that cause.
+
+**How to apply:** State the observed failure separately from its likely cause. Do not remove runtime dependencies merely to avoid a transport failure, or describe a replacement transport as proven until a real connection and upload have been verified.
