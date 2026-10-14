@@ -20,3 +20,9 @@ Verify Apache rewrite and access rules with Apache, not with the PHP development
 **Why:** The webhost's uploaded asset rule rewrote missing assets to themselves and reproduced HTTP 500 in an Apache fixture. The PHP built-in server ignores `.htaccess`, so an otherwise successful preview cannot validate those rules.
 
 **How to apply:** Check missing-resource responses, directory-listing protection and portal entrypoints in an isolated Apache fixture. Distinguish the webroot configuration from the configuration inside `public`; do not transplant a fixed `/public/` rewrite base into the webroot.
+
+For GitHub Actions deployments, the workflow directory must be exactly `.github/workflows` (lowercase). Verify that a successful run's `head_sha` matches the commit being evaluated; an older green run does not verify a newer push.
+
+**Why:** A case-variant directory was ignored by GitHub Actions, and an older successful FTP run was initially mistaken for verification of a later commit.
+
+**How to apply:** Check registered workflows and the latest run metadata before attributing a deployment to a push. Compare the run's commit SHA and retrieve the failing step log before diagnosing an FTP transfer failure.
