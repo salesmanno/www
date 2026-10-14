@@ -9,11 +9,11 @@ Do not describe a Replit connection or login-page check as verification of the s
 
 **How to apply:** Verify the exact reported URL and request stage. Obtain the external server's relevant error log or authorized deployment access before attributing its HTTP 500 to database passwords. Replit Secrets do not configure a separate webhost automatically.
 
-Use environment variables for the project's database credentials, not hardcoded values or a newly required private configuration file.
+Support database constants directly in config/database.php as well as the existing environment variables. Do not introduce a required private configuration file.
 
-**Why:** The user explicitly chose environment variables after rejecting the proposed private PHP configuration file.
+**Why:** After initially choosing environment variables, the user explicitly requested the same file-based configuration as another exported project. Environment-only configuration must no longer be treated as a standing requirement.
 
-**How to apply:** Preserve the existing MYSQL_* interface and verify that the PHP process in the actual hosting environment receives it. Do not assume an up-to-date Git checkout establishes those settings.
+**How to apply:** Preserve the MYSQL_* interface for existing installations, but respect explicitly configured DB_* constants. Never extract secret values into source or recover the former password from Git. File-configured credentials must be entered by the owner and treated as sensitive export contents.
 
 Verify Apache rewrite and access rules with Apache, not with the PHP development server.
 
