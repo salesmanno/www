@@ -2,10 +2,30 @@
 
 class MysqlConfigurationException extends RuntimeException {}
 
-/**
- * Webhosts may not provide the Replit environment. A host-managed PHP
- * configuration outside the document root is supported instead.
- */
+/** Read only server-managed settings, never HTTP_*, GET, POST or cookies. */
+function mysqlEnvironmentValue(string $name) {
+    $value = getenv($name);
+    if ($value !== false) return $value;
+    foreach ([$_ENV, $_SERVER] as $source) {
+        if (array_key_exists($name, $source)) {
+            if (!is_string($source[$name])) {
+                throw new MysqlConfigurationException('MySQL-miljøvariablene er ugyldige.');
+            }
+            return $source[$name];
+        }
+    }
+    // Apache may preserve SetEnv settings under REDIRECT_ after an internal rewrite.
+    $value = getenv('REDIRECT_' . $name);
+    if ($value !== false) return $value;
+    if (array_key_exists('REDIRECT_' . $name, $_SERVER)) {
+        if (!is_string($_SERVER['REDIRECT_' . $name])) {
+            throw new MysqlConfigurationException('MySQL-miljøvariablene er ugyldige.');
+        }
+        return $_SERVER['REDIRECT_' . $name];
+    }
+    return false;
+}
+
 function mysqlRuntimeSettings(): array {
     $names = [
         'host' => 'MYSQL_HOST', 'database' => 'MYSQL_DATABASE',
@@ -13,42 +33,7 @@ function mysqlRuntimeSettings(): array {
     ];
     $settings = [];
     foreach ($names as $key => $name) {
-        $settings[$key] = getenv($name);
-    }
-    if ($settings['host'] !== false && $settings['database'] !== false &&
-        $settings['user'] !== false && $settings['password'] !== false) {
-        return $settings;
-    }
-    $explicitPath = getenv('MYSQL_CONFIG_FILE');
-    $webRoot = !empty($_SERVER['DOCUMENT_ROOT'])
-        ? realpath($_SERVER['DOCUMENT_ROOT']) : dirname(__DIR__);
-    if ($webRoot === false) {
-        throw new MysqlConfigurationException('Webroten kunne ikke bestemmes.');
-    }
-    $path = $explicitPath ?: dirname($webRoot) . '/salesman-private/mysql.php';
-    if (!is_file($path)) {
-        if ($explicitPath) throw new MysqlConfigurationException('Privat MySQL-konfigurasjon mangler.');
-        return $settings;
-    }
-    $private = mysqlPrivateSettings($path, $webRoot);
-    foreach ($names as $key => $name) {
-        if ($settings[$key] === false && array_key_exists($key, $private)) {
-            $settings[$key] = $private[$key];
-        }
-    }
-    return $settings;
-}
-
-function mysqlPrivateSettings(string $path, string $documentRoot): array {
-    $real = realpath($path);
-    $root = realpath($documentRoot);
-    if ($real === false || !is_readable($real) || $root === false ||
-        $real === $root || str_starts_with($real, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
-        throw new MysqlConfigurationException('Privat MySQL-konfigurasjon må ligge utenfor webroten.');
-    }
-    $settings = (static function ($file) { return require $file; })($real);
-    if (!is_array($settings)) {
-        throw new MysqlConfigurationException('Privat MySQL-konfigurasjon er ugyldig.');
+        $settings[$key] = mysqlEnvironmentValue($name);
     }
     return $settings;
 }

@@ -3,10 +3,10 @@
 require_once __DIR__ . '/mysql_settings.php';
 
 // Use the existing MySQL configuration supplied to the process, never credentials in source.
-define('DB_HOST', getenv('MYSQL_HOST') ?: '');
-define('DB_NAME', getenv('MYSQL_DATABASE') ?: '');
-define('DB_USER', getenv('MYSQL_USER') ?: '');
-define('DB_PASS', getenv('MYSQL_PASSWORD') === false ? '' : getenv('MYSQL_PASSWORD'));
+define('DB_HOST', mysqlEnvironmentValue('MYSQL_HOST') ?: '');
+define('DB_NAME', mysqlEnvironmentValue('MYSQL_DATABASE') ?: '');
+define('DB_USER', mysqlEnvironmentValue('MYSQL_USER') ?: '');
+define('DB_PASS', mysqlEnvironmentValue('MYSQL_PASSWORD') === false ? '' : mysqlEnvironmentValue('MYSQL_PASSWORD'));
 define('DB_CHARSET', 'utf8mb4');
 
 function getDBConnection() {

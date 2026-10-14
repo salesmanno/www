@@ -6,32 +6,21 @@ password change is needed for this configuration.
 
 ## Supported configuration
 
-1. Supply `MYSQL_HOST`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` and,
-   optionally, `MYSQL_PORT` in the webhost's PHP environment; or
-2. Put a private PHP configuration **outside the public document root**.
+Supply `MYSQL_HOST`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` and,
+optionally, `MYSQL_PORT` in the webhost's PHP environment. The user chose
+environment-only configuration; no private PHP credential file is loaded.
 
-For a server whose document root is `/home/account/www`, the default private file is
-`/home/account/salesman-private/mysql.php`, even if the project is installed in a
-subdirectory. Use `MYSQL_CONFIG_FILE` to identify a different private file. The application
-rejects a file inside the document root, including symlinks pointing there.
+The supported sources, in precedence order, are the process environment
+(`getenv`), exact keys in `$_ENV`, exact keys in `$_SERVER`, and Apache's
+`REDIRECT_MYSQL_*` environment settings after internal rewrites.
+HTTP-prefixed headers, query strings, POST data and cookies are not sources.
+An explicitly empty value is not silently replaced with another source.
 
-The file returns an array of these keys:
-
-```php
-<?php
-return [
-    'host' => 'YOUR_DATABASE_HOST',
-    'database' => 'YOUR_DATABASE_NAME',
-    'user' => 'YOUR_DATABASE_USER',
-    'password' => 'YOUR_DATABASE_PASSWORD',
-    'port' => '3306',
-];
-```
-
-Enter the existing values directly on the host through its secure file manager
-or SSH. Do not send passwords in chat, commit this file, or place it under `www`.
-Restrict file permissions so only the account/PHP process can read it.
-Environment values take precedence over private file settings.
+Configure the existing values using the webhost's secure server-management
+tools. Never send passwords in chat or commit them. A Git update does not set
+these variables on an external host. If the host cannot supply PHP environment
+settings, that is an unresolved hosting configuration requirement, not a reason
+to restore embedded credentials automatically.
 
 ## Portal entrypoints and server errors
 
