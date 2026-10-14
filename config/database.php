@@ -2,17 +2,30 @@
 
 require_once __DIR__ . '/mysql_settings.php';
 
-// Use the existing MySQL configuration supplied to the process, never credentials in source.
-define('DB_HOST', mysqlEnvironmentValue('MYSQL_HOST') ?: '');
-define('DB_NAME', mysqlEnvironmentValue('MYSQL_DATABASE') ?: '');
-define('DB_USER', mysqlEnvironmentValue('MYSQL_USER') ?: '');
-define('DB_PASS', mysqlEnvironmentValue('MYSQL_PASSWORD') === false ? '' : mysqlEnvironmentValue('MYSQL_PASSWORD'));
-define('DB_CHARSET', 'utf8mb4');
+// Values explicitly defined before this file takes precedence. This supports
+// installations that provide DB_* constants in a private bootstrap, while
+// keeping the existing MYSQL_* environment-variable setup as the default.
+if (!defined('DB_HOST')) define('DB_HOST', mysqlEnvironmentValue('MYSQL_HOST'));
+if (!defined('DB_NAME')) define('DB_NAME', mysqlEnvironmentValue('MYSQL_DATABASE'));
+if (!defined('DB_USER')) define('DB_USER', mysqlEnvironmentValue('MYSQL_USER'));
+if (!defined('DB_PASS')) define('DB_PASS', mysqlEnvironmentValue('MYSQL_PASSWORD'));
+if (!defined('DB_PORT')) define('DB_PORT', mysqlEnvironmentValue('MYSQL_PORT'));
+if (!defined('DB_CHARSET')) define('DB_CHARSET', 'utf8mb4');
+
+function databaseConnectionSettings(): array {
+    return mysqlConnectionSettings([
+        'host' => DB_HOST,
+        'database' => DB_NAME,
+        'user' => DB_USER,
+        'password' => DB_PASS,
+        'port' => DB_PORT,
+    ]);
+}
 
 function getDBConnection() {
     static $conn = null;
     if ($conn !== null) return $conn;
-    $settings = mysqlConnectionSettings(mysqlRuntimeSettings());
+    $settings = databaseConnectionSettings();
     try {
         $dsn = 'mysql:host=' . $settings['host'] . ';port=' . $settings['port'] . ';dbname=' . $settings['database'] . ';charset=' . DB_CHARSET;
         $conn = new PDO($dsn, $settings['user'], $settings['password'], [
