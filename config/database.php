@@ -2,6 +2,12 @@
 
 require_once __DIR__ . '/mysql_settings.php';
 
+// MySQL ONLY - Domeneshop production database
+define('DB_HOST', 'http://salesmanno04.mysql.domeneshop.no/');
+define('DB_NAME', 'salesmanno04');
+define('DB_USER', 'salesmanno04');
+define('DB_PASS', 'samle-lime-2Salgs-kd');
+define('DB_CHARSET', 'utf8mb4');
 // Values explicitly defined before this file takes precedence. This supports
 // installations that provide DB_* constants in a private bootstrap, while
 // keeping the existing MYSQL_* environment-variable setup as the default.
