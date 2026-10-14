@@ -32,3 +32,9 @@ Treat an FTP "FIN packet unexpectedly" error as evidence of a closed connection,
 **Why:** The deployment failed while creating dependency directories. The timing suggested a no-transfer timeout, but the supplied log did not include a server reply confirming that cause.
 
 **How to apply:** State the observed failure separately from its likely cause. Do not remove runtime dependencies merely to avoid a transport failure, or describe a replacement transport as proven until a real connection and upload have been verified.
+
+The user's instruction for this webhost deployment is: "Bruk FTP."
+
+**Why:** The user explicitly rejected continuing with the SFTP/SSH-fingerprint setup.
+
+**How to apply:** Keep the FTP transport with its existing TLS protection. Do not switch this deployment to SFTP or introduce SSH-fingerprint setup without a new request.

@@ -1,4 +1,4 @@
-name: Domeneshop SFTP
+name: Domeneshop FTP
 
 on:
   push:
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   web-deploy:
-    name: Preview or upload via SFTP
+    name: Preview or upload via FTP with TLS
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -28,49 +28,16 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
 
-      - name: Check deployment configuration without displaying credentials
+      - name: Preview or upload files over FTP with TLS
         env:
-          DEPLOY_USER: ${{ secrets.FTP_USERNAME }}
-          DEPLOY_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          PINNED_HOST_KEY: ${{ vars.DOMENESHOP_SFTP_HOST_KEY }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          PUBLISH_APPROVED: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$DEPLOY_USER" || -z "$DEPLOY_PASSWORD" ]]; then
-            echo "::error::Configure GitHub Actions secrets FTP_USERNAME and FTP_PASSWORD."
-            exit 1
+          args=()
+          if [[ "$PUBLISH_APPROVED" == "true" ]]; then
+            args+=(--publish)
           fi
-          if ! printf '%s\n' "$PINNED_HOST_KEY" | grep -Eq 'SHA256:[A-Za-z0-9+/]{43}=?'; then
-            echo "::error::Set the verified SSH fingerprint in GitHub Actions variable DOMENESHOP_SFTP_HOST_KEY. See docs/domeneshop_sftp_deployment.md."
-            exit 1
-          fi
-
-      - name: Preview or upload files
-        # easySFTP v3.0.0; pinned to the release commit.
-        uses: eiserv/easySFTP@1099f2b751397a781f0920101d57f9754f7934b4
-        with:
-          host: sftp.domeneshop.no
-          port: 22
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          host-key: ${{ vars.DOMENESHOP_SFTP_HOST_KEY }}
-          source: .
-          target: www
-          mode: overlay
-          # A push only previews. Upload requires an explicit manual selection.
-          dry-run: ${{ github.event_name != 'workflow_dispatch' || !inputs.publish }}
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.repl*
-            **/.repl*/**
-            **/.upm*
-            **/.upm*/**
-            **/.cache*
-            **/.cache*/**
-            **/*.agent
-            **/agent/**
-            **/.agents*
-            **/.agents*/**
+          python3 .github/scripts/deploy_ftp.py "${args[@]}"
