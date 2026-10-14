@@ -60,6 +60,14 @@ try {
         }
         putenv('MYSQL_HOST');
         putenv('MYSQL_CONFIG_FILE');
+        mkdir($fixture . '/salesman-private');
+        copy($privateFile, $fixture . '/salesman-private/mysql.php');
+        $runtime = mysqlRuntimeSettings();
+        if ($runtime['host'] !== 'fixture.local') {
+            throw new RuntimeException('Document-root-relative configuration failed.');
+        }
+        unlink($fixture . '/salesman-private/mysql.php');
+        rmdir($fixture . '/salesman-private');
         echo "PASS external-webhost runtime fallback and environment precedence.\n";
     }
     echo "PASS private host configuration and public-root rejection.\n";

@@ -15,6 +15,7 @@ if (empty($email) || empty($password)) {
 }
 
 try {
+    require_once __DIR__.'/../services/PortalLoginFailure.php';
     require_once __DIR__ . '/../../config/database.php';
     require_once __DIR__.'/../services/PortalSaasIdentity.php';
     require_once __DIR__.'/../services/PortalGlobalUsers.php';
@@ -74,6 +75,7 @@ try {
     $cause = $e->getPrevious() ?: $e;
     $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$cause->getCode());
     error_log('SaaS admin login failed: ' . get_class($cause) . ' code=' . $code);
-    header('Location: /saas_portal/login.php?error=system_error');
+    $failure = class_exists('PortalLoginFailure', false) ? PortalLoginFailure::code($e) : 'system_error';
+    header('Location: /saas_portal/login.php?error=' . $failure);
     exit;
 }

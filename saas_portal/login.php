@@ -132,6 +132,9 @@
             if (isset($_GET['error'])):
                 $error_msg = 'Ukjent feil';
                 switch($_GET['error']) {
+                    case 'database_configuration': $error_msg = 'Databaseinnstillingene på serveren mangler eller er ugyldige. Konfigurer MYSQL-variablene eller den private salesman-private/mysql.php-filen utenfor webroten. Oppdatering fra Git setter ikke disse innstillingene.'; break;
+                    case 'database_connection': $error_msg = 'Serveren kunne ikke koble til databasen. Kontroller databasevert, port og innloggingsopplysninger på webhotellet.'; break;
+                    case 'database_query': $error_msg = 'Databaseforbindelsen ble opprettet, men et databaseoppslag under innlogging feilet. Se serverens PHP-feillogg.'; break;
                     case 'system_error': $error_msg = 'Innloggingen kunne ikke fullføres på grunn av en systemfeil. Prøv igjen. Hvis feilen vedvarer, må databaseforbindelsen kontrolleres.'; break;
                     case 'invalid_request': $error_msg = 'Ugyldig innloggingsforespørsel. Prøv igjen.'; break;
                     case 'invalid_credentials': $error_msg = 'Ugyldig e-post eller passord'; break;

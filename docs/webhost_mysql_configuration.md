@@ -10,9 +10,9 @@ password change is needed for this configuration.
    optionally, `MYSQL_PORT` in the webhost's PHP environment; or
 2. Put a private PHP configuration **outside the public document root**.
 
-For a project whose root is `/home/account/www`, the default private file is
-`/home/account/salesman-private/mysql.php`. If the project is installed deeper,
-use `MYSQL_CONFIG_FILE` to identify the actual private file. The application
+For a server whose document root is `/home/account/www`, the default private file is
+`/home/account/salesman-private/mysql.php`, even if the project is installed in a
+subdirectory. Use `MYSQL_CONFIG_FILE` to identify a different private file. The application
 rejects a file inside the document root, including symlinks pointing there.
 
 The file returns an array of these keys:
@@ -51,6 +51,9 @@ A generic HTTP 500 is not proof of a bad database password. Check the webhost
 error log for PHP errors, missing helper files, PHP version or Apache directives.
 PHP 8 is required by this project. Authentication logs only the exception type
 and driver code, not addresses, credentials or raw driver messages.
+The login page distinguishes invalid/missing configuration, failed database
+connections and failed queries. Updating the Git checkout does not populate
+host-managed database configuration.
 
 ## Which .htaccess belongs where?
 
