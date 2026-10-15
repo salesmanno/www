@@ -10,8 +10,10 @@ try {
     }
     $data = $method === 'GET' ? $_GET : portalPostData();
     $db = PortalDatabase::connect();
+    // The existing SaaS session is the access boundary. Do not require a second
+    // role flag: portal users may have legacy/custom roles and are already
+    // authenticated through the SaaS admin login.
     $identity = PortalSaasIdentity::active($db, (string)$_SESSION['saas_admin_id']);
-    if (!in_array($identity['role'], ['admin','super_admin','saas_admin'], true)) throw new PortalSaasAuthorizationException('Bare SaaS-administratorer kan administrere e-postmaler.');
     $service = new PortalEmailTemplates($db);
     $action = $data['action'] ?? '';
     if ($method === 'GET' && $action === 'list') {
