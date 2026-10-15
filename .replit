@@ -16,6 +16,10 @@ author = "agent"
 task = "workflow.run"
 args = "PHP Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Push"
+
 [[workflows.workflow]]
 name = "PHP Server"
 author = "agent"
@@ -31,11 +35,20 @@ outputType = "webview"
 [[workflows.workflow]]
 name = "Push"
 mode = "sequential"
-author = 15553469
+author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "git init && git config user.email \"replit@example.com\" && git config user.name \"Replit Workflow\" && git remote remove origin 2>/dev/null; git remote add origin https://${MY_PERSONAL_TOKEN}@${TARGET_REPO} && git add . && git commit -m \"Lagret før pull\" --allow-empty && git pull origin main --rebase --allow-unrelated-histories -X theirs && git push -u origin main"
+args = """
+set -eu
+: \"${MY_PERSONAL_KEY:?MY_PERSONAL_KEY is not configured}\"
+export GIT_TERMINAL_PROMPT=0
+git remote set-url origin https://github.com/salesmanno/www.git
+git -c credential.helper= -c 'credential.helper=!f() { if [ \"$1\" = get ]; then printf \"%s
+\" \"username=x-access-token\" \"password=$MY_PERSONAL_KEY\"; fi; }; f' push -u origin main"""
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
