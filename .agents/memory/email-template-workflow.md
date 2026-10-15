@@ -3,7 +3,7 @@ name: Sentralt malverksted
 description: Brukerens ønskede arbeidsflyt for e-postmaler på tvers av firmaer.
 ---
 
-E-postmaler skal kunne bearbeides ett sentralt sted og derfra delegeres til firmaer. Maler må kunne flyttes eller kopieres frem og tilbake mellom firmaer.
+E-postmaler skal kunne bearbeides ett sentralt sted og derfra delegeres til firmaer. Maler må kunne flyttes eller kopieres frem og tilbake mellom firmaer, og slettes/fjernes.
 
 **Why:** Brukeren ønsker én samlet arbeidsflate, ikke å måtte redigere maler separat inne på hvert firma.
 
