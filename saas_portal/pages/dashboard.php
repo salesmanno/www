@@ -259,56 +259,6 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             margin-bottom: 0.3rem;
         }
 
-        .dashboard-tool-link {
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
-            width: min(100%, 520px);
-            min-height: 76px;
-            padding: 0.9rem 1rem;
-            margin: 0 0 1.25rem;
-            border: 1px solid #dbe3dd;
-            border-radius: 12px;
-            background: #fbfcf8;
-            color: #293c40;
-            text-decoration: none;
-            transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
-        }
-
-        .dashboard-tool-link:hover,
-        .dashboard-tool-link:focus-visible {
-            border-color: #28635c;
-            box-shadow: 0 5px 18px #293f4012;
-            color: #204d48;
-            transform: translateY(-1px);
-        }
-
-        .dashboard-tool-icon {
-            display: grid;
-            place-items: center;
-            flex: 0 0 42px;
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
-            background: #e5efea;
-            color: #28635c;
-            font-size: 1.2rem;
-        }
-
-        .dashboard-tool-copy {
-            display: flex;
-            flex-direction: column;
-            gap: .15rem;
-            min-width: 0;
-        }
-
-        .dashboard-tool-copy strong { font-size: .95rem; }
-        .dashboard-tool-copy span { color: #64716f; font-size: .8rem; }
-        .dashboard-tool-arrow { margin-left: auto; color: #587b72; }
-
-        @media (max-width: 575px) {
-            .dashboard-tool-link { width: 100%; }
-        }
     </style>
     <link href="/saas_portal/assets/portal-workspace.css" rel="stylesheet">
 </head>
@@ -335,18 +285,11 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             <div class="workspace-actions">
                 <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i> Opprett ny bedrift</button>
                 <button type="button" class="btn btn-outline-primary" id="grantModeButton">Tildel moduler</button>
+                <a href="/saas_portal/pages/email_templates.php" class="btn btn-outline-secondary"><i class="bi bi-envelope-paper me-1" aria-hidden="true"></i>E-postmaler</a>
                 <button type="button" class="btn btn-outline-secondary" id="moduleTransitionPreviewButton">Kontroller eldre tilganger</button>
                 <button type="button" class="btn btn-primary-custom" id="grantConfirmButton" hidden disabled>Velg moduler (0)</button>
             </div>
         </div>
-        <a class="dashboard-tool-link" href="/saas_portal/pages/email_templates.php">
-            <span class="dashboard-tool-icon"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
-            <span class="dashboard-tool-copy">
-                <strong>E-postmalverksted</strong>
-                <span>Rediger maler sentralt og fordel dem til bedrifter.</span>
-            </span>
-            <i class="bi bi-arrow-right dashboard-tool-arrow" aria-hidden="true"></i>
-        </a>
         <div id="companyStatus" role="status" aria-live="polite"></div>
         <div id="companiesList"><div class="portal-skeleton" aria-label="Laster bedrifter"></div></div>
         <section class="portal-panel global-users-panel" aria-labelledby="globalUsersTitle">
