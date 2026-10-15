@@ -1,4 +1,5 @@
 name: Domeneshop FTP
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.inspect_target && 'Read-only FTP target inspection' || github.event_name == 'workflow_dispatch' && inputs.publish && 'LIVE FTP upload' || 'File preview - no upload' }}
 
 on:
   push:
@@ -7,6 +8,11 @@ on:
     inputs:
       publish:
         description: "Upload to live salesman.no (overwrites matching files; never deletes)"
+        required: true
+        type: boolean
+        default: false
+      inspect_target:
+        description: "Read-only FTP file comparison; no upload or deletion"
         required: true
         type: boolean
         default: false
@@ -23,7 +29,7 @@ jobs:
     name: Preview or upload via FTP with TLS
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -33,11 +39,18 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           PUBLISH_APPROVED: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+          INSPECT_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.inspect_target }}
         shell: bash
         run: |
           set -euo pipefail
           args=()
+          if [[ "$PUBLISH_APPROVED" == "true" && "$INSPECT_TARGET" == "true" ]]; then
+            echo "::error::Choose either read-only inspection or live upload, not both."
+            exit 1
+          fi
           if [[ "$PUBLISH_APPROVED" == "true" ]]; then
             args+=(--publish)
+          elif [[ "$INSPECT_TARGET" == "true" ]]; then
+            args+=(--inspect)
           fi
           python3 .github/scripts/deploy_ftp.py "${args[@]}"

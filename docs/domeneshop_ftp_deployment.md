@@ -37,6 +37,15 @@ Afterward verify the run's SHA matches the intended commit, its transfer step su
 and the affected page on the actual webhost runs the expected version. Offline checks
 and a successful preview do not prove that the webhotel has received the files.
 
+For a read-only check, manually select **Read-only FTP file comparison** and leave
+**Upload to live salesman.no** off. This reads three fixed entry files from `www`,
+compares their hashes against the checkout, and reports existence and match status
+only. It never prints file contents, account names, or credentials and never writes
+to the webhost. Inspection and publishing cannot be combined.
+
+The overall workflow limit is 90 minutes. The previous 20-minute limit interrupted
+a manual run after 383 successful file transfers, leaving the deployment incomplete.
+
 Uploads are not atomic across the whole site. An interruption may leave a mix of old
 and new files; the job fails and a new approved run can retry. Removed local files are
 not automatically removed from the server.

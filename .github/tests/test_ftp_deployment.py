@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -102,6 +102,43 @@ class FtpDeploymentTests(unittest.TestCase):
             fixture = subprocess.CompletedProcess([], 0, stdout=b"index.php\0linked\0")
             with patch.object(FTP.subprocess, "run", return_value=fixture):
                 self.assertEqual(FTP.tracked_files(root), [Path("index.php")])
+
+    def test_read_only_inspection_matches_files_without_remote_writes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "saas_portal").mkdir()
+            for name in ("index.php", "index.html", "saas_portal/login.php"):
+                (root / name).write_bytes(b"expected fixture")
+            client = MagicMock()
+            client.__enter__.return_value = client
+
+            def retrieve(command, callback):
+                if command == "RETR index.html":
+                    raise FTP.ftplib.error_perm("550 Unavailable")
+                callback(b"expected fixture" if command == "RETR index.php" else b"other fixture")
+
+            client.retrbinary.side_effect = retrieve
+            output = io.StringIO()
+            with patch.object(FTP.ftplib, "FTP_TLS", return_value=client), patch("sys.stdout", output):
+                FTP.inspect_target(root, "fixture-user", "fixture-password")
+            lines = [FTP.json.loads(line) for line in output.getvalue().splitlines()
+                     if line.startswith("{")]
+            self.assertTrue(lines[0]["matches_checkout"])
+            self.assertFalse(lines[1]["available"])
+            self.assertFalse(lines[2]["matches_checkout"])
+            client.prot_p.assert_called_once()
+            client.cwd.assert_called_once_with("www")
+            client.storbinary.assert_not_called()
+            client.delete.assert_not_called()
+            client.mkd.assert_not_called()
+            self.assertNotIn("fixture-password", output.getvalue())
+
+    def test_inspection_and_publish_cannot_be_combined(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / ".github/scripts/deploy_ftp.py"), "--inspect", "--publish"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 2)
 
 
 if __name__ == "__main__":

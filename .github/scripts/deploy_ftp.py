@@ -6,9 +6,13 @@ dependency tree before the first data transfer. Preview is the default.
 
 import argparse
 import fnmatch
+import ftplib
+import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
+import ssl
 import tempfile
 from urllib.parse import quote
 
@@ -95,11 +99,52 @@ def deploy(root, paths, username, password):
         return result.returncode
 
 
+def inspect_target(root, username, password):
+    """Read a fixed set of entry files; never print their contents or credentials."""
+    if not username or not password:
+        raise ValueError("Configure GitHub Actions secrets FTP_USERNAME and FTP_PASSWORD.")
+    paths = ("index.php", "index.html", "saas_portal/login.php")
+    with ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=30) as client:
+        client.connect(SERVER, 21)
+        client.login(username, password)
+        client.prot_p()
+        client.cwd(TARGET)
+        for name in paths:
+            digest = hashlib.sha256()
+            size = 0
+
+            def consume(block):
+                nonlocal size
+                size += len(block)
+                if size > 1024 * 1024:
+                    raise ValueError("Diagnostic entry file exceeded the read-only size limit.")
+                digest.update(block)
+
+            try:
+                client.retrbinary("RETR " + name, consume)
+            except ftplib.error_perm as error:
+                if str(error).startswith("550"):
+                    print(json.dumps({"inspection": "ftp_target", "path": TARGET + "/" + name,
+                                      "available": False}))
+                    continue
+                raise
+            expected = hashlib.sha256((root / name).read_bytes()).digest()
+            print(json.dumps({"inspection": "ftp_target", "path": TARGET + "/" + name,
+                              "available": True, "matches_checkout": digest.digest() == expected}))
+    print("Read-only FTP inspection completed. No remote files were changed.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--publish", action="store_true", help="Upload to the live webhost.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--publish", action="store_true", help="Upload to the live webhost.")
+    modes.add_argument("--inspect", action="store_true", help="Read-only comparison of FTP entry files.")
     args = parser.parse_args()
     try:
+        if args.inspect:
+            inspect_target(ROOT, os.environ.get("FTP_USERNAME", ""),
+                           os.environ.get("FTP_PASSWORD", ""))
+            return 0
         paths = tracked_files(ROOT)
         if not args.publish:
             print(f"PREVIEW ONLY: {len(paths)} tracked files → {SERVER}:21/{TARGET}/")
@@ -113,6 +158,9 @@ def main():
         )
         print("FTP upload completed." if code == 0 else "FTP upload failed; deployment is incomplete.")
         return code
+    except (ftplib.Error, EOFError):
+        print("FTP inspection failed. No upload or deletion was attempted.")
+        return 1
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         # Do not print subprocess arguments, config contents, or credentials.
         print("Deployment error: " + (
