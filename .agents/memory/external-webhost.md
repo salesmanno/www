@@ -3,11 +3,11 @@ name: External webhost verification
 description: Distinguish Replit checks from the independently hosted salesman.no installation.
 ---
 
-Do not describe a Replit connection or login-page check as verification of the salesman.no installation.
+Do not describe a Replit check, historical FTP success, or green file-preview run as verification of the current salesman.no installation.
 
-**Why:** The local MySQL connection succeeded while salesman.no authentication and the hyphenated portal entrypoint returned generic HTTP 500 errors. The deployment service reported no Replit deployment for this project; workspace changes alone cannot establish what files or settings the external host runs.
+**Why:** Local checks and the external site have repeatedly differed. Previously successful FTP transfers were later found missing or replaced in the same target, despite unchanged FTP credential metadata. The hostname can therefore serve a different login interface from the intended SaaS entrypoint without the user's password being the cause.
 
-**How to apply:** Verify the exact reported URL and request stage. Obtain the external server's relevant error log or authorized deployment access before attributing its HTTP 500 to database passwords. Replit Secrets do not configure a separate webhost automatically.
+**How to apply:** Compare the current public entrypoint and current FTP entry-file hashes with the intended checkout. If they disagree, investigate the destination directory and competing publishers before changing accounts or passwords. Obtain relevant server logs before diagnosing HTTP 500. Replit Secrets do not configure a separate webhost automatically.
 
 Support database constants directly in config/database.php as well as the existing environment variables. Do not introduce a required private configuration file.
 
