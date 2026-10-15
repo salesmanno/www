@@ -188,6 +188,7 @@ if (!$company) {
                         <i class="bi bi-envelope"></i> Epost-konfigurasjon
                     </h3>
                     <p class="text-muted">Konfigurer SMTP og IMAP innstillinger for <?= htmlspecialchars($company['name']) ?></p>
+                    <p><a class="btn btn-outline-secondary btn-sm" href="/saas_portal/pages/email_templates.php?owner=<?= rawurlencode((string)$company_id) ?>"><i class="bi bi-envelope-paper me-1"></i>Åpne firmaets e-postmaler i malverkstedet</a></p>
 
                     <div class="portal-panel mb-3" id="emailEditPanel">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">

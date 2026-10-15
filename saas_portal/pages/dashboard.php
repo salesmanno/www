@@ -268,6 +268,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 <i class="bi bi-building-gear me-2"></i>SaaS Admin Portal
             </a>
             <div class="ms-auto d-flex align-items-center gap-2">
+                <a href="/saas_portal/pages/email_templates.php" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-envelope-paper"></i> E-postmaler
+                </a>
                 <span class="text-white me-2">
                     <i class="bi bi-person-circle me-2"></i><?= htmlspecialchars($admin_name) ?>
                 </span>

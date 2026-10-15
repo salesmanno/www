@@ -52,7 +52,7 @@ class EmailService {
             
             // 3. Render template with data
             $subject = $this->renderTemplate($template['subject_template'], $params['data'] ?? []);
-            $body = $this->renderTemplate($template['body_template'], $params['data'] ?? []);
+            $body = $this->renderTemplate($template['body_template'], $params['data'] ?? [], true);
             
             // 4. Create email log entry (pending)
             $logId = $this->createEmailLog([
@@ -126,7 +126,7 @@ class EmailService {
      * @param array $data - Key-value pairs for replacement
      * @return string Rendered template
      */
-    private function renderTemplate($template, $data) {
+    private function renderTemplate($template, $data, $html = false) {
         // Add company info to data (always available)
         $stmt = $this->db->prepare("SELECT name FROM tenant_companies WHERE id = ?");
         $stmt->execute([$this->companyId]);
@@ -135,6 +135,10 @@ class EmailService {
         
         // Replace all {{key}} with values from $data
         foreach ($data as $key => $value) {
+            if (!is_scalar($value) && $value !== null) continue;
+            $value = $html
+                ? htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                : str_replace(["\r", "\n"], ' ', (string)$value);
             $template = str_replace('{{' . $key . '}}', $value, $template);
         }
         
