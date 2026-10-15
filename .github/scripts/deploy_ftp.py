@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SERVER = "ftp.domeneshop.no"
 TARGET = "www"
 EXCLUDED_NAMES = (".git*", ".repl*", ".upm*", ".cache*", ".agents*", "*.agent")
-EXCLUDED_DIRS = {"node_modules", "agent"}
+EXCLUDED_DIRS = {".github", "node_modules", "agent"}
 
 
 def excluded(path):

@@ -99,7 +99,9 @@ class FtpDeploymentTests(unittest.TestCase):
             (root / "index.php").write_text("fixture")
             (root / "not-tracked").write_text("fixture")
             (root / "linked").symlink_to(root / "not-tracked")
-            fixture = subprocess.CompletedProcess([], 0, stdout=b"index.php\0linked\0")
+            fixture = subprocess.CompletedProcess(
+                [], 0, stdout=b"index.php\0linked\0.github/scripts/deploy_ftp.py\0"
+            )
             with patch.object(FTP.subprocess, "run", return_value=fixture):
                 self.assertEqual(FTP.tracked_files(root), [Path("index.php")])
 

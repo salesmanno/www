@@ -18,7 +18,8 @@ args = "PHP Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Push"
+args = "Publish to salesman.no"
+
 
 [[workflows.workflow]]
 name = "PHP Server"
@@ -33,19 +34,12 @@ waitForPort = 5000
 outputType = "webview"
 
 [[workflows.workflow]]
-name = "Push"
-mode = "sequential"
+name = "Publish to salesman.no"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = """
-set -eu
-: \"${MY_PERSONAL_KEY:?MY_PERSONAL_KEY is not configured}\"
-export GIT_TERMINAL_PROMPT=0
-git remote set-url origin https://github.com/salesmanno/www.git
-git -c credential.helper= -c 'credential.helper=!f() { if [ \"$1\" = get ]; then printf \"%s
-\" \"username=x-access-token\" \"password=$MY_PERSONAL_KEY\"; fi; }; f' push -u origin main"""
+args = "bash .github/scripts/publish_from_replit.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
