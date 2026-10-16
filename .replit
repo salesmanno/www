@@ -16,9 +16,6 @@ author = "agent"
 task = "workflow.run"
 args = "PHP Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Publish to salesman.no"
 
 
 [[workflows.workflow]]
@@ -50,3 +47,7 @@ externalPort = 80
 
 [agent]
 expertMode = true
+
+[postMerge]
+path = ".github/scripts/post-merge-setup.sh"
+timeoutMs = 180000
