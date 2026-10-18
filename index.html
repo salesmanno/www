@@ -1,163 +1,795 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="no">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salesman.no - Profesjonell Salgsstøtte</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f5">
+    <meta name="description" content="Salesman samler arrangementer, utleie, medlemskap, økonomi, e-post og nyheter i én fleksibel plattform.">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>Salesman.no — verktøyene som samler driften</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            color-scheme: light;
+            --ink: #11263b;
+            --ink-soft: #42566a;
+            --muted: #697b8d;
+            --paper: #f7f8f5;
+            --white: #fff;
+            --line: #e2e8e7;
+            --blue: #2c5cdb;
+            --blue-dark: #2148b6;
+            --mint: #dff1e9;
+            --mint-ink: #1f694e;
+            --radius: 22px;
+            --shadow: 0 22px 60px rgba(17, 38, 59, .09);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            scroll-behavior: smooth;
         }
 
+        * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: #ffffff;
-            min-height: 100vh;
+            margin: 0;
+            color: var(--ink);
+            background: var(--paper);
+            font-size: 16px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { color: inherit; }
+        a:focus-visible {
+            outline: 3px solid #87a7ff;
+            outline-offset: 4px;
+            border-radius: 5px;
+        }
+        .container { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
+        .site-header {
+            position: relative;
+            z-index: 2;
+            background: rgba(247, 248, 245, .9);
+            border-bottom: 1px solid rgba(17, 38, 59, .07);
+        }
+        .header-inner {
+            min-height: 96px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
+            justify-content: space-between;
+            gap: 28px;
         }
-
-        .container {
-            max-width: 1000px;
-            width: 100%;
-        }
-
-        .logo {
-            max-width: 550px;
-            width: 100%;
-            height: auto;
-            margin: 0 auto 60px;
-            display: block;
-        }
-
-        .content {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
-        .tagline {
-            color: #1a2f4a;
-            font-size: 28px;
-            font-weight: 400;
-            margin-bottom: 50px;
-            line-height: 1.5;
-            text-align: center;
-        }
-
-        .services {
-            color: #333;
-            line-height: 1.8;
-            font-size: 17px;
-            margin-bottom: 60px;
-            text-align: center;
-        }
-
-        .divider {
-            height: 1px;
-            background: #e0e0e0;
-            margin: 50px 0;
-        }
-
-        .contact-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 40px;
-            margin-top: 50px;
-        }
-
-        .contact-item {
-            text-align: center;
-        }
-
-        .contact-label {
-            color: #888;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 12px;
-            font-weight: 500;
-        }
-
-        .contact-value {
-            color: #1a2f4a;
-            font-size: 24px;
-            font-weight: 500;
-        }
-
-        .contact-value a {
-            color: #1a2f4a;
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            flex: 0 0 auto;
             text-decoration: none;
-            transition: opacity 0.2s ease;
+        }
+        .brand-logo { display: block; width: 176px; height: 89px; object-fit: contain; }
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: clamp(18px, 3vw, 38px);
+        }
+        .nav a {
+            color: var(--ink-soft);
+            font-size: .93rem;
+            font-weight: 580;
+            text-decoration: none;
+            transition: color .18s ease;
+        }
+        .nav a:hover { color: var(--blue); }
+        .nav .nav-cta {
+            color: var(--white);
+            background: var(--ink);
+            padding: 10px 18px;
+            border-radius: 999px;
+        }
+        .nav .nav-cta:hover { color: white; background: var(--blue-dark); }
+
+        .hero {
+            overflow: hidden;
+            position: relative;
+            padding: clamp(64px, 9vw, 118px) 0 72px;
+            background:
+                radial-gradient(ellipse at 78% 16%, rgba(170, 220, 203, .42), transparent 35%),
+                radial-gradient(ellipse at 5% 2%, rgba(206, 220, 255, .48), transparent 36%),
+                var(--paper);
+        }
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.04fr) minmax(340px, .96fr);
+            gap: clamp(42px, 7vw, 94px);
+            align-items: center;
+        }
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            margin: 0 0 22px;
+            color: var(--blue-dark);
+            font-size: .76rem;
+            font-weight: 760;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+        .eyebrow::before {
+            content: "";
+            width: 22px;
+            height: 2px;
+            background: currentColor;
+        }
+        h1, h2, h3, p { margin-top: 0; }
+        h1 {
+            max-width: 690px;
+            margin-bottom: 24px;
+            font-size: clamp(2.8rem, 6.2vw, 5.35rem);
+            line-height: .99;
+            font-weight: 680;
+            letter-spacing: -.073em;
+        }
+        h1 em {
+            color: var(--blue);
+            font-style: normal;
+        }
+        .hero-copy {
+            max-width: 570px;
+            margin-bottom: 30px;
+            color: var(--ink-soft);
+            font-size: clamp(1.05rem, 1.6vw, 1.21rem);
+            line-height: 1.75;
+        }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+        .button {
+            min-height: 50px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            padding: 12px 20px;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            background: var(--blue);
+            color: white;
+            font-weight: 680;
+            text-decoration: none;
+            transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            background: var(--blue-dark);
+            box-shadow: 0 10px 24px rgba(44, 92, 219, .2);
+        }
+        .button-secondary {
+            color: var(--ink);
+            background: rgba(255, 255, 255, .65);
+            border-color: #d8e0e5;
+        }
+        .button-secondary:hover { color: var(--ink); background: white; }
+        .arrow { font-size: 1.15rem; line-height: 1; }
+        .hero-note {
+            margin: 21px 0 0;
+            color: var(--muted);
+            font-size: .88rem;
         }
 
-        .contact-value a:hover {
-            opacity: 0.7;
+        .visual-wrap { position: relative; padding: 15px 10px 22px 20px; }
+        .visual-orb {
+            position: absolute;
+            z-index: 0;
+            width: 190px;
+            aspect-ratio: 1;
+            top: -30px;
+            right: -20px;
+            border-radius: 50%;
+            background: #bed4ff;
+            opacity: .58;
+            filter: blur(2px);
+        }
+        .product-card {
+            position: relative;
+            z-index: 1;
+            max-width: 490px;
+            margin-left: auto;
+            padding: clamp(21px, 3.2vw, 34px);
+            border: 1px solid rgba(255, 255, 255, .8);
+            border-radius: 28px;
+            background: rgba(255, 255, 255, .84);
+            box-shadow: var(--shadow);
+            transform: rotate(1deg);
+        }
+        .product-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 21px;
+            border-bottom: 1px solid var(--line);
+        }
+        .product-top strong { font-size: .98rem; letter-spacing: -.02em; }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 10px;
+            border-radius: 99px;
+            color: var(--mint-ink);
+            background: var(--mint);
+            font-size: .72rem;
+            font-weight: 720;
+        }
+        .status-pill::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #2c9b6e;
+        }
+        .preview-list { display: grid; gap: 11px; padding-top: 19px; }
+        .preview-row {
+            display: grid;
+            grid-template-columns: 42px 1fr auto;
+            align-items: center;
+            gap: 13px;
+            min-height: 67px;
+            padding: 10px 12px;
+            border: 1px solid #edf0ef;
+            border-radius: 15px;
+            background: white;
+        }
+        .preview-icon {
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: var(--blue-dark);
+            background: #edf2ff;
+            font-size: 1.1rem;
+            font-weight: 750;
+        }
+        .preview-row:nth-child(2) .preview-icon { color: #267354; background: #e8f5ef; }
+        .preview-row:nth-child(3) .preview-icon { color: #9a671e; background: #fff3d9; }
+        .preview-info strong, .preview-info span { display: block; }
+        .preview-info strong { font-size: .9rem; }
+        .preview-info span { color: var(--muted); font-size: .76rem; }
+        .preview-count { color: #8a99a7; font-size: .77rem; }
+        .product-foot {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            margin-top: 17px;
+            padding: 16px 17px;
+            border-radius: 15px;
+            color: white;
+            background: var(--ink);
+        }
+        .foot-symbol {
+            width: 35px;
+            height: 35px;
+            display: grid;
+            place-items: center;
+            border-radius: 11px;
+            color: var(--ink);
+            background: #c7f0da;
+            font-weight: 800;
+        }
+        .product-foot p { margin: 0; color: rgba(255,255,255,.7); font-size: .75rem; }
+        .product-foot strong { color: white; font-size: .88rem; }
+        .floating-note {
+            position: absolute;
+            z-index: 2;
+            left: -7px;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: white;
+            box-shadow: 0 12px 30px rgba(17, 38, 59, .1);
+            font-size: .83rem;
+            font-weight: 680;
+        }
+        .floating-note span { color: #27835e; font-size: 1.15rem; }
+
+        .proof-strip {
+            padding: 24px 0;
+            border-block: 1px solid var(--line);
+            background: rgba(255,255,255,.6);
+        }
+        .proof-inner {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: center;
+            gap: 20px;
+            color: var(--ink-soft);
+            font-size: .9rem;
+        }
+        .proof-item { display: flex; align-items: center; gap: 10px; }
+        .proof-check { color: var(--blue); font-weight: 850; }
+
+        .section { padding: clamp(72px, 9vw, 112px) 0; }
+        .section-heading {
+            max-width: 690px;
+            margin: 0 auto 45px;
+            text-align: center;
+        }
+        .section-heading .eyebrow { justify-content: center; }
+        h2 {
+            margin-bottom: 16px;
+            font-size: clamp(2.2rem, 4.1vw, 3.55rem);
+            line-height: 1.05;
+            font-weight: 680;
+            letter-spacing: -.065em;
+        }
+        .section-heading > p:last-child {
+            margin-bottom: 0;
+            color: var(--muted);
+            font-size: 1.05rem;
+        }
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 17px;
+        }
+        .module-card {
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: white;
+            box-shadow: 0 7px 22px rgba(17, 38, 59, .035);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        .module-card:hover {
+            transform: translateY(-4px);
+            border-color: #c8d5f5;
+            box-shadow: 0 17px 35px rgba(17, 38, 59, .08);
+        }
+        .module-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .module-symbol {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            background: #edf2ff;
+            color: var(--blue-dark);
+            font-size: 1.1rem;
+            font-weight: 780;
+        }
+        .module-card:nth-child(2) .module-symbol { color: #267354; background: #e8f5ef; }
+        .module-card:nth-child(3) .module-symbol { color: #976019; background: #fff3d9; }
+        .module-card:nth-child(4) .module-symbol { color: #8256a6; background: #f2eafa; }
+        .module-card:nth-child(5) .module-symbol { color: #b34d5d; background: #ffedf0; }
+        .module-card:nth-child(6) .module-symbol { color: #267354; background: #e8f5ef; }
+        .module-badge {
+            padding: 5px 9px;
+            border-radius: 99px;
+            color: #536578;
+            background: #f2f5f5;
+            font-size: .67rem;
+            font-weight: 720;
+            letter-spacing: .045em;
+            text-transform: uppercase;
+        }
+        .module-badge.included { color: var(--mint-ink); background: var(--mint); }
+        .module-badge.progress { color: #815b1d; background: #fff2d8; }
+        .module-card h3 {
+            margin: 20px 0 9px;
+            font-size: 1.25rem;
+            letter-spacing: -.035em;
+        }
+        .module-description {
+            flex: 1;
+            margin-bottom: 24px;
+            color: var(--ink-soft);
+            font-size: .91rem;
+            line-height: 1.65;
+        }
+        .module-price {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid var(--line);
+        }
+        .price-part { display: grid; gap: 2px; }
+        .price-part span { color: var(--muted); font-size: .72rem; }
+        .price-part strong { font-size: .91rem; font-weight: 730; }
+        .price-part.monthly { text-align: right; }
+        .pricing-note {
+            max-width: 820px;
+            margin: 25px auto 0;
+            color: var(--muted);
+            font-size: .83rem;
+            text-align: center;
+        }
+        .future-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-top: 25px;
+            padding: 18px 21px;
+            border: 1px dashed #cbd5da;
+            border-radius: 16px;
+            color: var(--ink-soft);
+            background: rgba(255,255,255,.55);
+            font-size: .88rem;
+        }
+        .future-note strong { color: var(--ink); }
+        .future-note p { margin: 0; }
+        .future-mark {
+            flex: 0 0 28px;
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            color: var(--blue-dark);
+            background: #edf2ff;
+            font-weight: 800;
         }
 
-        @media (max-width: 768px) {
-            .logo {
-                max-width: 400px;
-                margin-bottom: 40px;
-            }
+        .how-section { background: #eef3f0; }
+        .how-grid {
+            display: grid;
+            grid-template-columns: .85fr 1.15fr;
+            gap: clamp(35px, 7vw, 90px);
+            align-items: center;
+        }
+        .how-copy .eyebrow { margin-bottom: 18px; }
+        .how-copy h2 { max-width: 480px; }
+        .how-copy > p:last-child { max-width: 480px; margin-bottom: 0; color: var(--ink-soft); }
+        .steps { display: grid; gap: 13px; }
+        .step {
+            display: grid;
+            grid-template-columns: 42px 1fr;
+            gap: 15px;
+            padding: 18px;
+            border: 1px solid rgba(17, 38, 59, .08);
+            border-radius: 17px;
+            background: rgba(255,255,255,.72);
+        }
+        .step-number {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: white;
+            background: var(--ink);
+            font-size: .82rem;
+            font-weight: 760;
+        }
+        .step h3 { margin: 1px 0 4px; font-size: .98rem; }
+        .step p { margin: 0; color: var(--muted); font-size: .86rem; }
 
-            .tagline {
-                font-size: 22px;
-            }
+        .contact-section { padding: clamp(72px, 9vw, 108px) 0; }
+        .contact-panel {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 38px;
+            padding: clamp(30px, 6vw, 66px);
+            border-radius: 28px;
+            color: white;
+            background:
+                radial-gradient(circle at 90% -10%, rgba(115, 148, 255, .46), transparent 36%),
+                var(--ink);
+        }
+        .contact-panel::after {
+            content: "";
+            position: absolute;
+            width: 230px;
+            height: 230px;
+            right: 20%;
+            bottom: -185px;
+            border: 1px solid rgba(255,255,255,.16);
+            border-radius: 50%;
+            box-shadow: 0 0 0 30px rgba(255,255,255,.025), 0 0 0 60px rgba(255,255,255,.025);
+        }
+        .contact-panel .eyebrow { color: #b8c9ff; }
+        .contact-panel h2 { max-width: 620px; margin-bottom: 13px; }
+        .contact-panel p { max-width: 560px; margin-bottom: 0; color: rgba(255,255,255,.72); }
+        .contact-actions { position: relative; z-index: 1; display: grid; gap: 11px; min-width: 190px; }
+        .contact-actions .button { color: var(--ink); background: white; }
+        .contact-actions .button:hover { background: #e6edff; }
+        .contact-email {
+            color: rgba(255,255,255,.84);
+            font-size: .82rem;
+            text-align: center;
+            text-decoration: none;
+        }
+        .contact-email:hover { color: white; text-decoration: underline; }
 
-            .services {
-                font-size: 16px;
-            }
+        .site-footer { padding: 24px 0 31px; border-top: 1px solid var(--line); }
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            color: var(--muted);
+            font-size: .82rem;
+        }
+        .footer-inner p { margin: 0; }
+        .footer-links { display: flex; gap: 20px; }
+        .footer-links a { color: var(--ink-soft); text-decoration: none; }
+        .footer-links a:hover { color: var(--blue); }
 
-            .contact-grid {
-                grid-template-columns: 1fr;
-                gap: 35px;
-            }
-
-            .contact-value {
-                font-size: 20px;
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr); gap: 30px; }
+            .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .how-grid { grid-template-columns: 1fr 1.1fr; gap: 35px; }
+        }
+        @media (max-width: 680px) {
+            .container { width: min(100% - 36px, 520px); }
+            .header-inner { min-height: 76px; }
+            .brand-logo { width: 138px; height: 70px; }
+            .nav { gap: 14px; }
+            .nav a:not(.nav-cta) { display: none; }
+            .nav .nav-cta { padding: 9px 14px; font-size: .85rem; }
+            .hero { padding: 57px 0 52px; }
+            .hero-grid { grid-template-columns: 1fr; gap: 38px; }
+            h1 { max-width: 540px; font-size: clamp(2.8rem, 13vw, 4rem); }
+            .hero-copy { font-size: 1rem; }
+            .visual-wrap { max-width: 500px; width: 100%; margin-inline: auto; padding: 9px 3px 20px; }
+            .product-card { transform: none; }
+            .visual-orb { right: -25px; }
+            .floating-note { left: 0; }
+            .proof-inner { grid-template-columns: 1fr; gap: 10px; }
+            .proof-item { font-size: .84rem; }
+            .section { padding: 68px 0; }
+            .section-heading { margin-bottom: 31px; text-align: left; }
+            .section-heading .eyebrow { justify-content: flex-start; }
+            .module-grid { grid-template-columns: 1fr; gap: 13px; }
+            .module-card { min-height: 0; padding: 22px; }
+            .module-description { margin-bottom: 20px; }
+            .future-note { padding: 16px; }
+            .how-grid { grid-template-columns: 1fr; gap: 29px; }
+            .contact-panel { grid-template-columns: 1fr; gap: 26px; border-radius: 23px; }
+            .contact-actions { max-width: 300px; width: 100%; }
+            .contact-email { text-align: left; }
+            .footer-inner { align-items: flex-start; flex-direction: column; }
+        }
+        @media (max-width: 390px) {
+            .container { width: calc(100% - 28px); }
+            .hero-actions { align-items: stretch; flex-direction: column; }
+            .hero-actions .button { width: 100%; }
+            .product-card { padding: 18px; }
+            .preview-row { grid-template-columns: 38px 1fr; }
+            .preview-count { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/saas_portal/login.php" style="text-decoration: none; display: block;">
-            <img src="attached_assets/EBF96C6D-D9D9-4976-9382-9C21A41822F4_1762084787475.png" alt="Salesman.no Logo" class="logo" style="cursor: pointer;">
-        </a>
-        
-        <div class="content">
-            <p class="tagline">
-                Din partner for profesjonell salgsstøtte og CRM-løsninger
-            </p>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="#topp" aria-label="Salesman.no – til toppen">
+                <img class="brand-logo" src="/attached_assets/salesman-logo.webp" alt="Salesman.no">
+            </a>
+            <nav class="nav" aria-label="Hovedmeny">
+                <a href="#moduler">Moduler</a>
+                <a href="#slik-fungerer-det">Slik fungerer det</a>
+                <a class="nav-cta" href="#kontakt">Snakk med oss <span aria-hidden="true">↗</span></a>
+            </nav>
+        </div>
+    </header>
 
-            <p class="services">
-                Vi tilbyr skreddersydde CRM-systemer og salgsstøtteverktøy som hjelper din bedrift med å 
-                effektivisere salgsprosessen, administrere kunderelasjoner og øke konverteringsraten. 
-                Med våre moderne løsninger får du full kontroll over kundedata, salgsrapporter og oppfølging.
-            </p>
-
-            <div class="divider"></div>
-
-            <div class="contact-grid">
-                <div class="contact-item">
-                    <div class="contact-label">Telefon</div>
-                    <div class="contact-value">
-                        <a href="tel:40469364">404 69 364</a>
+    <main id="topp">
+        <section class="hero">
+            <div class="container hero-grid">
+                <div>
+                    <p class="eyebrow">En plattform. Modulene dere trenger.</p>
+                    <h1>Få mer flyt i <em>hverdagen.</em></h1>
+                    <p class="hero-copy">
+                        Samle arrangementer, utleie, medlemskap og oppfølging på ett sted.
+                        Velg funksjonene dere trenger nå — og bygg videre når behovene endrer seg.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="button" href="#moduler">Utforsk modulene <span class="arrow" aria-hidden="true">→</span></a>
+                        <a class="button button-secondary" href="#kontakt">Avtal en prat</a>
                     </div>
+                    <p class="hero-note">Fleksible moduler for organisasjoner og virksomheter.</p>
                 </div>
 
-                <div class="contact-item">
-                    <div class="contact-label">E-post</div>
-                    <div class="contact-value">
-                        <a href="mailto:magne.k@salesman.no">magne.k@salesman.no</a>
+                <div class="visual-wrap" aria-label="Illustrasjon av moduler samlet på ett sted">
+                    <div class="visual-orb" aria-hidden="true"></div>
+                    <div class="product-card">
+                        <div class="product-top">
+                            <strong>Oversikt, samlet</strong>
+                            <span class="status-pill">Modulbasert</span>
+                        </div>
+                        <div class="preview-list">
+                            <div class="preview-row">
+                                <span class="preview-icon" aria-hidden="true">E</span>
+                                <span class="preview-info"><strong>Events</strong><span>Planlegg og ta imot påmeldinger</span></span>
+                                <span class="preview-count">01</span>
+                            </div>
+                            <div class="preview-row">
+                                <span class="preview-icon" aria-hidden="true">R</span>
+                                <span class="preview-info"><strong>Rental</strong><span>Objekter, forespørsler og kalender</span></span>
+                                <span class="preview-count">02</span>
+                            </div>
+                            <div class="preview-row">
+                                <span class="preview-icon" aria-hidden="true">M</span>
+                                <span class="preview-info"><strong>Memberships</strong><span>Planer, medlemmer og status</span></span>
+                                <span class="preview-count">03</span>
+                            </div>
+                        </div>
+                        <div class="product-foot">
+                            <span class="foot-symbol" aria-hidden="true">+</span>
+                            <p><strong>Start med det viktigste</strong><br>Legg til flere moduler ved behov.</p>
+                        </div>
+                    </div>
+                    <div class="floating-note"><span aria-hidden="true">✓</span> Tilpasset deres behov</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="proof-strip" aria-label="Plattformens fordeler">
+            <div class="container proof-inner">
+                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Velg modulene dere trenger</span>
+                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Oppstart og månedspris vises separat</span>
+                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Bygg ut i eget tempo</span>
+            </div>
+        </div>
+
+        <section class="section" id="moduler">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="eyebrow">Dagens tilbud</p>
+                    <h2>Velg verktøyene som passer dere.</h2>
+                    <p>Start med én modul eller kombiner flere. Prisene under er et veiledende overslag i norske kroner.</p>
+                </div>
+
+                <div class="module-grid">
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">E</span>
+                            <span class="module-badge">Arrangement</span>
+                        </div>
+                        <h3>Events</h3>
+                        <p class="module-description">Opprett og publiser arrangementer, sett priser, ta imot reservasjoner og sjekk inn deltakere.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>kr 5 000</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>kr 350</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">R</span>
+                            <span class="module-badge">Utleie</span>
+                        </div>
+                        <h3>Rental</h3>
+                        <p class="module-description">Administrer utleieobjekter, priser, forespørsler og kalender. Få oversikt over kommende leie og kontaktinformasjon.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>kr 7 500</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>kr 300</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">M</span>
+                            <span class="module-badge">Medlemskap</span>
+                        </div>
+                        <h3>Memberships</h3>
+                        <p class="module-description">Opprett medlemskapsplaner og hold orden på medlemmer, varighet, pris og medlemsstatus.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>kr 3 500</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>kr 300</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">E</span>
+                            <span class="module-badge progress">Videreutvikles</span>
+                        </div>
+                        <h3>Economy</h3>
+                        <p class="module-description">Sett opp betalingsmetoder som Vipps og Stripe, og samle inntekts- og utgiftsoversikt fra utvalgte moduler. Fakturering er under utvikling.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>kr 1 500</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>kr 100</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">E</span>
+                            <span class="module-badge">E-post</span>
+                        </div>
+                        <h3>Email</h3>
+                        <p class="module-description">Få en egen e-postadresse på salesman.no og send varsler knyttet til reservasjoner, kjøp og medlemskap.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>kr 10 000</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>kr 400</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="module-card">
+                        <div class="module-top">
+                            <span class="module-symbol" aria-hidden="true">N</span>
+                            <span class="module-badge included">Inkludert</span>
+                        </div>
+                        <h3>News</h3>
+                        <p class="module-description">Administrer nyheter på hjemmesiden, bestem rekkefølgen og vis aktuelt innhold for besøkende.</p>
+                        <div class="module-price">
+                            <div class="price-part"><span>Etablering</span><strong>Gratis</strong></div>
+                            <div class="price-part monthly"><span>Per måned</span><strong>Gratis</strong></div>
+                        </div>
+                    </article>
+                </div>
+
+                <p class="pricing-note">Etablering og månedspris beregnes per valgt modul. Endelig tilbud avhenger av oppsettet dere trenger.</p>
+                <div class="future-note">
+                    <span class="future-mark" aria-hidden="true">↗</span>
+                    <p><strong>Flere muligheter kommer.</strong> Sales, Services og andre moduler er under vurdering og er ikke del av dagens tilbud.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section how-section" id="slik-fungerer-det">
+            <div class="container how-grid">
+                <div class="how-copy">
+                    <p class="eyebrow">En enkel start</p>
+                    <h2>Riktig oppsett. Uten unødvendig kompleksitet.</h2>
+                    <p>Vi tar utgangspunkt i hvordan dere jobber, setter opp relevante moduler og hjelper dere i gang. Dere velger hva som skal være tilgjengelig for brukerne deres.</p>
+                </div>
+                <div class="steps">
+                    <article class="step">
+                        <span class="step-number">01</span>
+                        <div><h3>Fortell hva dere trenger</h3><p>Vi ser på arbeidsflyten deres og hvilke oppgaver som tar mest tid.</p></div>
+                    </article>
+                    <article class="step">
+                        <span class="step-number">02</span>
+                        <div><h3>Velg relevante moduler</h3><p>Få et tydelig tilbud med etablering og månedspris for valgene deres.</p></div>
+                    </article>
+                    <article class="step">
+                        <span class="step-number">03</span>
+                        <div><h3>Kom i gang og bygg videre</h3><p>Start med et praktisk oppsett. Legg til funksjoner når behovene vokser.</p></div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="contact-section" id="kontakt">
+            <div class="container">
+                <div class="contact-panel">
+                    <div>
+                        <p class="eyebrow">Neste steg</p>
+                        <h2>La oss finne ut hva som passer for dere.</h2>
+                        <p>Ta kontakt for en uforpliktende prat om behov, moduler og oppstart.</p>
+                    </div>
+                    <div class="contact-actions">
+                        <a class="button" href="mailto:magne.k@salesman.no?subject=Foresp%C3%B8rsel%20om%20Salesman">Kontakt Salesman <span aria-hidden="true">↗</span></a>
+                        <a class="contact-email" href="tel:40469364">Eller ring 404 69 364</a>
                     </div>
                 </div>
             </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <p>© Salesman.no</p>
+            <div class="footer-links">
+                <a href="mailto:magne.k@salesman.no">E-post</a>
+                <a href="tel:40469364">404 69 364</a>
+            </div>
         </div>
-    </div>
+    </footer>
 </body>
 </html>
