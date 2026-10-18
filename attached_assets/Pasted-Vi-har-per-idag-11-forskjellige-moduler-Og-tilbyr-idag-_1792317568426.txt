@@ -1,0 +1,53 @@
+Vi har per idag 11 forskjellige moduler
+
+Og tilbyr idag følgende 6 moduler:
+
+* Events(Arrangementer)
+* Rental(Utleie)
+* Memberships(Medlemskapsplaner)
+* Economy (Økonomi)
+* Email(egen dedikert epost(*@[salesman.no](http://salesman.no/))
+* News(Gratis! styrer ‘Hjem’ på nettstedet)
+
+Events:
+Etablering: kr 5.000,-, månedspris: kr 350,-
+Opprette og publisere arrangementer på hovedsiden med og uten reservasjonsmuligheter, lar deg sette opp priser pr. arrangement, ta imot billettreservasjoner, lar deg sjekke inn ankomte arrangementsdeltagere)
+
+Rental (mest passende for dere):
+Etablering kr 7.500,-, månedspris: kr 300,- 
+Her kan man opprette egne utleieobjekter(per nå - bare selskapslokaler o.l) sette priser, både grunnpris(vanlig dagsats, lørdagspris og søndagspris) du kan også ta imot utleieforespørsler, som kan redigeres, avslås eller godkjennes. hvert utleieobjekt(lokale - om du vil) får egen kalender og kan settes opp nøkkelkode eller låsekombinasjon, på.
+Du får oversikt over kommende utleie, Hvem og når, samt viktig kontaktinformasjon
+ 
+Memberships:
+Etablering kr 3.500,-, månedspris kr 300,-
+Lar deg opprette én eller flere medlemskapsplaner, med varighet som vil vises på 'tjenester' alle medlemmer knyttes til medlemskapet og reflekteres på "medlemmer", med riktig medlemskapsplan, pris og medlemskapsstatus.(Memberships har også funksjonalitet oppmot email, economy, events)
+
+Economy (denne kan dere vurdere)
+Etablering: kr 1.500,-, månedspris: kr 100,-
+Dette er en modul for å konfigurere betalingsmetoder, i all hovedsak. lar dere plotte inn eller sette inn verdier som kreves for at bl.a Vipps, eller Stripe skal kunne hentes og brukes. Fører også fullstendig oversikt over alle inntekter og utgifter på Events, Membership og Rental, (flere skal komme) fakturering er en påbegynt post her.
+- Mer arbeid skal gjøres på denne modulen.
+
+Email (denne er en god "must have" uavhengig av hva man velger)
+Etablering: kr 10.000,-, månedspris: kr 400,-
+Med denne modulen vil man få opprettet en egen dedikert epostadresse(*@[salesman.no](http://salesman.no/)) nøyaktig ønsket adresse kan dere oppgi. Her vil man kunne skru på varsler ved reservasjonsbekreftelser(rental,events) eller kjøp (membership, events) av tjenester. Eposten vil bli satt opp internt i deres innlogging i https://super.salesman.no, her vil du kunne se alt som går ut, både på automatikk og manuelle utsendelser, både til kunder og til aktive medlemmer(ved membership).
+
+News (Medfølger u/ekstra kostnad)
+Etablering: kr 0,- månedspris: kr 0,-
+Her oppretter du og administrerer 'Hjem', du får en simulert nyhetsvisning for hjemmesiden hvor du kan se på hver enkelt sak(fra super) - og sette prioritet(1 er høyest - 9 er lavest). og saker blir plassert deretter. Dette kan kobles oppmot tjenester som arrangement(inntil videre..)
+
+Grovt overslag informasjonsmessig gitt ovenfor.
+Fremtidige moduler som må bygges og testes kan gis tilgang til underveis dersom dere ønsker dette(f.eks Sales, eller Services som er blant de totalt 11 modulene).
+
+Dere får fri tilgang på 2 brukere(+100kr mnd for over 3 brukere). modulene som velges av dere, kan fritt disponeres mellom begge brukerne, eller kan ekskluderes ved spesielle ansvarsområder.
+
+Presiserer igjen at dere kan være med på å utvikle prosjektet videre(gjennom eventuelle behov eller forslag)
+Ønsker å gi dere 50% avslag i den fullstendige etableringen ved en eventuell avtale.
+Ved behov for flere svar eller om det fortsatt er ubesvarte spørsmål, tar dere helt enkelt kontakt med meg per telefon.
+
+Jeg vil la demoen https://speiderhus.salesman.no, stå oppe frem til en eventuell beslutning.
+
+
+Mvh
+Magne Barstad Kvalsvik
+[www.salesman.no](http://www.salesman.no/)
+404 69 364
