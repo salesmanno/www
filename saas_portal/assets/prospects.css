@@ -133,6 +133,79 @@
 .prospects-editor-empty strong { margin-bottom: .3rem; color: #43584f; }
 .prospects-alert { margin: .75rem .9rem; font-size: .82rem; }
 .prospects-mobile-editor-link { display: none; }
+.prospects-convert-help { margin: -.45rem 1.1rem .7rem; color: #74827b; font-size: .7rem; }
+.prospects-editor-actions #createProspectCompany:not(:disabled) { box-shadow: inset 0 -2px 0 rgba(27, 72, 58, .2); }
+
+.prospect-company-dialog {
+    width: min(680px, calc(100% - 1.25rem));
+    max-width: none;
+    max-height: min(90dvh, 820px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #cfdad0;
+    border-radius: 14px;
+    background: #f7f8f2;
+    color: #34483f;
+    box-shadow: 0 24px 80px rgba(25, 47, 38, .25);
+}
+.prospect-company-dialog::backdrop { background: rgba(25, 44, 36, .48); }
+.prospect-company-shell { display: flex; flex-direction: column; max-height: min(90dvh, 820px); }
+.prospect-company-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.15rem 1.25rem .95rem; border-bottom: 1px solid #dce4dc; background: #edf2e9; }
+.prospect-company-kicker { color: #8c6d43; font-size: .65rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.prospect-company-header h2 { margin: .18rem 0 0; color: #30473d; font-size: 1.25rem; font-weight: 750; }
+.prospect-company-close { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #d2ddd2; border-radius: 8px; background: #f8faf5; color: #52695e; }
+.prospect-company-body { min-height: 170px; padding: 1.1rem 1.25rem; overflow-y: auto; }
+.prospect-company-alert { margin-bottom: .8rem; padding: .65rem .75rem; border: 1px solid #e2c8b8; border-radius: 8px; background: #fbf0e8; color: #794a37; font-size: .82rem; }
+.prospect-company-loading { display: grid; gap: .65rem; padding: 1rem 0; }
+.prospect-company-skeleton { height: 42px; border-radius: 7px; background: linear-gradient(100deg, #e8eee6 20%, #dfe8df 42%, #e8eee6 64%); background-size: 200% 100%; animation: company-shimmer 1.25s ease-in-out infinite; }
+@keyframes company-shimmer { to { background-position: -200% 0; } }
+.prospect-company-error { padding: 1rem; border: 1px solid #e6d6ca; border-radius: 9px; background: #fbf3ec; }
+.prospect-company-error strong { color: #684632; }
+.prospect-company-error p { margin: .35rem 0 .75rem; color: #75685e; font-size: .82rem; }
+.prospect-company-match-panel { padding: .85rem; border: 1px solid #d7e1d7; border-radius: 10px; background: #f0f4ed; }
+.prospect-company-match-panel h3, .prospect-company-candidates h3 { margin: 0; color: #3d5548; font-size: .9rem; font-weight: 750; }
+.prospect-company-match-panel > p { margin: .4rem 0 .7rem; color: #6d7c73; font-size: .78rem; }
+.prospect-company-match-list { display: grid; gap: .5rem; }
+.prospect-company-match { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .65rem; border: 1px solid #e0e7de; border-radius: 8px; background: #fbfcf8; }
+.prospect-company-match > div { min-width: 0; }
+.prospect-company-match strong, .prospect-company-match small { display: block; overflow-wrap: anywhere; }
+.prospect-company-match strong { font-size: .82rem; }
+.prospect-company-match small { margin-top: .18rem; color: #77877d; font: .7rem ui-monospace, monospace; }
+.prospect-company-match a { display: inline-block; margin-top: .25rem; color: #28635c; font-size: .72rem; text-underline-offset: 2px; }
+.prospect-company-match button { flex: 0 0 auto; }
+.prospect-company-intro { margin: 0 0 .85rem; color: #687a70; font-size: .82rem; }
+.prospect-company-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.prospect-company-field { min-width: 0; padding: .55rem .65rem; border: 1px solid #e0e7df; border-radius: 8px; background: #fbfcf8; }
+.prospect-company-field > span, .prospect-company-field > label { display: block; margin-bottom: .22rem; color: #75847a; font-size: .65rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.prospect-company-field output { display: block; min-height: 1.2em; color: #3b5146; font-size: .8rem; overflow-wrap: anywhere; }
+.prospect-company-subdomain { margin-top: .7rem; }
+.prospect-company-domain-input { display: flex; align-items: center; gap: .45rem; }
+.prospect-company-domain-input input { min-width: 0; font-size: .82rem; }
+.prospect-company-domain-input > span { color: #748379; font: .75rem ui-monospace, monospace; white-space: nowrap; }
+#prospectCompanyDomainHelp { display: block; margin-top: .3rem; color: #77877d; font-size: .7rem; }
+.prospect-company-field-error { display: block; margin-top: .3rem; color: #a33e34; font-size: .72rem; }
+.prospect-company-candidates { margin-top: .9rem; padding-top: .85rem; border-top: 1px solid #dce4dc; }
+.prospect-company-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
+.prospect-company-section-heading p { margin: .25rem 0 .6rem; color: #718078; font-size: .72rem; }
+.prospect-company-count { flex: 0 0 auto; color: #75857b; font: .68rem ui-monospace, monospace; }
+.prospect-company-warning { margin-bottom: .55rem; padding: .55rem .65rem; border-left: 3px solid #b88b4b; background: #f7f0df; color: #735d35; font-size: .76rem; }
+.prospect-company-candidate-list { display: grid; gap: .4rem; }
+.prospect-company-candidate { display: flex; align-items: flex-start; gap: .55rem; padding: .55rem .65rem; border: 1px solid #e1e7df; border-radius: 8px; background: #fbfcf8; }
+.prospect-company-candidate input { flex: 0 0 auto; margin-top: .2rem; accent-color: #597960; }
+.prospect-company-candidate strong { display: block; color: #3d5147; font-size: .77rem; }
+.prospect-company-candidate small { display: block; margin-top: .12rem; color: #77857d; font-size: .69rem; }
+.prospect-company-candidates-empty { margin: 0; padding: .7rem; border: 1px dashed #d5dfd4; border-radius: 7px; color: #6d7c73; font-size: .76rem; }
+.prospect-company-candidate.is-disabled { background: #f2f3ed; color: #7b847c; }
+.prospect-company-result { padding: .9rem; border: 1px solid #d3e0d3; border-radius: 9px; background: #eef4eb; color: #3d5948; font-size: .82rem; }
+.prospect-company-result.is-partial { border-color: #e5d7b8; background: #faf4e5; color: #705b36; }
+.prospect-company-result strong { display: block; margin-bottom: .25rem; font-size: .92rem; }
+.prospect-company-result p { margin: .3rem 0; }
+.prospect-company-result a { display: inline-block; margin-top: .45rem; color: #28635c; font-weight: 700; text-underline-offset: 2px; }
+.prospect-company-footer { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem 1.25rem; border-top: 1px solid #dce4dc; background: #f0f3ed; }
+.prospect-company-footer-note { color: #77857c; font-size: .69rem; }
+.prospect-company-footer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
+.prospect-company-footer-actions .btn { min-height: 36px; }
+.prospect-company-dialog button:focus-visible, .prospect-company-dialog input:focus-visible, .prospect-company-dialog a:focus-visible { outline: 3px solid rgba(91, 125, 98, .35); outline-offset: 2px; }
 
 @media (max-width: 900px) {
     .prospects-toolbar { grid-template-columns: minmax(160px, 1fr) minmax(140px, .7fr) minmax(140px, .7fr); }
@@ -155,8 +228,17 @@
     .prospects-form { padding: .85rem; }
     .prospects-editor-actions { flex: 0 0 auto; }
     .prospects-context { align-items: flex-start; }
+    .prospect-company-dialog { width: calc(100% - .75rem); max-height: 94dvh; border-radius: 11px; }
+    .prospect-company-shell { max-height: 94dvh; }
+    .prospect-company-header, .prospect-company-body, .prospect-company-footer { padding-right: .85rem; padding-left: .85rem; }
+    .prospect-company-fields { grid-template-columns: 1fr 1fr; }
+    .prospect-company-footer { align-items: flex-start; flex-direction: column; }
+    .prospect-company-footer-actions { width: 100%; }
+    .prospect-company-footer-actions .btn { flex: 1; }
+    .prospects-convert-help { margin-left: .85rem; margin-right: .85rem; }
 }
 @media (prefers-reduced-motion: reduce) {
     .prospects-loading .prospect-skeleton { animation: none; }
     .prospect-row { transition: none; }
+    .prospect-company-skeleton { animation: none; }
 }

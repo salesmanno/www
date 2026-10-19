@@ -73,7 +73,7 @@ try {
         $db->exec("UPDATE saas_companies_contact SET last_contacted_at='0000-00-00 00:00:00',interest_tags='{bad legacy' WHERE org_nr='999999999'");
         foreach (['pages','assets'] as $sub) mkdir($dir.'/saas_portal/'.$sub,0700,true);
         copy(__DIR__.'/../pages/prospects.php',$dir.'/saas_portal/pages/prospects.php');
-        foreach (['prospects.js','prospects.css','portal-workspace.css'] as $file) copy(__DIR__.'/../assets/'.$file,$dir.'/saas_portal/assets/'.$file);
+        foreach (['prospects.js','prospect-company.js','prospects.css','portal-workspace.css'] as $file) copy(__DIR__.'/../assets/'.$file,$dir.'/saas_portal/assets/'.$file);
         passthru('node '.escapeshellarg(__DIR__.'/prospects_browser_test.js').' '.(int)$port,$code);
         prospectCheck($code===0,'Browser checks');
     }

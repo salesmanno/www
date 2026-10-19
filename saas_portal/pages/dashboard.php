@@ -654,6 +654,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
             const form = document.getElementById('createCompanyForm');
             if (!form.reportValidity()) return;
             const formData = new FormData(form);
+            formData.set('csrf_token', portalCsrf);
             
             fetch('/saas_portal/api/create_company.php', {
                 method: 'POST',
@@ -666,6 +667,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                     form.reset();
                     loadCompanies();
                     console.log('Company created successfully');
+                    if (Array.isArray(data.setup_warnings) && data.setup_warnings.length) alert(data.setup_warnings.join('\n'));
                 } else {
                     alert('Feil: ' + data.message);
                 }

@@ -5,7 +5,8 @@ const fs=require('node:fs'), os=require('node:os'), path=require('node:path');
 const port=Number(process.argv[2]);
 if (!Number.isInteger(port) || port<1024 || port>65535) throw Error('Supply fixture port');
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'prospect-chrome-'));
-const browser=spawn('chromium',['--headless','--no-sandbox','--disable-gpu','--remote-debugging-pipe','--user-data-dir='+profile],{stdio:['ignore','ignore','ignore','pipe','pipe']});
+const browser=spawn('chromium',['--headless','--no-sandbox','--disable-gpu','--remote-debugging-pipe','--user-data-dir='+profile],{detached:true,stdio:['ignore','ignore','ignore','pipe','pipe']});
+function stopBrowser(signal){try{process.kill(-browser.pid,signal);}catch(e){if(e.code!=='ESRCH')throw e;}}
 let serial=0,buffer='';
 const pending=new Map();
 browser.stdio[4].on('data',chunk=>{
@@ -22,7 +23,7 @@ function call(method,params={},sessionId) {
         browser.stdio[3].write(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})})+'\0');
     });
 }
-const timeout=setTimeout(()=>{console.error('Browser timeout');browser.kill('SIGKILL');process.exitCode=1;},90000);
+const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGKILL');process.exitCode=1;},90000);
 (async()=>{
     const target=await call('Target.createTarget',{url:'about:blank'});
     const session=(await call('Target.attachToTarget',{targetId:target.targetId,flatten:true})).sessionId;
@@ -128,6 +129,7 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');browser.kill('SIG
     fs.writeFileSync('/tmp/prospects-mobile.png',Buffer.from(image.data,'base64'));
     console.log('PASS mobile: no horizontal overflow. Fixture screenshots saved in /tmp.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{
-    clearTimeout(timeout);browser.kill('SIGTERM');
-    browser.once('exit',()=>fs.rmSync(profile,{recursive:true,force:true}));
+    clearTimeout(timeout);
+    browser.once('close',()=>fs.rmSync(profile,{recursive:true,force:true,maxRetries:20,retryDelay:100}));
+    stopBrowser('SIGTERM');
 });

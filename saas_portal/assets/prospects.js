@@ -92,6 +92,13 @@
         el('saveProspect').disabled = state.saving || !state.dirty;
         if (!state.saving && state.dirty) setStatusText('Ulagrede endringer');
         else if (!state.saving && !state.dirty) setStatusText(state.selectedItem ? 'Alle endringer lagret' : '');
+        window.dispatchEvent(new CustomEvent('prospect:selection-state', { detail: {
+            item: state.selectedItem,
+            status: state.selectedItem ? text(state.selectedItem.status).trim().toLowerCase() : '',
+            saved: !!state.selectedItem && !!state.selectedItem.id,
+            dirty: state.dirty,
+            saving: state.saving
+        } }));
     }
 
     function snapshotForm() {
@@ -190,6 +197,13 @@
         el('saveProspect').disabled = true;
         setStatusText(newRecord ? 'Ny registrering' : 'Alle endringer lagret');
         renderList();
+        window.dispatchEvent(new CustomEvent('prospect:selection-state', { detail: {
+            item: state.selectedItem,
+            status: state.selectedItem ? text(state.selectedItem.status).trim().toLowerCase() : '',
+            saved: !!state.selectedItem && !!state.selectedItem.id,
+            dirty: state.dirty,
+            saving: state.saving
+        } }));
     }
 
     function updateContactLinks(item) {
@@ -228,7 +242,7 @@
         const suggestions = el('prospectStatuses');
         suggestions.replaceChildren();
         const value = isNew && current == null ? 'ny' : text(current);
-        [...new Set(['ny', ...state.statuses, ...(value ? [value] : [])])].forEach((status) => {
+        [...new Set(['ny', 'interessert', ...state.statuses, ...(value ? [value] : [])])].forEach((status) => {
             const option = make('option', '', status);
             option.value = status;
             suggestions.append(option);

@@ -121,9 +121,11 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                             <div id="prospectContactLinks" class="prospects-contact-row" aria-label="Kontaktlenker"></div>
                         </div>
                         <div class="prospects-editor-actions">
+                            <button type="button" id="createProspectCompany" class="btn btn-primary-custom btn-sm" disabled aria-describedby="createProspectCompanyHelp"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Opprett</button>
                             <button type="button" id="registerContact" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-telephone me-1" aria-hidden="true"></i>Registrer kontakt nå</button>
                         </div>
                     </div>
+                    <p id="createProspectCompanyHelp" class="prospects-convert-help">Opprett er tilgjengelig når prospektet er lagret uten ulagrede endringer og status er «interessert».</p>
                     <form id="prospectForm" class="prospects-form" novalidate>
                         <div id="prospectFormAlert" class="alert alert-danger py-2 px-3 small" role="alert" hidden></div>
                         <div class="prospects-form-grid">
@@ -202,9 +204,74 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
         </div>
     </main>
 
+    <dialog id="prospectCompanyDialog" class="prospect-company-dialog" aria-labelledby="prospectCompanyTitle">
+        <form method="dialog" class="prospect-company-shell">
+            <header class="prospect-company-header">
+                <div>
+                    <span class="prospect-company-kicker">Fra prospekt til bedrift</span>
+                    <h2 id="prospectCompanyTitle">Opprett bedrift</h2>
+                </div>
+                <button type="button" id="prospectCompanyClose" class="prospect-company-close" aria-label="Lukk dialog"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+            </header>
+            <div class="prospect-company-body">
+                <div id="prospectCompanyAlert" class="prospect-company-alert" role="alert" hidden></div>
+                <div id="prospectCompanyLoading" class="prospect-company-loading" role="status" aria-live="polite" hidden>
+                    <span class="prospect-company-skeleton"></span><span class="prospect-company-skeleton"></span><span class="prospect-company-skeleton"></span>
+                    <span class="visually-hidden">Henter bedriftsopplysninger</span>
+                </div>
+                <section id="prospectCompanyPrepareError" class="prospect-company-error" hidden>
+                    <strong>Opplysningene kunne ikke hentes</strong>
+                    <p id="prospectCompanyPrepareErrorText"></p>
+                    <button type="button" id="retryProspectCompanyPrepare" class="btn btn-outline-secondary btn-sm">Prøv igjen</button>
+                </section>
+                <section id="prospectCompanyMatches" class="prospect-company-match-panel" hidden aria-labelledby="prospectCompanyMatchesTitle">
+                    <h3 id="prospectCompanyMatchesTitle">Virksomheter med samme organisasjonsnummer</h3>
+                    <p>Ingen ny bedrift opprettes automatisk. Velg en virksomhet bare hvis du vil klargjøre import av manglende ansatte.</p>
+                    <div id="prospectCompanyMatchList" class="prospect-company-match-list"></div>
+                </section>
+                <section id="prospectCompanyDetails" hidden>
+                    <p id="prospectCompanyIntro" class="prospect-company-intro"></p>
+                    <div class="prospect-company-fields">
+                        <div class="prospect-company-field"><span>Bedrift</span><output id="prospectCompanyName"></output></div>
+                        <div class="prospect-company-field"><span>Organisasjonsnummer</span><output id="prospectCompanyOrg"></output></div>
+                        <div class="prospect-company-field"><span>Kontakt</span><output id="prospectCompanyEmail"></output></div>
+                        <div class="prospect-company-field"><span>Telefon</span><output id="prospectCompanyPhone"></output></div>
+                        <div class="prospect-company-field"><span>Juridisk navn</span><output id="prospectCompanyLegalName"></output></div>
+                        <div class="prospect-company-field"><span>Adresse</span><output id="prospectCompanyAddress"></output></div>
+                        <div class="prospect-company-field"><span>Bransje</span><output id="prospectCompanyIndustry"></output></div>
+                    </div>
+                    <div class="prospect-company-field prospect-company-subdomain">
+                        <label for="prospectCompanySubdomain">Nettadresse</label>
+                        <div class="prospect-company-domain-input"><input id="prospectCompanySubdomain" class="form-control" type="text" required maxlength="63" pattern="[a-z0-9]{1,63}" autocomplete="off" spellcheck="false" aria-describedby="prospectCompanyDomainHelp prospectCompanySubdomainError"><span>.salesman.no</span></div>
+                        <small id="prospectCompanyDomainHelp">Kun små bokstaver og tall, maks 63 tegn.</small>
+                        <span id="prospectCompanySubdomainError" class="prospect-company-field-error" hidden></span>
+                    </div>
+                    <section id="prospectCompanyCandidatesSection" class="prospect-company-candidates" hidden aria-labelledby="prospectCompanyCandidatesTitle">
+                        <div class="prospect-company-section-heading">
+                            <div><h3 id="prospectCompanyCandidatesTitle">Ansatte fra Brønnøysundregistrene</h3><p>Vi oppretter ingen brukerkontoer. Bare manglende ansatte kan importeres.</p></div>
+                            <span id="prospectCompanyCandidateCount" class="prospect-company-count"></span>
+                        </div>
+                        <div id="prospectCompanyWarning" class="prospect-company-warning" role="status" hidden></div>
+                        <div id="prospectCompanyCandidateList" class="prospect-company-candidate-list"></div>
+                    </section>
+                </section>
+                <section id="prospectCompanyResult" class="prospect-company-result" hidden aria-live="polite"></section>
+            </div>
+            <footer class="prospect-company-footer">
+                <span class="prospect-company-footer-note">Prospektdata forblir uendret.</span>
+                <div class="prospect-company-footer-actions">
+                    <button type="button" id="prospectCompanyCancel" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    <button type="button" id="prospectCompanySubmit" class="btn btn-primary-custom btn-sm" disabled>Opprett bedrift</button>
+                    <button type="button" id="prospectCompanyRetryImport" class="btn btn-primary-custom btn-sm" hidden>Prøv ansattimport på nytt</button>
+                </div>
+            </footer>
+        </form>
+    </dialog>
+
     <script>
         window.prospectsCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     </script>
+    <script src="/saas_portal/assets/prospect-company.js" defer></script>
     <script src="/saas_portal/assets/prospects.js" defer></script>
 </body>
 </html>
