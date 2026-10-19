@@ -59,11 +59,11 @@ try {
     $db->exec("CREATE TABLE tenant_company_modules (company_id CHAR(36),module_id CHAR(36),is_active BOOLEAN,activated_at DATETIME,assigned_by CHAR(36)) ENGINE=InnoDB");
     $db->exec("CREATE TABLE saas_system_config (config_key VARCHAR(100),config_value VARCHAR(255)) ENGINE=InnoDB");
     $db->exec("CREATE TABLE fixture_effects (kind VARCHAR(50),company_id VARCHAR(255)) ENGINE=InnoDB");
+    $db->exec("CREATE TABLE saas_admins (id CHAR(36) PRIMARY KEY,is_active BOOLEAN DEFAULT TRUE,role VARCHAR(50),view_only BOOLEAN DEFAULT FALSE) ENGINE=InnoDB");
+    $db->exec("INSERT INTO saas_admins VALUES ('actor',TRUE,'admin',FALSE)");
     if (!$legacyLayout) {
         // Actual mandatory columns/keys from docs/database_schema.sql and the
         // uploaded SQL structure. Do not import its data or strip constraints.
-        $db->exec("CREATE TABLE saas_admins (id CHAR(36) PRIMARY KEY,is_active BOOLEAN DEFAULT TRUE) ENGINE=InnoDB");
-        $db->exec("INSERT INTO saas_admins VALUES ('actor',TRUE)");
         $db->exec("CREATE TABLE self_company (id CHAR(36) PRIMARY KEY,company_name VARCHAR(255) NOT NULL,is_active BOOLEAN DEFAULT TRUE) ENGINE=InnoDB");
         $db->exec("INSERT INTO self_company VALUES ('453afc7e-b0e4-11f0-a1bb-b02628506e5c','Salesman',TRUE)");
         $db->exec("CREATE TABLE saas_subscription_plans (id CHAR(36) PRIMARY KEY) ENGINE=InnoDB");

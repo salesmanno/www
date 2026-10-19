@@ -1,5 +1,17 @@
 <?php
-session_start();
+// Do not hold the old session lock during network/database work or password verification.
+$loginStarted=microtime(true);$loginPrevious=$loginStarted;$loginTimings=[];
+$loginStage=static function(string $name) use (&$loginPrevious,&$loginTimings): void {
+    $now=microtime(true);$loginTimings[$name]=round(($now-$loginPrevious)*1000,1);$loginPrevious=$now;
+};
+register_shutdown_function(static function() use ($loginStarted,&$loginTimings): void {
+    $total=round((microtime(true)-$loginStarted)*1000,1);
+    if (!headers_sent()) {
+        $parts=[];foreach ($loginTimings as $name=>$ms) $parts[]=$name.';dur='.$ms;
+        $parts[]='total;dur='.$total;header('Server-Timing: '.implode(', ',$parts));
+    }
+    if ($total>1500) error_log('SaaS login timing: '.json_encode($loginTimings+['total'=>$total]));
+});
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /saas_portal/login.php?error=invalid_request');
@@ -20,6 +32,7 @@ try {
     require_once __DIR__.'/../services/PortalSaasIdentity.php';
     require_once __DIR__.'/../services/PortalGlobalUsers.php';
     $db = getDBConnection();
+    $loginStage('database');
     
     $stmt = $db->prepare("
         SELECT sa.*, ss.first_name, ss.last_name 
@@ -29,6 +42,7 @@ try {
     ");
     $stmt->execute([$email]);
     $admin = $stmt->fetch();
+    $loginStage('lookup');
     
     if (!$admin) {
         header('Location: /saas_portal/login.php?error=invalid_credentials');
@@ -39,6 +53,7 @@ try {
         header('Location: /saas_portal/login.php?error=invalid_credentials');
         exit;
     }
+    $loginStage('password');
     
     // Preserve the existing SaaS roles; conversion must not lock legacy operators out.
     if (!$admin['is_active']) {
@@ -48,12 +63,16 @@ try {
     
     $stmt = $db->prepare("UPDATE saas_admins SET last_login = NOW() WHERE id = ?");
     $stmt->execute([$admin['id']]);
-    
+    $loginStage('last_login');
+    session_start();
+    $loginStage('session_wait');
     session_regenerate_id(true);
     
     $_SESSION['saas_admin_id'] = $admin['id'];
     $_SESSION['saas_admin_email'] = $admin['email'];
     $_SESSION['saas_admin_role'] = $admin['role'];
+    $_SESSION['saas_admin_view_only'] = (int)($admin['view_only'] ?? 0)===1;
+    $_SESSION['portal_csrf'] = bin2hex(random_bytes(32));
     $_SESSION['saas_admin_name'] = trim(($admin['first_name'] ?? '') . ' ' . ($admin['last_name'] ?? ''));
     if ($_SESSION['saas_admin_name']==='') $_SESSION['saas_admin_name']=$admin['email'];
     $_SESSION['saas_logged_in_at'] = time();
@@ -67,11 +86,14 @@ try {
         foreach (array_keys($_SESSION) as $key) if (str_starts_with($key,'tenant_admin_')) unset($_SESSION[$key]);
     }
     
-    header('Location: /saas_portal/pages/dashboard.php');
+    $destination=$_SESSION['saas_admin_view_only'] ? 'prospects.php' : 'dashboard.php';
+    $loginStage('session_setup');
+    session_write_close();
+    header('Location: /saas_portal/pages/'.$destination);
     exit;
     
 } catch (Throwable $e) {
-    foreach (array_keys($_SESSION) as $key) if (str_starts_with($key,'saas_')) unset($_SESSION[$key]);
+    foreach (array_keys($_SESSION ?? []) as $key) if (str_starts_with($key,'saas_')) unset($_SESSION[$key]);
     $cause = $e->getPrevious() ?: $e;
     $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$cause->getCode());
     error_log('SaaS admin login failed: ' . get_class($cause) . ' code=' . $code);

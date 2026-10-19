@@ -29,12 +29,42 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
     const session=(await call('Target.attachToTarget',{targetId:target.targetId,flatten:true})).sessionId;
     await call('Page.enable',{},session);
     await call('Network.enable',{},session);
-    await call('Network.setCookie',{name:'PHPSESSID',value:'prospecttest',url:`http://127.0.0.1:${port}`},session);
+    const restricted=process.argv.includes('--restricted');
+    await call('Network.setCookie',{name:'PHPSESSID',value:restricted?'limited':'prospecttest',url:`http://127.0.0.1:${port}`},session);
     await call('Page.navigate',{url:`http://127.0.0.1:${port}/saas_portal/pages/prospects.php`},session);
     for(let i=0;i<100;i++) {
         const ready=await call('Runtime.evaluate',{expression:"document.readyState === 'complete' && !!document.getElementById('prospectsList')",returnByValue:true},session);
         if(ready.result?.value)break;
         await new Promise(r=>setTimeout(r,100));
+    }
+    if(restricted){
+        const checked=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+            const $=id=>document.getElementById(id);
+            const wait=async(fn)=>{for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Restricted UI timeout');};
+            await wait(()=>document.querySelector('.prospect-row'));
+            document.querySelector('.prospect-row').click();await wait(()=>!$('editorContent').hidden);
+            for(const id of ['orgNr','companyName','contactPerson','contactEmail','contactPhone','interestScore','interestTags','lastContactedAt']){
+                if(!$(id).readOnly)throw Error('Editable protected field '+id);
+            }
+            for(const id of ['newProspect','registerContact','createProspectCompany'])if(!$(id).hidden)throw Error('Visible forbidden action '+id);
+            if($('prospectNotes').readOnly||$('prospectInterestToggle').getAttribute('role')!=='switch')throw Error('Notes and toggle missing');
+            $('prospectNotes').value='Nettlesernotat';
+            $('prospectNotes').dispatchEvent(new Event('input',{bubbles:true}));
+            $('prospectInterestToggle').click();$('saveProspect').click();
+            await wait(()=>$('prospectSaveState').textContent==='Alle endringer lagret');
+            if(!$('prospectInterestToggle').checked)throw Error('Interest not retained');
+            const r=await fetch('/saas_portal/api/prospects.php?id=11111111-1111-4111-8111-111111111111');
+            const body=await r.json();if(body.item.notes!=='Nettlesernotat'||body.item.status!=='interessert')throw Error('Notes/toggle not saved');
+            return true;
+        })()`},session);
+        if(checked.exceptionDetails||!checked.result.value)throw Error(JSON.stringify(checked.exceptionDetails||checked));
+        await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},session);
+        const layout=await call('Runtime.evaluate',{expression:"document.documentElement.scrollWidth<=innerWidth",returnByValue:true},session);
+        if(!layout.result.value)throw Error('Restricted mobile overflow');
+        const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true},session);
+        fs.writeFileSync('/tmp/prospects-limited-mobile.png',Buffer.from(image.data,'base64'));
+        console.log('PASS restricted browser: protected contact fields, hidden forbidden actions, notes and interest toggle save, mobile layout.');
+        return;
     }
     const result=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
         const $=id=>document.getElementById(id), pass=[];

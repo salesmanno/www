@@ -4,14 +4,25 @@ class PortalSaasAuthorizationException extends RuntimeException {}
 
 /** Never infer global access from a missing employee or a client-supplied role. */
 final class PortalSaasIdentity {
-    public static function active(PDO $db, string $id): array {
+    public static function principal(PDO $db, string $id): array {
         $activeSql=function_exists('dbBool')?dbBool(true):'1';
-        $query = $db->prepare('SELECT id,email,role,is_active FROM saas_admins WHERE id=? AND is_active='.$activeSql);
+        // SELECT * keeps installations without the optional view_only column
+        // compatible. Never return or store password hashes in the principal.
+        $query = $db->prepare('SELECT * FROM saas_admins WHERE id=? AND is_active='.$activeSql);
         $query->execute([$id]);
         $identity = $query->fetch(PDO::FETCH_ASSOC);
         if (!$identity) {
             throw new PortalSaasAuthorizationException('SaaS-innloggingen er ikke lenger gyldig.');
         }
+        if (!array_key_exists('view_only',$identity) && !empty($_SESSION['saas_admin_view_only'])) {
+            throw new PortalSaasAuthorizationException('Kontobegrensningen kunne ikke bekreftes. Logg inn på nytt.');
+        }
+        return ['id'=>$identity['id'],'email'=>$identity['email'] ?? '',
+            'role'=>$identity['role'] ?? '', 'is_active'=>$identity['is_active'],
+            'view_only'=>(int)($identity['view_only'] ?? 0)===1];
+    }
+    public static function active(PDO $db, string $id): array {
+        $identity=self::principal($db,$id);
         if (($_SESSION['saas_session_kind'] ?? null)==='global' && $identity['role']!=='global_admin') {
             throw new PortalSaasAuthorizationException('Globalrollen er tilbakekalt. Logg inn på nytt.');
         }

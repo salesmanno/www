@@ -54,6 +54,7 @@ if ($values['email'] !== '' && !filter_var($values['email'], FILTER_VALIDATE_EMA
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 require_once __DIR__ . '/../services/ActivityLogger.php';
 try {
     $db = getDBConnection();

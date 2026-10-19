@@ -96,6 +96,34 @@ final class PortalProspects {
         if ($errors) throw new ProspectValidationException($errors);
         return $data;
     }
+    public function saveNotesAndInterest(array $input): array {
+        $allowed=['id','version','notes','status','action','csrf_token'];
+        if (array_diff(array_keys($input),$allowed)) throw new ProspectValidationException(['permission'=>'Bare notater og interesse kan endres.']);
+        $id=$input['id'] ?? null;
+        if (!is_string($id) || !preg_match('/^[a-f0-9-]{36}$/Di',$id)) throw new ProspectValidationException(['id'=>'Velg en eksisterende interessent.']);
+        if (!is_string($input['notes'] ?? null) || strlen($input['notes'])>65535 || !mb_check_encoding($input['notes'],'UTF-8')) {
+            throw new ProspectValidationException(['notes'=>'Notatet må være gyldig tekst på maksimalt 65535 byte.']);
+        }
+        if (!in_array($input['status'] ?? null,['interessert','ikke_interessert'],true)) throw new ProspectValidationException(['status'=>'Velg interesse av eller på.']);
+        $this->db->beginTransaction();
+        try {
+            $lock=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':'';
+            $stmt=$this->db->prepare('SELECT * FROM saas_companies_contact WHERE id=?'.$lock);
+            $stmt->execute([$id]);$row=$stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) throw new ProspectNotFoundException('Interessenten finnes ikke lenger.');
+            if (!is_string($input['version'] ?? null) || !hash_equals(self::present($row)['version'],$input['version'])) throw new ProspectConflictException('Opplysningene er endret av en annen. Last inn interessenten på nytt før du lagrer.');
+            $current=strtolower(trim((string)($row['status'] ?? '')))==='interessert';
+            $desired=$input['status']==='interessert';
+            $status=$current===$desired ? $row['status'] : $input['status'];
+            $this->db->prepare('UPDATE saas_companies_contact SET notes=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')
+                ->execute([$input['notes'],$status,$id]);
+            $item=$this->get($id);$this->db->commit();return $item;
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     public function save(array $input): array {
         $data = self::validate($input);
         $id = $input['id'] ?? '';

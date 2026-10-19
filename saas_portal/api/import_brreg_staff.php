@@ -31,6 +31,7 @@ if (!is_string($data['company_id'] ?? null) || $data['company_id'] === '' || str
     brregImportReply(400, ['success' => false, 'message' => 'Bedrifts-ID mangler eller er ugyldig.']);
 }
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 require_once __DIR__ . '/../services/BrregStaffImportService.php';
 
 try {

@@ -16,6 +16,9 @@ if (empty($_SESSION['portal_csrf'])) {
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
+$prospects_view_only = !empty($_SESSION['saas_admin_view_only']);
+$prospects_csrf = $_SESSION['portal_csrf'];
+session_write_close();
 ?>
 <!DOCTYPE html>
 <html lang="no">
@@ -31,9 +34,9 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="/saas_portal/pages/dashboard.php">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="<?= $prospects_view_only ? '/saas_portal/pages/prospects.php' : '/saas_portal/pages/dashboard.php' ?>">
                 <i class="bi bi-arrow-left" aria-hidden="true"></i>
-                <span>Salesman <span class="fw-normal opacity-75">/ tilbake til oversikt</span></span>
+                <span>Salesman <span class="fw-normal opacity-75"><?= $prospects_view_only ? '/ interessenter' : '/ tilbake til oversikt' ?></span></span>
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
                 <span class="text-white small"><i class="bi bi-person-circle me-1" aria-hidden="true"></i><?= htmlspecialchars((string)$admin_name, ENT_QUOTES, 'UTF-8') ?></span>
@@ -269,7 +272,8 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
     </dialog>
 
     <script>
-        window.prospectsCsrf = <?= json_encode($_SESSION['portal_csrf'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        window.prospectsCsrf = <?= json_encode($prospects_csrf, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        window.prospectsViewOnly = <?= $prospects_view_only ? 'true' : 'false' ?>;
     </script>
     <script src="/saas_portal/assets/prospect-company.js" defer></script>
     <script src="/saas_portal/assets/prospects.js" defer></script>

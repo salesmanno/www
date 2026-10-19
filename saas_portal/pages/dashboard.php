@@ -13,6 +13,7 @@ if (empty($_SESSION['portal_csrf'])) {
 }
 
 $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
+session_write_close();
 ?>
 <!DOCTYPE html>
 <html lang="no">

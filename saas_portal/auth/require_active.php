@@ -9,15 +9,37 @@ if (!isset($_SESSION['saas_admin_id'])) {
     echo json_encode(['success'=>false,'message'=>'Ikke autorisert. Logg inn på nytt.']);
     exit;
 }
-// Keep the pre-existing SaaS login/session policy unchanged. The new revocation
-// checks are mandatory for explicitly converted global identities, not an
-// additional schema/connection dependency for ordinary legacy operators.
-if (($_SESSION['saas_session_kind'] ?? '')!=='global') return;
+// Read access from the database on every request, including existing sessions.
+// Only explicitly converted identities depend on the global-session tables.
 try {
     $portalIdentityDb = getDBConnection();
     if (!$portalIdentityDb instanceof PDO) throw new PortalDatabaseUnavailableException('Database unavailable');
-    $portalIdentity = PortalSaasIdentity::active($portalIdentityDb, (string)($_SESSION['saas_admin_id'] ?? ''));
+    $portalIdentity = ($_SESSION['saas_session_kind'] ?? '')==='global'
+        ? PortalSaasIdentity::active($portalIdentityDb, (string)$_SESSION['saas_admin_id'])
+        : PortalSaasIdentity::principal($portalIdentityDb, (string)$_SESSION['saas_admin_id']);
     $_SESSION['saas_admin_role'] = $portalIdentity['role'];
+    $_SESSION['saas_admin_view_only'] = $portalIdentity['view_only'];
+    header('Cache-Control: no-store');
+    if ($portalIdentity['view_only']) {
+        $script=realpath($_SERVER['SCRIPT_FILENAME'] ?? '');
+        $allowed=[realpath(__DIR__.'/../pages/prospects.php'),realpath(__DIR__.'/../api/prospects.php')];
+        if (!$script || !in_array($script,array_filter($allowed),true)) {
+            if (str_contains($_SERVER['SCRIPT_NAME'] ?? '', '/api/')) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success'=>false,'message'=>'Denne kontoen har bare tilgang til interessenter, notater og interesse.']);
+            } else {
+                header('Location: /saas_portal/pages/prospects.php',true,303);
+            }
+            exit;
+        }
+    }
+    // These read endpoints do not modify session state. A slow query or
+    // response must not block a login/navigation using the same session.
+    if (($_SERVER['REQUEST_METHOD'] ?? '')==='GET' &&
+        preg_match('~/api/(?:get_[a-z0-9_]+|fetch_orgdata)\.php$~D',$_SERVER['SCRIPT_NAME'] ?? '')) {
+        session_write_close();
+    }
 } catch (Throwable $e) {
     http_response_code($e instanceof PortalSaasAuthorizationException ? 403 : 503);
     if ($e instanceof PortalSaasAuthorizationException) {

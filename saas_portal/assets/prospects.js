@@ -1,4 +1,5 @@
 (() => {
+    const restricted = window.prospectsViewOnly === true;
     'use strict';
 
     const API_URL = '/saas_portal/api/prospects.php';
@@ -83,6 +84,31 @@
     function clearFieldErrors() {
         Object.keys(fields).forEach((key) => setFieldError(key, ''));
         el('prospectFormAlert').hidden = true;
+    }
+
+    function configureRestrictedView() {
+        if (!restricted) return;
+        Object.entries(fields).forEach(([name,input]) => {
+            if (name !== 'notes') input.readOnly = true;
+        });
+        ['newProspect','registerContact','createProspectCompany'].forEach(id => {
+            el(id).hidden = true;el(id).disabled = true;
+        });
+        el('createProspectCompanyHelp').hidden = true;
+        fields.status.hidden = true;
+        const label=form.querySelector('label[for="prospectStatus"]');
+        if (label) { label.htmlFor='prospectInterestToggle';label.textContent='Interesse'; }
+        const toggle=document.createElement('input');
+        toggle.type='checkbox';toggle.id='prospectInterestToggle';
+        toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','Interessert');
+        toggle.className='form-check-input';
+        const switchWrap=document.createElement('div');
+        switchWrap.className='form-check form-switch';
+        fields.status.insertAdjacentElement('afterend',switchWrap);switchWrap.append(toggle);
+        toggle.addEventListener('change',()=>{
+            fields.status.value=toggle.checked?'interessert':'ikke_interessert';
+            updateDirtyState();
+        });
     }
 
     function updateDirtyState() {
@@ -176,9 +202,10 @@
         fields.last_contacted_at.value = localDateInput(source.last_contacted_at);
         fields.notes.value = text(source.notes);
         updateStatusOptions(source.status, newRecord);
-        renderTagsWarning(source.interest_tags);
+        if (restricted) el('prospectInterestToggle').checked=text(source.status).trim().toLowerCase()==='interessert';
+        else renderTagsWarning(source.interest_tags);
         clearFieldErrors();
-        if (source.last_contacted_at && !localDateInput(source.last_contacted_at)) {
+        if (!restricted && source.last_contacted_at && !localDateInput(source.last_contacted_at)) {
             el('prospectFormAlert').textContent = 'Lagret kontaktdato er ugyldig. Velg en gyldig dato før lagring; den gamle verdien blir ikke fjernet automatisk.';
             el('prospectFormAlert').hidden = false;
         }
@@ -381,6 +408,7 @@
     }
 
     function startNew() {
+        if (restricted) return;
         if (!allowLeave()) return;
         ++state.detailRequest;
         populateForm({ status: 'ny', interest_tags: null }, true);
@@ -390,6 +418,12 @@
 
     function validateForm() {
         clearFieldErrors();
+        if (restricted) {
+            if (new TextEncoder().encode(fields.notes.value).length>65535) {
+                setFieldError('notes','Notatet er for langt. Maksimalt 65535 byte.');return false;
+            }
+            return true;
+        }
         let valid = true;
         const org = fields.org_nr.value.trim();
         if (!/^\d{9}$/.test(org)) { setFieldError('org_nr', 'Organisasjonsnummer må bestå av 9 siffer.'); valid = false; }
@@ -419,7 +453,7 @@
     async function saveProspect(event) {
         event.preventDefault();
         if (state.saving || !validateForm()) return;
-        const values = readFieldData();
+        const values = restricted ? {notes:fields.notes.value,status:el('prospectInterestToggle').checked?'interessert':'ikke_interessert'} : readFieldData();
         const payload = { csrf_token: window.prospectsCsrf, action: 'save', ...values };
         if (!state.isNew && state.selectedItem) {
             payload.id = state.selectedItem.id;
@@ -479,6 +513,7 @@
     }
 
     function registerContactNow() {
+        if (restricted) return;
         if (state.saving || state.isNew) return;
         const now = new Date();
         const pad = (value) => String(value).padStart(2, '0');
@@ -559,6 +594,7 @@
     Object.values(fields).forEach((input) => {
         input.addEventListener('input', updateDirtyState);
     });
+    configureRestrictedView();
     bindEvents();
     loadList();
 })();

@@ -14,3 +14,9 @@ Bare notater og interesse skal kunne redigeres i kontaktoversikten. Firmaopplysn
 **Why:** Brukeren korrigerte den generelle redigeringsflaten: «Eneste som skal kunne redigeres er notater eller interesse».
 
 **How to apply:** Begrens både skjermen og serverens oppdateringer til disse to opplysningene. Ikke behold fritekstredigering av status eller andre handlinger som endrer kontaktopplysninger.
+
+SaaS-kontoer med `view_only = 1` skal bare ha tilgang til interessentoversikten og kunne endre notater og interesse. Navnet «view_only» betyr ikke at notater og interesse skal være låst.
+
+**Why:** Brukeren spesifiserte «saas_admins.view_only = 1 tilgang bare til interesser(notat,statusendring på bedrifter)».
+
+**How to apply:** Les begrensningen fra den aktive kontoen, også for eksisterende økter. Sperr andre skjermbilder og API-handlinger; ikke la en globalrolle overstyre denne begrensningen.

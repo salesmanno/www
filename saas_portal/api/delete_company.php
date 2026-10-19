@@ -9,6 +9,7 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../auth/require_active.php';
 require_once __DIR__ . '/../services/ActivityLogger.php';
 require_once __DIR__ . '/../services/CompanyDeletionService.php';
 

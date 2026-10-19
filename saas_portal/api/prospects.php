@@ -13,11 +13,12 @@ try {
         header('Allow: GET, POST');
         portalReply(405,['success'=>false,'message'=>'Metoden er ikke tillatt.']);
     }
+    $prospectsRestricted=!empty($_SESSION['saas_admin_view_only']);
     session_write_close();
     $db=getDBConnection();
     if (!$db instanceof PDO) throw new RuntimeException('Database unavailable');
     $service=new PortalProspects($db);
-    if ($method==='POST') portalReply(200,['success'=>true,'item'=>$service->save($input)]);
+    if ($method==='POST') portalReply(200,['success'=>true,'item'=>$prospectsRestricted ? $service->saveNotesAndInterest($input) : $service->save($input)]);
     if (isset($_GET['id'])) {
         if (!is_string($_GET['id']) || !preg_match('/^[a-f0-9-]{36}$/Di',$_GET['id'])) portalReply(400,['success'=>false,'message'=>'Ugyldig interessent.']);
         portalReply(200,['success'=>true,'item'=>$service->get($_GET['id'])]);

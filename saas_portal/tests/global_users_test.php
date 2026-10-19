@@ -52,7 +52,7 @@ try {
     $_SESSION=[];
     // Real existing SaaS form/handler/guard, before any global migration.
     foreach (['config','sessions','saas_portal/auth','saas_portal/services','saas_portal/migrations','saas_portal/pages'] as $relative) mkdir($directory.'/'.$relative,0700,true);
-    foreach (['auth/authenticate.php','auth/require_active.php','services/PortalSaasIdentity.php','services/PortalGlobalUsers.php','services/PortalDatabase.php','migrations/GlobalSaasSchema.php'] as $file) copy(__DIR__.'/../'.$file,$directory.'/saas_portal/'.$file);
+    foreach (['auth/authenticate.php','auth/require_active.php','services/PortalSaasIdentity.php','services/PortalGlobalUsers.php','services/PortalDatabase.php','services/PortalLoginFailure.php','migrations/GlobalSaasSchema.php'] as $file) copy(__DIR__.'/../'.$file,$directory.'/saas_portal/'.$file);
     file_put_contents($directory.'/config/database.php',"<?php function dbBool(\$value){return \$value?'1':'0';} function getDBConnection(){return new PDO(".var_export('mysql:unix_socket='.$socket.';dbname='.$database,true).",'root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);}");
     file_put_contents($directory.'/saas_portal/pages/dashboard.php',"<?php session_start();require __DIR__.'/../../config/database.php';require __DIR__.'/../auth/require_active.php';echo json_encode(['id'=>\$_SESSION['saas_admin_id'],'kind'=>\$_SESSION['saas_session_kind']]);");
     $listener=stream_socket_server('tcp://127.0.0.1:0',$errno,$error);

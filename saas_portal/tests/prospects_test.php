@@ -34,6 +34,8 @@ try {
     prospectCheck($service->listing(['page'=>999])['page']===2,'Page clamping');
     prospectCheck($service->listing(['q'=>"' OR 1=1 --"])['total']===0,'SQL input inert');
     // Real endpoints, existing auth guard, and a fixture-only session.
+    $db->exec("CREATE TABLE saas_admins (id TEXT PRIMARY KEY,is_active INTEGER,role TEXT,view_only INTEGER);
+        INSERT INTO saas_admins VALUES ('actor',1,'admin',0)");
     foreach (['config','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
     foreach (['prospects','portal_request'] as $file) copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
     foreach (['PortalProspects','PortalDatabase','PortalSaasIdentity'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
