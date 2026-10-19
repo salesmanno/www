@@ -46,7 +46,7 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
             for(const id of ['orgNr','companyName','contactPerson','contactEmail','contactPhone','interestScore','interestTags','lastContactedAt']){
                 if(!$(id).readOnly)throw Error('Editable protected field '+id);
             }
-            for(const id of ['newProspect','registerContact','createProspectCompany'])if(!$(id).hidden)throw Error('Visible forbidden action '+id);
+            for(const id of ['newProspect','registerContact','createProspectCompany'])if($(id)&&!$(id).hidden)throw Error('Visible forbidden action '+id);
             if($('prospectNotes').readOnly||$('prospectInterestToggle').getAttribute('role')!=='switch')throw Error('Notes and toggle missing');
             $('prospectNotes').value='Nettlesernotat';
             $('prospectNotes').dispatchEvent(new Event('input',{bubbles:true}));
@@ -81,11 +81,13 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
         $('saveProspect').click();
         check($('orgNr').getAttribute('aria-invalid')==='true','Client validation');
         input('orgNr','888888888');input('companyName','Nettleser <img src=x onerror=alert(1)>');
-        input('prospectStatus','Interessert - egen status');
+        $('prospectInterestToggle').click();
         input('interestTags','{"modules":["Events"],"large":9007199254740993}');
         input('website','https://example.test'); input('contactEmail','kontakt@example.test');input('contactPhone','+47 12345678');
         await save();
-        check($('prospectStatus').value==='Interessert - egen status','Custom status created');
+        check($('prospectInterestToggle').checked&&$('prospectInterestState').textContent==='Interessert','Interest switch persisted');
+        check(!$('registerContact'),'Contact-date action removed');
+        for(const id of ['orgNr','companyName','website','contactPerson','contactEmail','contactPhone','interestScore','interestTags','prospectSource','lastContactedAt'])check($(id).readOnly,'Protected '+id);
         check($('interestTags').value.includes('9007199254740993'),'JSON large integer retained as text');
         check(!document.querySelector('.prospect-row img'),'Untrusted name rendered as text');
         check([...$('prospectContactLinks').querySelectorAll('a')].every(a=>/^(https:|mailto:|tel:)/.test(a.href)),'Safe contact links');
@@ -96,8 +98,6 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
         await wait(()=>$('prospectFormAlert').textContent.includes('Simulert'),'failed save');
         check($('prospectNotes').value==='Behold dette ved feil'&&!$('saveProspect').disabled,'Failed save preserves form and allows retry');
         window.fetch=originalFetch;
-        $('registerContact').click();
-        check(!!$('lastContactedAt').value,'Contact date set without immediate write');
         let posts=0;
         window.fetch=async(url,options)=>{if(options?.method==='POST'){posts++;await new Promise(r=>setTimeout(r,200));}return originalFetch(url,options);};
         $('saveProspect').click();$('saveProspect').click();
@@ -109,7 +109,7 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
         await wait(()=>rows().length===1,'search');
         check($('prospectNotes').value==='Ulagret søk'&&!$('saveProspect').disabled,'Searching preserves unsaved edits');
         await save();
-        $('prospectStatusFilter').value='Interessert - egen status';$('prospectStatusFilter').dispatchEvent(new Event('change'));
+        $('prospectStatusFilter').value='interessert';$('prospectStatusFilter').dispatchEvent(new Event('change'));
         await wait(()=>rows().length===1,'status filter');
         check(rows()[0].textContent.includes('Nettleser'),'Status filter');
         window.fetch=async(url,options)=>{const r=await originalFetch(url,options);if(String(url).includes('q=Firma'))await new Promise(r=>setTimeout(r,800));return r;};
@@ -124,7 +124,7 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
         await wait(()=>$('companyName').value.startsWith('Nettleser'),'reopen');
         input('prospectNotes','Konflikt - ikke mist');
         const item=(await(await originalFetch('/saas_portal/api/prospects.php?q=Nettleser')).json()).items[0];
-        await originalFetch('/saas_portal/api/prospects.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...item,notes:'Annen operatør',action:'save',csrf_token:window.prospectsCsrf})});
+        await originalFetch('/saas_portal/api/prospects.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,version:item.version,status:'interessert',notes:'Annen operatør',action:'save',csrf_token:window.prospectsCsrf})});
         $('saveProspect').click();await wait(()=>$('prospectFormAlert').textContent.includes('beholdt'),'conflict');
         check($('prospectNotes').value==='Konflikt - ikke mist','Conflict preserves unsaved edits');
         rows()[0].click();await wait(()=>$('prospectNotes').value==='Annen operatør','conflict reload');
@@ -135,18 +135,38 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopBrowser('SIGK
         $('prospectStatusFilter').value='';$('prospectStatusFilter').dispatchEvent(new Event('change'));
         input('prospectSearch','HTTP bedrift');await wait(()=>rows().length===1&&rows()[0].textContent.includes('HTTP bedrift'),'legacy row');
         rows()[0].click();await wait(()=>$('companyName').value==='HTTP bedrift','legacy detail');
-        check($('interestTags').value==='{bad legacy'&&!$('interestTagsWarning').hidden,'Invalid legacy JSON retained and warned');
-        check(!$('prospectFormAlert').hidden&&$('prospectFormAlert').textContent.includes('kontaktdato'),'Invalid legacy date warned instead of silently cleared');
-        input('interestTags','null');
-        $('saveProspect').click();await wait(()=>$('lastContactedAtError').textContent.includes('gyldig'),'legacy date rejection');
-        check($('companyName').value==='HTTP bedrift','Invalid legacy date blocks silent data loss');
-        input('lastContactedAt','2026-10-19T12:00:00');await save();
+        check($('interestTags').value==='{bad legacy'&&$('interestTagsWarning').hidden,'Legacy JSON displayed readonly without edit prompts');
+        check($('lastContactedAt').value==='0000-00-00 00:00:00'&&$('prospectFormAlert').hidden,'Raw legacy date displayed without blocking notes');
+        const legacyStatus=$('prospectStatus').value;
+        $('prospectInterestToggle').click();$('prospectInterestToggle').click();
+        check($('prospectStatus').value===legacyStatus&&$('saveProspect').disabled,'Unsaved toggle roundtrip preserves legacy status and clean state');
+        input('prospectNotes','Notat med eldre data');await save();
+        check($('interestTags').value==='{bad legacy'&&$('lastContactedAt').value==='0000-00-00 00:00:00','Saving notes preserves legacy data');
         input('prospectSearch','Nettleser');await wait(()=>rows().length===1&&rows()[0].textContent.includes('Nettleser'),'restore screenshot row');
         rows()[0].click();await wait(()=>$('companyName').value.startsWith('Nettleser'),'screenshot detail');
         return pass;
     })()`},session);
     if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));
     console.log('PASS browser:',result.result.value.join('; '));
+    for (const interested of [false,true]) {
+        await call('Runtime.evaluate',{expression:"document.getElementById('prospectInterestToggle').focus()"},session);
+        await call('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32},session);
+        await call('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32},session);
+        const keyboard=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+            const $=id=>document.getElementById(id);
+            if($('prospectInterestToggle').checked!==${interested}||$('prospectInterestState').textContent!==${JSON.stringify(interested?'Interessert':'Ikke interessert')})throw Error('Keyboard interest state');
+            if(!$('createProspectCompany').disabled)throw Error('Unsaved interest allows conversion');
+            $('saveProspect').click();
+            for(let i=0;i<100&&$('prospectSaveState').textContent!=='Alle endringer lagret';i++)await new Promise(r=>setTimeout(r,50));
+            if($('prospectSaveState').textContent!=='Alle endringer lagret')throw Error('Keyboard interest save failed');
+            const row=(await(await fetch('/saas_portal/api/prospects.php?q=Nettleser')).json()).items[0];
+            if(row.status!==${JSON.stringify(interested?'interessert':'ikke_interessert')})throw Error('Keyboard state not persisted');
+            if($('createProspectCompany').disabled===${interested})throw Error('Saved interest conversion gate');
+            return true;
+        })()`},session);
+        if(keyboard.exceptionDetails||!keyboard.result.value)throw Error(JSON.stringify(keyboard.exceptionDetails||keyboard));
+    }
+    console.log('PASS keyboard: Space toggles and persists interest off/on; conversion requires saved interest.');
     await call('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,deviceScaleFactor:1,mobile:false},session);
     await call('Runtime.evaluate',{expression:'window.scrollTo(0,0)'},session);
     let image=await call('Page.captureScreenshot',{format:'png'},session);

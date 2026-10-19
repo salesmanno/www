@@ -125,7 +125,6 @@ session_write_close();
                         </div>
                         <div class="prospects-editor-actions">
                             <button type="button" id="createProspectCompany" class="btn btn-primary-custom btn-sm" disabled aria-describedby="createProspectCompanyHelp"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Opprett</button>
-                            <button type="button" id="registerContact" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-telephone me-1" aria-hidden="true"></i>Registrer kontakt nå</button>
                         </div>
                     </div>
                     <p id="createProspectCompanyHelp" class="prospects-convert-help">Opprett er tilgjengelig når prospektet er lagret uten ulagrede endringer og status er «interessert».</p>
@@ -169,9 +168,12 @@ session_write_close();
                                 <span id="interestScoreError" class="prospects-field-error" hidden></span>
                             </div>
                             <div class="prospects-field">
-                                <label for="prospectStatus">Status</label>
-                                <input id="prospectStatus" name="status" class="form-control" list="prospectStatuses" maxlength="50" aria-describedby="statusError">
-                                <datalist id="prospectStatuses"></datalist>
+                                <label for="prospectInterestToggle">Interesse</label>
+                                <input id="prospectStatus" name="status" type="hidden" aria-describedby="statusError">
+                                <div class="form-check form-switch prospects-interest">
+                                    <input id="prospectInterestToggle" class="form-check-input" type="checkbox" role="switch" aria-label="Interessert" aria-describedby="prospectInterestState">
+                                    <span id="prospectInterestState" aria-live="polite">Ikke interessert</span>
+                                </div>
                                 <span id="statusError" class="prospects-field-error" hidden></span>
                             </div>
                             <div class="prospects-field">

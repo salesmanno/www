@@ -24,10 +24,29 @@ try {
     foreach (['org_nr'=>'12','contact_email'=>'not-mail','website'=>'javascript:alert(1)','interest_tags'=>'{bad','interest_score'=>'32768','last_contacted_at'=>'2026-02-30 10:00:00','company_name'=>['bad']] as $field=>$value) {
         prospectReject(fn()=>$service->save(array_replace($base,[$field=>$value])),ProspectValidationException::class);
     }
-    $changed=$service->save(array_replace($base,['id'=>$first['id'],'version'=>$first['version'],'notes'=>'Oppdatert','interest_tags'=>'"legacy scalar"']));
-    prospectCheck($changed['notes']==='Oppdatert' && $changed['interest_tags']==='"legacy scalar"','Update and scalar JSON');
-    prospectReject(fn()=>$service->save(array_replace($base,['id'=>$first['id'],'version'=>$first['version']])),ProspectConflictException::class);
+    $update=['id'=>$first['id'],'version'=>$first['version'],'notes'=>'Oppdatert','status'=>'ikke_interessert'];
+    foreach (array_diff(array_keys($base),['notes','status']) as $field) {
+        prospectReject(fn()=>$service->save($update+[$field=>'forged']),ProspectValidationException::class);
+        prospectCheck($service->get($first['id'])===$first,'Protected-field attempt is atomic: '.$field);
+    }
+    $changed=$service->save($update);
+    prospectCheck($changed['notes']==='Oppdatert' && $changed['interest_tags']===$base['interest_tags'] && $changed['status']==='Egen status','Note save preserves original JSON and custom status');
+    prospectReject(fn()=>$service->save($update),ProspectConflictException::class);
     prospectCheck($service->get($first['id'])['notes']==='Oppdatert','Stale write preserved');
+    $db->prepare("UPDATE saas_companies_contact SET website='javascript:legacy',contact_email='legacy invalid',last_contacted_at='0000-00-00 00:00:00',interest_tags='{bad legacy' WHERE id=?")->execute([$first['id']]);
+    $legacy=$service->get($first['id']);
+    $on=$service->save(['id'=>$first['id'],'version'=>$legacy['version'],'notes'=>'Eldre data beholdes','status'=>'interessert']);
+    $off=$service->save(['id'=>$first['id'],'version'=>$on['version'],'notes'=>$on['notes'],'status'=>'ikke_interessert']);
+    foreach ($legacy as $key=>$value) if (!in_array($key,['version','notes','status','updated_at'],true)) {
+        prospectCheck($off[$key]===$value,'Legacy value unchanged: '.$key);
+    }
+    prospectCheck($off['status']==='ikke_interessert','Actual on-to-off transition is stored');
+    $largeTags='{"legacy":"'.str_repeat('x',33000).'"}';
+    $db->prepare('UPDATE saas_companies_contact SET interest_tags=?,status=NULL WHERE id=?')->execute([$largeTags,$first['id']]);
+    $large=$service->get($first['id']);
+    $large=$service->save(['id'=>$large['id'],'version'=>$large['version'],'notes'=>'Bare notat','status'=>'ikke_interessert']);
+    prospectCheck($large['interest_tags']===$largeTags && $large['status']===null,'Large legacy JSON and null status preserved by note-only save');
+    foreach (['',null,[]] as $invalidId) prospectReject(fn()=>$service->save(array_replace($update,['id'=>$invalidId])),ProspectValidationException::class);
     for ($i=0;$i<24;$i++) $service->save(['org_nr'=>(string)(200000000+$i),'company_name'=>'Firma '.str_pad((string)$i,2,'0',STR_PAD_LEFT)]);
     $page=$service->listing(['page'=>2,'sort'=>'name']);
     prospectCheck($page['total']===25 && count($page['items'])===5 && $page['pages']===2,'Pagination');
@@ -63,8 +82,11 @@ try {
     prospectCheck($saved[0]===200 && $saved[1]['item']['status']==='ny','HTTP create');
     $item=$saved[1]['item'];
     prospectCheck($request('GET',null,true,'?id='.$item['id'])[1]['item']['company_name']==='HTTP bedrift','HTTP detail');
-    prospectCheck($request('POST',array_replace($item,['action'=>'save','csrf_token'=>'csrf','notes'=>'HTTP endring']))[0]===200,'HTTP edit');
-    prospectCheck($request('POST',$item+['action'=>'save','csrf_token'=>'csrf'])[0]===409,'HTTP version conflict');
+    $payload=['id'=>$item['id'],'version'=>$item['version'],'notes'=>'HTTP endring','status'=>'ikke_interessert','action'=>'save','csrf_token'=>'csrf'];
+    $forged=$request('POST',$payload+['company_name'=>'Forged']);
+    prospectCheck($forged[0]===422 && str_contains($forged[1]['message'],'Bare notater og interesse'),'HTTP protected contact edit rejected clearly');
+    prospectCheck($request('POST',$payload)[0]===200,'HTTP edit');
+    prospectCheck($request('POST',$payload)[0]===409,'HTTP version conflict');
     prospectCheck($request('POST',['action'=>'save','csrf_token'=>'csrf','org_nr'=>'999999999','company_name'=>'Duplikat'])[0]===422,'HTTP duplicate');
     file_put_contents($dir.'/config/outage','1');
     $outage=$request();

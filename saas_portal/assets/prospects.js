@@ -1,6 +1,6 @@
 (() => {
-    const restricted = window.prospectsViewOnly === true;
     'use strict';
+    const restricted = window.prospectsViewOnly === true;
 
     const API_URL = '/saas_portal/api/prospects.php';
     const fields = {
@@ -87,28 +87,25 @@
     }
 
     function configureRestrictedView() {
-        if (!restricted) return;
-        Object.entries(fields).forEach(([name,input]) => {
-            if (name !== 'notes') input.readOnly = true;
+        if (restricted) ['newProspect','createProspectCompany','createProspectCompanyHelp'].forEach(id => {
+            el(id).hidden = true;
         });
-        ['newProspect','registerContact','createProspectCompany'].forEach(id => {
-            el(id).hidden = true;el(id).disabled = true;
-        });
-        el('createProspectCompanyHelp').hidden = true;
-        fields.status.hidden = true;
-        const label=form.querySelector('label[for="prospectStatus"]');
-        if (label) { label.htmlFor='prospectInterestToggle';label.textContent='Interesse'; }
-        const toggle=document.createElement('input');
-        toggle.type='checkbox';toggle.id='prospectInterestToggle';
-        toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','Interessert');
-        toggle.className='form-check-input';
-        const switchWrap=document.createElement('div');
-        switchWrap.className='form-check form-switch';
-        fields.status.insertAdjacentElement('afterend',switchWrap);switchWrap.append(toggle);
+        const toggle=el('prospectInterestToggle');
         toggle.addEventListener('change',()=>{
-            fields.status.value=toggle.checked?'interessert':'ikke_interessert';
+            const original=state.selectedItem?.status ?? 'ny';
+            const originallyInterested=text(original).trim().toLowerCase()==='interessert';
+            fields.status.value=toggle.checked===originallyInterested ? text(original) : toggle.checked?'interessert':'ikke_interessert';
+            el('prospectInterestState').textContent=toggle.checked?'Interessert':'Ikke interessert';
             updateDirtyState();
         });
+    }
+
+    function configureEditorMode(newRecord) {
+        form.classList.toggle('is-existing',!newRecord);
+        Object.entries(fields).forEach(([name,input]) => { input.readOnly=!newRecord && name!=='notes'; });
+        fields.last_contacted_at.type=newRecord?'datetime-local':'text';
+        el('interestTagsHelp').hidden=!newRecord;
+        el('interestScoreHelp').hidden=!newRecord;
     }
 
     function updateDirtyState() {
@@ -161,10 +158,7 @@
             const value = input.value;
             if (key === 'interest_score') data[key] = value.trim() === '' ? null : Number(value);
             else if (key === 'interest_tags') data[key] = value.trim() === '' ? null : value;
-            else if (key === 'last_contacted_at') {
-                const original = state.selectedItem?.last_contacted_at;
-                data[key] = !value && original && !localDateInput(original) ? original : dateForApi(value);
-            }
+            else if (key === 'last_contacted_at') data[key] = dateForApi(value);
             else data[key] = value.trim() === '' ? null : value;
         });
         return data;
@@ -176,20 +170,9 @@
         try { JSON.parse(raw); return true; } catch (_) { return false; }
     }
 
-    function renderTagsWarning(value) {
-        const warning = el('interestTagsWarning');
-        let invalidLegacy = false;
-        if (value !== null && value !== undefined && value !== '') {
-            try { JSON.parse(String(value)); } catch (_) { invalidLegacy = true; }
-        }
-        warning.textContent = invalidLegacy
-            ? 'Advarsel: Lagret verdi er ugyldig JSON. Den er beholdt urørt; rediger og lagre bare hvis du ønsker å endre den.'
-            : '';
-        warning.hidden = !invalidLegacy;
-    }
-
     function populateForm(item, newRecord = false) {
         const source = item || {};
+        configureEditorMode(newRecord);
         fields.org_nr.value = text(source.org_nr);
         fields.company_name.value = text(source.company_name);
         fields.website.value = text(source.website);
@@ -199,16 +182,13 @@
         fields.interest_score.value = source.interest_score === null || source.interest_score === undefined ? '' : text(source.interest_score);
         fields.interest_tags.value = source.interest_tags === null || source.interest_tags === undefined ? '' : typeof source.interest_tags === 'string' ? source.interest_tags : JSON.stringify(source.interest_tags);
         fields.source.value = text(source.source);
-        fields.last_contacted_at.value = localDateInput(source.last_contacted_at);
+        fields.last_contacted_at.value = newRecord ? localDateInput(source.last_contacted_at) : text(source.last_contacted_at);
         fields.notes.value = text(source.notes);
-        updateStatusOptions(source.status, newRecord);
-        if (restricted) el('prospectInterestToggle').checked=text(source.status).trim().toLowerCase()==='interessert';
-        else renderTagsWarning(source.interest_tags);
+        fields.status.value = newRecord && source.status == null ? 'ny' : text(source.status);
+        el('prospectInterestToggle').checked=text(source.status).trim().toLowerCase()==='interessert';
+        el('prospectInterestState').textContent=el('prospectInterestToggle').checked?'Interessert':'Ikke interessert';
+        el('interestTagsWarning').hidden=true;
         clearFieldErrors();
-        if (!restricted && source.last_contacted_at && !localDateInput(source.last_contacted_at)) {
-            el('prospectFormAlert').textContent = 'Lagret kontaktdato er ugyldig. Velg en gyldig dato før lagring; den gamle verdien blir ikke fjernet automatisk.';
-            el('prospectFormAlert').hidden = false;
-        }
         updateContactLinks(source);
         state.selectedItem = item || null;
         state.selectedId = item ? text(item.id) : null;
@@ -220,7 +200,6 @@
         el('editorContent').hidden = false;
         el('prospectEditorTitle').textContent = newRecord ? 'Nytt prospekt' : text(source.company_name) || 'Prospekt';
         el('prospectEditorDescription').textContent = newRecord ? 'Registrer en norsk virksomhet for oppfølging.' : `Organisasjonsnummer ${text(source.org_nr) || 'ikke oppgitt'}`;
-        el('registerContact').disabled = newRecord || state.saving;
         el('saveProspect').disabled = true;
         setStatusText(newRecord ? 'Ny registrering' : 'Alle endringer lagret');
         renderList();
@@ -263,18 +242,6 @@
             if (href.startsWith('http:') || href.startsWith('https:')) anchor.target = '_blank';
             container.append(anchor);
         });
-    }
-
-    function updateStatusOptions(current, isNew) {
-        const suggestions = el('prospectStatuses');
-        suggestions.replaceChildren();
-        const value = isNew && current == null ? 'ny' : text(current);
-        [...new Set(['ny', 'interessert', ...state.statuses, ...(value ? [value] : [])])].forEach((status) => {
-            const option = make('option', '', status);
-            option.value = status;
-            suggestions.append(option);
-        });
-        fields.status.value = value;
     }
 
     function renderStatusFilter() {
@@ -361,7 +328,6 @@
             state.pages = Math.max(1, Number(body.pages) || 1);
             if (Array.isArray(body.statuses)) state.statuses = body.statuses.map((value) => String(value));
             renderStatusFilter();
-            if (!el('editorContent').hidden) updateStatusOptions(fields.status.value, state.isNew);
             renderList();
         } catch (error) {
             if (requestId !== state.listRequest) return;
@@ -418,7 +384,7 @@
 
     function validateForm() {
         clearFieldErrors();
-        if (restricted) {
+        if (!state.isNew) {
             if (new TextEncoder().encode(fields.notes.value).length>65535) {
                 setFieldError('notes','Notatet er for langt. Maksimalt 65535 byte.');return false;
             }
@@ -453,7 +419,7 @@
     async function saveProspect(event) {
         event.preventDefault();
         if (state.saving || !validateForm()) return;
-        const values = restricted ? {notes:fields.notes.value,status:el('prospectInterestToggle').checked?'interessert':'ikke_interessert'} : readFieldData();
+        const values = !state.isNew ? {notes:fields.notes.value,status:el('prospectInterestToggle').checked?'interessert':'ikke_interessert'} : readFieldData();
         const payload = { csrf_token: window.prospectsCsrf, action: 'save', ...values };
         if (!state.isNew && state.selectedItem) {
             payload.id = state.selectedItem.id;
@@ -461,9 +427,9 @@
         }
         state.saving = true;
         Object.values(fields).forEach(input => { input.disabled = true; });
+        el('prospectInterestToggle').disabled = true;
         el('newProspect').disabled = true;
         el('saveProspect').disabled = true;
-        el('registerContact').disabled = true;
         setStatusText('Lagrer …');
         try {
             const response = await fetch(API_URL, {
@@ -506,25 +472,14 @@
         } finally {
             state.saving = false;
             Object.values(fields).forEach(input => { input.disabled = false; });
+            el('prospectInterestToggle').disabled = false;
             el('newProspect').disabled = false;
-            el('registerContact').disabled = state.isNew;
             updateDirtyState();
         }
     }
 
-    function registerContactNow() {
-        if (restricted) return;
-        if (state.saving || state.isNew) return;
-        const now = new Date();
-        const pad = (value) => String(value).padStart(2, '0');
-        fields.last_contacted_at.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-        updateDirtyState();
-        fields.last_contacted_at.focus();
-    }
-
     function bindEvents() {
         form.addEventListener('input', (event) => {
-            if (event.target === fields.interest_tags) renderTagsWarning(null);
             if (event.target.matches('[aria-invalid="true"]')) setFieldError(Object.keys(fields).find((key) => fields[key] === event.target), '');
             updateDirtyState();
         });
@@ -570,7 +525,6 @@
             state.page += 1;
             loadList();
         });
-        el('registerContact').addEventListener('click', registerContactNow);
         window.addEventListener('beforeunload', (event) => {
             if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ''; }
         });

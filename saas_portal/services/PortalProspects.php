@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 final class ProspectValidationException extends InvalidArgumentException {
-    public function __construct(public array $errors) { parent::__construct('Kontroller de markerte feltene.'); }
+    public function __construct(public array $errors) { parent::__construct($errors['permission'] ?? 'Kontroller de markerte feltene.'); }
 }
 final class ProspectConflictException extends RuntimeException {}
 final class ProspectNotFoundException extends RuntimeException {}
@@ -125,28 +125,16 @@ final class PortalProspects {
     }
 
     public function save(array $input): array {
+        // Updates never pass through new-registration validation or rewrite contact data.
+        if (array_key_exists('id',$input)) return $this->saveNotesAndInterest($input);
         $data = self::validate($input);
-        $id = $input['id'] ?? '';
-        if (!is_string($id) || ($id !== '' && !preg_match('/^[a-f0-9-]{36}$/Di',$id))) throw new ProspectValidationException(['id'=>'Ugyldig interessent.']);
         $this->db->beginTransaction();
         try {
-            if ($id !== '') {
-                $lock = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? ' FOR UPDATE' : '';
-                $stmt=$this->db->prepare('SELECT * FROM saas_companies_contact WHERE id = ?'.$lock);
-                $stmt->execute([$id]); $row=$stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$row) throw new ProspectNotFoundException('Interessenten finnes ikke lenger.');
-                if (!is_string($input['version'] ?? null) || !hash_equals(self::present($row)['version'],$input['version'])) {
-                    throw new ProspectConflictException('Opplysningene er endret av en annen. Last inn interessenten på nytt før du lagrer.');
-                }
-                $sql='UPDATE saas_companies_contact SET '.implode(', ',array_map(fn($f)=>"$f = ?",self::FIELDS)).', updated_at = CURRENT_TIMESTAMP WHERE id = ?';
-                $values=array_map(fn($f)=>$data[$f],self::FIELDS); $values[]=$id;
-            } else {
-                $hex=bin2hex(random_bytes(16));
-                $id=substr($hex,0,8).'-'.substr($hex,8,4).'-4'.substr($hex,13,3).'-'.dechex((hexdec($hex[16])&3)|8).substr($hex,17,3).'-'.substr($hex,20);
-                if ($data['status']===null) $data['status']='ny';
-                $sql='INSERT INTO saas_companies_contact (id,'.implode(',',self::FIELDS).') VALUES ('.implode(',',array_fill(0,count(self::FIELDS)+1,'?')).')';
-                $values=[$id,...array_map(fn($f)=>$data[$f],self::FIELDS)];
-            }
+            $hex=bin2hex(random_bytes(16));
+            $id=substr($hex,0,8).'-'.substr($hex,8,4).'-4'.substr($hex,13,3).'-'.dechex((hexdec($hex[16])&3)|8).substr($hex,17,3).'-'.substr($hex,20);
+            if ($data['status']===null) $data['status']='ny';
+            $sql='INSERT INTO saas_companies_contact (id,'.implode(',',self::FIELDS).') VALUES ('.implode(',',array_fill(0,count(self::FIELDS)+1,'?')).')';
+            $values=[$id,...array_map(fn($f)=>$data[$f],self::FIELDS)];
             $stmt=$this->db->prepare($sql); $stmt->execute($values);
             $result=$this->get($id);
             $this->db->commit();

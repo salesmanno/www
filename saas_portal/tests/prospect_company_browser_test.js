@@ -43,7 +43,7 @@ const timeout=setTimeout(()=>{console.error('Browser timeout');stopChrome('SIGKI
         await wait(()=>document.querySelector('.prospect-row'),'initial list');
         await pick('BROWSER Ny');
         passed.push(check($('createProspectCompany').disabled,'Uninterested lead cannot convert'));
-        input('prospectStatus','interessert');
+        $('prospectInterestToggle').click();
         passed.push(check($('createProspectCompany').disabled,'Unsaved interested status cannot convert'));
         $('saveProspect').click();await wait(()=>!$('createProspectCompany').disabled,'saved eligible');
         input('prospectNotes','Unsaved data');passed.push(check($('createProspectCompany').disabled,'Dirty form protected'));

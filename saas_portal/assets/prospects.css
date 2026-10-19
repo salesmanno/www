@@ -116,6 +116,12 @@
 .prospects-field label, .prospects-field .field-label { display: block; margin-bottom: .32rem; color: #43584f; font-size: .78rem; font-weight: 700; }
 .prospects-field .form-control, .prospects-field .form-select { min-height: 38px; font-size: .84rem; }
 .prospects-field textarea.form-control { min-height: 94px; resize: vertical; }
+.prospects-form.is-existing .form-control[readonly] { background: #f1f4ef; border-color: #e0e6de; color: #53665b; }
+.prospects-form.is-existing label .text-danger { display: none; }
+.prospects-interest { display: flex; align-items: center; gap: .65rem; min-height: 38px; }
+.prospects-interest .form-check-input { flex-shrink: 0; cursor: pointer; }
+.prospects-interest span { font-size: .84rem; color: #43584f; }
+.prospects-interest .form-check-input:focus-visible { outline: 3px solid #597960; outline-offset: 3px; }
 .prospects-field .form-text { margin-top: .28rem; color: #78877f; font-size: .7rem; }
 .prospects-field [aria-invalid="true"] { border-color: #b44d40; }
 .prospects-field-error { display: block; margin-top: .25rem; color: #a33e34; font-size: .73rem; }
