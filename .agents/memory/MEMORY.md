@@ -8,3 +8,4 @@
 - [Isolated MySQL tests](isolated-mysql-tests.md) — --no-defaults does not exclude connection environment variables; force a fixture socket and an environment allowlist.
 - [Rental custom fields](rental-custom-fields.md) — rental/customer field definitions belong in the existing dynamic form system, not a rental-specific settings table.
 - [Sentralt malverksted](email-template-workflow.md) — ett sted for bearbeiding og delegering, med kopiering og flytting begge veier mellom firmaer.
+- [Interessent til firma](prospect-conversion-policy.md) — firmaet må være markert som interessert i tabellen før opprettelse fra interessentoversikten.
