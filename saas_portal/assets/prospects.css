@@ -1,0 +1,162 @@
+.prospects-workspace {
+    padding-top: 1.65rem;
+    padding-bottom: 3rem;
+}
+[hidden] { display: none !important; }
+
+.prospects-heading { margin-bottom: 1.1rem; }
+.prospects-heading p { margin: .45rem 0 0; max-width: 740px; color: #64766f; font-size: .92rem; }
+.prospects-heading h2 { font-size: clamp(1.55rem, 3vw, 2rem); }
+.prospects-context {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .75rem .9rem;
+    margin-bottom: 1rem;
+    border: 1px solid #d7e1d9;
+    border-left: 3px solid #a87842;
+    border-radius: 8px;
+    background: #f7f6ef;
+    color: #586a62;
+    font-size: .82rem;
+}
+.prospects-context i { color: #98703e; font-size: 1rem; }
+.prospects-toolbar {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) minmax(155px, 205px) minmax(155px, 190px) auto;
+    gap: .65rem;
+    align-items: end;
+    padding: .9rem;
+    border: 1px solid var(--portal-line);
+    border-radius: 11px 11px 0 0;
+    background: #eaf0e9;
+}
+.prospects-control label { display: block; margin: 0 0 .3rem; color: #597068; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.prospects-search-wrap { position: relative; }
+.prospects-search-wrap i { position: absolute; top: 50%; left: .7rem; color: #74877d; transform: translateY(-50%); pointer-events: none; }
+.prospects-search-wrap input { padding-left: 2rem; }
+.prospects-toolbar-actions { display: flex; justify-content: flex-end; gap: .45rem; }
+.prospects-layout {
+    display: grid;
+    grid-template-columns: minmax(285px, .78fr) minmax(0, 1.45fr);
+    align-items: start;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.prospects-list-panel, .prospects-editor-panel { min-width: 0; overflow: hidden; }
+.prospects-list-panel { padding: 0; }
+.prospects-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--portal-line);
+}
+.prospects-list-head h3 { margin: 0; font-size: .96rem; }
+.prospects-count { color: #75877f; font: 600 .72rem ui-monospace, monospace; }
+.prospects-list { min-height: 285px; }
+.prospect-row {
+    width: 100%;
+    display: block;
+    border: 0;
+    border-bottom: 1px solid #e7ece7;
+    border-left: 3px solid transparent;
+    padding: .85rem .9rem .85rem 1rem;
+    background: transparent;
+    color: var(--portal-ink);
+    text-align: left;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+.prospect-row:last-child { border-bottom: 0; }
+.prospect-row:hover { background: #f3f7f1; }
+.prospect-row.is-selected { border-left-color: var(--portal-accent); background: #eaf2e8; }
+.prospect-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.prospect-row-name { display: block; min-width: 0; font-size: .89rem; font-weight: 700; overflow-wrap: anywhere; }
+.prospect-row-org { display: block; margin-top: .2rem; color: #72837b; font: .7rem ui-monospace, monospace; }
+.prospect-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; margin-top: .6rem; color: #72837b; font-size: .7rem; }
+.prospect-status {
+    display: inline-flex;
+    align-items: center;
+    max-width: 125px;
+    padding: .18rem .45rem;
+    border: 1px solid #d5e1d6;
+    border-radius: 99px;
+    background: #f0f5ed;
+    color: #486959;
+    font-size: .66rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.prospect-status[data-status="kontaktet"] { background: #eaf0f5; border-color: #d5e0e8; color: #506a7c; }
+.prospect-status[data-status="kvalifisert"] { background: #f5f0e5; border-color: #e8ddc6; color: #876738; }
+.prospect-status[data-status="avsluttet"] { background: #f2ece9; border-color: #e5d9d2; color: #806456; }
+.prospects-list-empty, .prospects-list-state { padding: 2rem 1rem; color: #71817a; text-align: center; }
+.prospects-list-empty i, .prospects-list-state i { display: block; margin-bottom: .6rem; color: #91a398; font-size: 1.45rem; }
+.prospects-list-empty strong { display: block; margin-bottom: .25rem; color: #40544c; font-size: .88rem; }
+.prospects-pagination { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .65rem .8rem; border-top: 1px solid var(--portal-line); background: #f7f9f5; }
+.prospects-page-info { color: #71817a; font: .72rem ui-monospace, monospace; }
+.prospects-editor-panel { padding: 0; }
+.prospects-editor-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .8rem;
+    padding: 1rem 1.1rem .9rem;
+    border-bottom: 1px solid var(--portal-line);
+    background: #f8faf6;
+}
+.prospects-editor-head h3 { margin: 0; font-size: 1.08rem; }
+.prospects-editor-head p { margin: .25rem 0 0; color: #71817a; font-size: .78rem; }
+.prospects-editor-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+.prospects-form { padding: 1rem 1.1rem 1.1rem; }
+.prospects-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem .85rem; }
+.prospects-field { min-width: 0; }
+.prospects-field.span-2 { grid-column: 1 / -1; }
+.prospects-field label, .prospects-field .field-label { display: block; margin-bottom: .32rem; color: #43584f; font-size: .78rem; font-weight: 700; }
+.prospects-field .form-control, .prospects-field .form-select { min-height: 38px; font-size: .84rem; }
+.prospects-field textarea.form-control { min-height: 94px; resize: vertical; }
+.prospects-field .form-text { margin-top: .28rem; color: #78877f; font-size: .7rem; }
+.prospects-field [aria-invalid="true"] { border-color: #b44d40; }
+.prospects-field-error { display: block; margin-top: .25rem; color: #a33e34; font-size: .73rem; }
+.prospects-tags-warning { margin-top: .35rem; padding: .45rem .55rem; border-radius: 6px; background: #fbf2df; color: #785a29; font-size: .73rem; }
+.prospects-contact-row { display: flex; flex-wrap: wrap; gap: .4rem .8rem; min-height: 1.2rem; margin: .45rem 0 0; font-size: .75rem; }
+.prospects-contact-row a { color: #28635c; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.prospects-contact-row span { color: #839087; }
+.prospects-form-footer { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding-top: .9rem; margin-top: .9rem; border-top: 1px solid #e4eae4; }
+.prospects-save-state { min-height: 1.2rem; color: #71817a; font-size: .75rem; }
+.prospects-form-footer .btn { min-width: 112px; }
+.prospects-loading .prospect-skeleton { height: 72px; margin: .5rem; border-radius: 8px; background: linear-gradient(90deg, #edf2eb 20%, #e5ece4 45%, #edf2eb 70%); background-size: 220% 100%; animation: prospect-shimmer 1.4s ease-in-out infinite; }
+@keyframes prospect-shimmer { to { background-position: -220% 0; } }
+.prospects-editor-empty { min-height: 380px; display: grid; align-content: center; justify-items: center; padding: 2rem; color: #71817a; text-align: center; }
+.prospects-editor-empty i { margin-bottom: .8rem; color: #92a59a; font-size: 2rem; }
+.prospects-editor-empty strong { margin-bottom: .3rem; color: #43584f; }
+.prospects-alert { margin: .75rem .9rem; font-size: .82rem; }
+.prospects-mobile-editor-link { display: none; }
+
+@media (max-width: 900px) {
+    .prospects-toolbar { grid-template-columns: minmax(160px, 1fr) minmax(140px, .7fr) minmax(140px, .7fr); }
+    .prospects-toolbar-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    .prospects-layout { grid-template-columns: minmax(245px, .78fr) minmax(0, 1.25fr); gap: .7rem; }
+}
+@media (max-width: 767px) {
+    .prospects-workspace { padding-top: 1.15rem; }
+    .prospects-toolbar { grid-template-columns: 1fr 1fr; gap: .55rem; padding: .7rem; }
+    .prospects-control:first-child { grid-column: 1 / -1; }
+    .prospects-toolbar-actions { grid-column: 1 / -1; }
+    .prospects-toolbar-actions .btn { flex: 1; }
+    .prospects-layout { display: flex; flex-direction: column; }
+    .prospects-list-panel, .prospects-editor-panel { width: 100%; }
+    .prospects-list { max-height: 43dvh; overflow-y: auto; }
+    .prospects-editor-panel { scroll-margin-top: .75rem; }
+    .prospects-form-grid { grid-template-columns: 1fr; }
+    .prospects-field.span-2 { grid-column: auto; }
+    .prospects-editor-head { padding: .85rem; }
+    .prospects-form { padding: .85rem; }
+    .prospects-editor-actions { flex: 0 0 auto; }
+    .prospects-context { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .prospects-loading .prospect-skeleton { animation: none; }
+    .prospect-row { transition: none; }
+}

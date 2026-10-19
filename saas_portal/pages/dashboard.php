@@ -286,6 +286,7 @@ $admin_name = $_SESSION['saas_admin_name'] ?? 'Admin';
                 <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i> Opprett ny bedrift</button>
                 <button type="button" class="btn btn-outline-primary" id="grantModeButton">Tildel moduler</button>
                 <a href="/saas_portal/pages/email_templates.php" class="btn btn-outline-secondary"><i class="bi bi-envelope-paper me-1" aria-hidden="true"></i>E-postmaler</a>
+                <a href="/saas_portal/pages/prospects.php" class="btn btn-outline-secondary"><i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>Interessenter</a>
                 <button type="button" class="btn btn-outline-secondary" id="moduleTransitionPreviewButton">Kontroller eldre tilganger</button>
                 <button type="button" class="btn btn-primary-custom" id="grantConfirmButton" hidden disabled>Velg moduler (0)</button>
             </div>
