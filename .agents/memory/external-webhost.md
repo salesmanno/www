@@ -38,3 +38,9 @@ The user's instruction for this webhost deployment is: "Bruk FTP."
 **Why:** The user explicitly rejected continuing with the SFTP/SSH-fingerprint setup.
 
 **How to apply:** Keep the FTP transport with its existing TLS protection. Do not switch this deployment to SFTP or introduce SSH-fingerprint setup without a new request.
+
+Replit can rewrite GitHub transport URLs to `github.replit.internal` while the configured origin still points to GitHub.
+
+**Why:** Comparing the resolved transport URL to the public repository URL incorrectly blocked publishing to the correct repository.
+
+**How to apply:** Validate the configured repository destination separately from Git's transport rewrite. Do not weaken repository checks or change the remote simply because its resolved transport uses the internal host.
