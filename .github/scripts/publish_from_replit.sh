@@ -12,7 +12,9 @@ if [[ "$branch" != "main" ]]; then
   exit 1
 fi
 
-remote="$(git remote get-url origin)"
+# `get-url` applies Replit's internal GitHub URL rewrite. Validate the
+# repository URL as configured instead, before Git applies that transport rewrite.
+remote="$(git config --get remote.origin.url)"
 if [[ "$remote" != "$EXPECTED_REMOTE" ]]; then
   echo "Publish stopped: origin is not the expected www repository. No files were pushed." >&2
   exit 1

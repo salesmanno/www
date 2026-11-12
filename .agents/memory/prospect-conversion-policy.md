@@ -9,6 +9,12 @@ Bedriften må være markert som interessert i tabellen når den opprettes fra in
 
 **How to apply:** Bruk den lagrede interessestatusen som vilkår i opprettelsesflyten, ikke bare et ulagret felt i nettleseren.
 
+Nettsidehenvendelser skal registreres i SaaS-interessentlisten, ikke i `tenant_customers`. Organisasjonsnummer kan mangle før henvendelsen er kvalifisert.
+
+**Why:** Brukeren ba om at mottaket ligger «ett layer opp» fra tenant-data.
+
+**How to apply:** Lagre henvendelsen som en ny interessent uten å opprette tenant-kunde eller firma. Opprettelse av firma skjer først gjennom den eksplisitte, kvalifiserte interessentflyten.
+
 Bare notater og interesse skal kunne redigeres i kontaktoversikten. Firmaopplysninger, kontaktperson og øvrige kontaktdata skal være skrivebeskyttet. Interesse skal være en av/på-bryter.
 
 **Why:** Brukeren korrigerte den generelle redigeringsflaten: «Eneste som skal kunne redigeres er notater eller interesse».

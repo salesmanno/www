@@ -36,6 +36,7 @@ uploads/
 *.sql
 !docs/*.sql
 !saas_portal/migrations/subscription_pricing.sql
+!saas_portal/migrations/contact_leads.sql
 
 # Composer
 composer.phar
