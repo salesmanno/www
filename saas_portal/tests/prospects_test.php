@@ -12,8 +12,19 @@ mkdir($dir,0700);
 $server=null;
 try {
     $db=new PDO('sqlite:'.$dir.'/fixture.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
-    $db->exec("CREATE TABLE saas_companies_contact (id CHAR(36) PRIMARY KEY,org_nr VARCHAR(9) NOT NULL UNIQUE,company_name VARCHAR(255) NOT NULL,website VARCHAR(255),contact_person VARCHAR(255),contact_email VARCHAR(255),contact_phone VARCHAR(50),interest_score SMALLINT DEFAULT 0,interest_tags JSON,status VARCHAR(50) DEFAULT 'ny',source VARCHAR(100),last_contacted_at DATETIME,notes TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    $db->exec("CREATE TABLE saas_companies_contact (id CHAR(36) PRIMARY KEY,org_nr VARCHAR(9) UNIQUE,company_name VARCHAR(255),website VARCHAR(255),logo_url VARCHAR(2048),contact_person VARCHAR(255),contact_first_name VARCHAR(100),contact_last_name VARCHAR(100),contact_email VARCHAR(255),contact_phone VARCHAR(50),interest_score SMALLINT DEFAULT 0,interest_tags JSON,status VARCHAR(50) DEFAULT 'ny',source VARCHAR(100),last_contacted_at DATETIME,notes TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
     $service=new PortalProspects($db);
+    prospectCheck($service->count()===0,'Prospect badge hides empty table');
+    $websiteLead=$service->createWebsiteLead(['first_name'=>'Ada','last_name'=>'Nord','contact_email'=>'ada@example.test','contact_phone'=>'+47 123 45 678']);
+    prospectCheck($websiteLead['org_nr']===null && $websiteLead['company_name']===null,'Website lead allows missing organization number and company name');
+    prospectCheck($websiteLead['contact_first_name']==='Ada' && $websiteLead['contact_last_name']==='Nord' &&
+        $websiteLead['contact_person']==='Ada Nord' && $websiteLead['status']==='ny' && $websiteLead['source']==='nettside','Website lead enters the prospect register');
+    prospectCheck($service->count()===1,'Prospect badge counts registered leads');
+    prospectCheck($service->listing(['q'=>'Ada'])['total']===1,'Website lead can be found by contact name');
+    $db->prepare('DELETE FROM saas_companies_contact WHERE id=?')->execute([$websiteLead['id']]);
+    prospectReject(fn()=>$service->createWebsiteLead(['first_name'=>'Ada','last_name'=>'Nord','contact_email'=>'bad','contact_phone'=>'12345']),ProspectValidationException::class);
+    prospectReject(fn()=>$service->createWebsiteLead(['first_name'=>'Ada','last_name'=>'Nord','contact_email'=>'ada@example.test','contact_phone'=>'12345','org_nr'=>'12']),ProspectValidationException::class);
+    prospectReject(fn()=>$service->createWebsiteLead(['first_name'=>'Ada','last_name'=>'Nord','contact_email'=>'ada@example.test','contact_phone'=>'12345','logo_url'=>'javascript:alert(1)']),ProspectValidationException::class);
     $base=['org_nr'=>'123456789','company_name'=>'Nord & Sør <script>','status'=>'Egen status','interest_tags'=>'{"custom":[1,"Events"],"large":9007199254740993}','notes'=>"Linje 1\nLinje 2",'interest_score'=>'-12','last_contacted_at'=>'2026-10-19 09:30:00','contact_email'=>'kontakt@example.test','website'=>'https://example.test'];
     $first=$service->save($base);
     prospectCheck(strlen($first['id'])===36 && $first['status']==='Egen status','Create and custom status');
@@ -56,7 +67,7 @@ try {
     $db->exec("CREATE TABLE saas_admins (id TEXT PRIMARY KEY,is_active INTEGER,role TEXT,view_only INTEGER);
         INSERT INTO saas_admins VALUES ('actor',1,'admin',0)");
     foreach (['config','sessions','saas_portal/api','saas_portal/services','saas_portal/auth'] as $sub) mkdir($dir.'/'.$sub,0700,true);
-    foreach (['prospects','portal_request'] as $file) copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
+    foreach (['prospects','portal_request','contact_request'] as $file) copy(__DIR__.'/../api/'.$file.'.php',$dir.'/saas_portal/api/'.$file.'.php');
     foreach (['PortalProspects','PortalDatabase','PortalSaasIdentity'] as $file) copy(__DIR__.'/../services/'.$file.'.php',$dir.'/saas_portal/services/'.$file.'.php');
     copy(__DIR__.'/../auth/require_active.php',$dir.'/saas_portal/auth/require_active.php');
     file_put_contents($dir.'/config/database.php',"<?php function getDBConnection(){if(file_exists(__DIR__.'/outage'))throw new RuntimeException('fixture-only');return new PDO('sqlite:". $dir."/fixture.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);}");
@@ -73,6 +84,13 @@ try {
         $raw=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
         return [$status,json_decode($raw,true),$raw];
     };
+    $contactRequest=function(array $data,string $cookie='contacttest') use($port):array {
+        $ch=curl_init("http://127.0.0.1:$port/saas_portal/api/contact_request.php");
+        curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_HTTPHEADER=>['Content-Type: application/json','Origin: http://127.0.0.1:'.$port,'Cookie: PHPSESSID='.$cookie],
+            CURLOPT_POSTFIELDS=>json_encode($data),CURLOPT_RETURNTRANSFER=>true,CURLOPT_PROXY=>'',CURLOPT_TIMEOUT=>5]);
+        $raw=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
+        return [$status,json_decode($raw,true),$raw];
+    };
     prospectCheck($request('GET',null,false)[0]===403,'HTTP anonymous GET');
     prospectCheck($request('POST',['action'=>'save'],false)[0]===403,'HTTP anonymous POST');
     prospectCheck($request('POST',['action'=>'save'])[0]===403,'HTTP CSRF');
@@ -80,6 +98,25 @@ try {
     prospectCheck($request()[1]['total']===25,'HTTP listing');
     $saved=$request('POST',['action'=>'save','csrf_token'=>'csrf','org_nr'=>'999999999','company_name'=>'HTTP bedrift']);
     prospectCheck($saved[0]===200 && $saved[1]['item']['status']==='ny','HTTP create');
+    $publicLead=$contactRequest(['first_name'=>'Lin','last_name'=>'Hansen','contact_email'=>'lin@example.test','contact_phone'=>'98765432','logo_url'=>'https://example.test/logo.svg']);
+    prospectCheck($publicLead[0]===200 && $publicLead[1]['success']===true,'Public contact endpoint accepts anonymous valid submission');
+    $storedLead=$db->query("SELECT * FROM saas_companies_contact WHERE contact_email='lin@example.test'")->fetch(PDO::FETCH_ASSOC);
+    prospectCheck($storedLead && $storedLead['org_nr']===null && $storedLead['company_name']===null &&
+        $storedLead['contact_first_name']==='Lin' && $storedLead['contact_last_name']==='Hansen' &&
+        $storedLead['logo_url']==='https://example.test/logo.svg' && $storedLead['status']==='ny' && $storedLead['source']==='nettside',
+        'Public contact saved as a prospect without creating a tenant record');
+    $spam=$contactRequest(['website_check'=>'https://spam.example','first_name'=>'Bot','last_name'=>'Bot','contact_email'=>'bot@example.test','contact_phone'=>'98765432']);
+    prospectCheck($spam[0]===200 && (int)$db->query("SELECT COUNT(*) FROM saas_companies_contact WHERE contact_email='bot@example.test'")->fetchColumn()===0,
+        'Honeypot acknowledges spam without storing it');
+    $limited=$contactRequest(['first_name'=>'Bot','last_name'=>'Bot','contact_email'=>'bad','contact_phone'=>'12345'],'ratelimit');
+    prospectCheck($limited[0]===422,'Public endpoint validates submitted fields');
+    for($i=0;$i<4;$i++) {
+        $allowed=$contactRequest(['first_name'=>'A','last_name'=>'B','contact_email'=>"rate$i@example.test",'contact_phone'=>'12345'],'ratelimit');
+        prospectCheck($allowed[0]===200,'Public contact allows submissions within rate limit');
+    }
+    prospectCheck($contactRequest(['first_name'=>'A','last_name'=>'B','contact_email'=>'rate5@example.test','contact_phone'=>'12345'],'ratelimit')[0]===429,
+        'Public contact per-session attempt limit');
+    $db->exec("DELETE FROM saas_companies_contact WHERE source='nettside'");
     $item=$saved[1]['item'];
     prospectCheck($request('GET',null,true,'?id='.$item['id'])[1]['item']['company_name']==='HTTP bedrift','HTTP detail');
     $payload=['id'=>$item['id'],'version'=>$item['version'],'notes'=>'HTTP endring','status'=>'ikke_interessert','action'=>'save','csrf_token'=>'csrf'];

@@ -40,8 +40,8 @@ try {
     foreach (['config','sessions','saas_portal/api','saas_portal/auth','saas_portal/services','saas_portal/includes','saas_portal/pages','saas_portal/assets'] as $dir) mkdir($root.'/'.$dir,0700,true);
     $db->exec("CREATE DATABASE $schema CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); $db->exec("USE $schema");
     $db->exec("CREATE TABLE saas_companies_contact (
-        id CHAR(36) PRIMARY KEY,org_nr VARCHAR(9) NOT NULL UNIQUE,company_name VARCHAR(255) NOT NULL,website VARCHAR(255),
-        contact_person VARCHAR(255),contact_email VARCHAR(255),contact_phone VARCHAR(50),interest_score SMALLINT DEFAULT 0,
+        id CHAR(36) PRIMARY KEY,org_nr VARCHAR(9) UNIQUE,company_name VARCHAR(255),website VARCHAR(255),logo_url VARCHAR(2048),
+        contact_person VARCHAR(255),contact_first_name VARCHAR(100),contact_last_name VARCHAR(100),contact_email VARCHAR(255),contact_phone VARCHAR(50),interest_score SMALLINT DEFAULT 0,
         interest_tags JSON,status VARCHAR(50) DEFAULT 'ny',source VARCHAR(100),last_contacted_at DATETIME,notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");

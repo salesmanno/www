@@ -20,6 +20,9 @@ final class ProspectCompanyConversion {
             throw new DomainException('Bedriften må være lagret med status «interessert» før opprettelse eller import.');
         }
         BrregRoleClient::orgNumber($item['org_nr']);
+        if (trim((string)($item['company_name'] ?? ''))==='') {
+            throw new DomainException('Oppgi bedriftsnavn før denne henvendelsen kan opprettes som bedrift.');
+        }
         if ($version===null || !hash_equals($item['version'],$version)) throw new ProspectConflictException(
             'Interessenten er endret. Last den inn på nytt og hent en ny forhåndsvisning.');
         return $item;

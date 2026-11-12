@@ -50,13 +50,13 @@ session_write_close();
             <div>
                 <div class="workspace-eyebrow">Salg / arbeidsflate</div>
                 <h2>Prospekter</h2>
-                <p>Et samlet arbeidsbord for å kvalifisere norske virksomheter og følge opp neste samtale.</p>
+                <p>Et samlet arbeidsbord for nye henvendelser og oppfølging av interessenter.</p>
             </div>
         </header>
 
         <div class="prospects-context">
             <i class="bi bi-compass" aria-hidden="true"></i>
-            <span><strong>Arbeidsliste for salg.</strong> Prospektopplysninger holdes adskilt fra live bedriftsadministrasjon.</span>
+                    <span><strong>Arbeidsliste for salg.</strong> Nettsidehenvendelser lagres her, adskilt fra live bedriftsadministrasjon.</span>
         </div>
 
         <section class="prospects-toolbar" aria-label="Søk og filtrer prospekter">
@@ -114,7 +114,7 @@ session_write_close();
                 <div class="prospects-editor-empty" id="editorEmpty">
                     <i class="bi bi-card-list" aria-hidden="true"></i>
                     <strong>Velg et prospekt</strong>
-                    <span>Åpne en bedrift i listen, eller opprett et nytt prospekt.</span>
+                    <span>Åpne en henvendelse i listen, eller opprett et nytt prospekt.</span>
                 </div>
                 <div id="editorContent" hidden>
                     <div class="prospects-editor-head">

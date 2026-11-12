@@ -198,8 +198,9 @@
         state.dirty = false;
         el('editorEmpty').hidden = true;
         el('editorContent').hidden = false;
-        el('prospectEditorTitle').textContent = newRecord ? 'Nytt prospekt' : text(source.company_name) || 'Prospekt';
-        el('prospectEditorDescription').textContent = newRecord ? 'Registrer en norsk virksomhet for oppfølging.' : `Organisasjonsnummer ${text(source.org_nr) || 'ikke oppgitt'}`;
+        el('prospectEditorTitle').textContent = newRecord ? 'Nytt prospekt' : text(source.company_name) || text(source.contact_person) || text(source.contact_email) || 'Henvendelse';
+        el('prospectEditorDescription').textContent = newRecord ? 'Registrer en norsk virksomhet for oppfølging.' :
+            `${text(source.source).toLowerCase()==='nettside' ? 'Henvendelse fra nettsiden · ' : ''}Organisasjonsnummer ${text(source.org_nr) || 'ikke oppgitt'}`;
         el('saveProspect').disabled = true;
         setStatusText(newRecord ? 'Ny registrering' : 'Alle endringer lagret');
         renderList();
@@ -216,6 +217,7 @@
         const container = el('prospectContactLinks');
         container.replaceChildren();
         const links = [
+            { value: item.logo_url, allowed: ['http:', 'https:'], prefix: '', label: 'Logo-URL' },
             { value: item.website, allowed: ['http:', 'https:'], prefix: '', label: 'Nettsted' },
             { value: item.contact_email, allowed: ['mailto:'], prefix: 'mailto:', label: 'E-post' },
             { value: item.contact_phone, allowed: ['tel:'], prefix: 'tel:', label: 'Telefon' }
@@ -287,8 +289,8 @@
             button.addEventListener('click', () => openItem(text(item.id)));
             const top = make('div', 'prospect-row-top');
             const identity = make('div');
-            identity.append(make('span', 'prospect-row-name', text(item.company_name) || 'Uten navn'));
-            identity.append(make('span', 'prospect-row-org', text(item.org_nr)));
+            identity.append(make('span', 'prospect-row-name', text(item.company_name) || text(item.contact_person) || text(item.contact_email) || 'Uten navn'));
+            if (item.org_nr) identity.append(make('span', 'prospect-row-org', text(item.org_nr)));
             top.append(identity);
             const status = make('span', 'prospect-status', text(item.status) || 'Uten status');
             status.dataset.status = text(item.status).toLowerCase();

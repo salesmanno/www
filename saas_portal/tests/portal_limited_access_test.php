@@ -11,13 +11,13 @@ try {
     $db=new PDO('sqlite:'.$root.'/fixture.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
     $db->exec("CREATE TABLE saas_staff(id TEXT PRIMARY KEY,first_name TEXT,last_name TEXT);
         CREATE TABLE saas_admins(id TEXT PRIMARY KEY,email TEXT UNIQUE,password_hash TEXT,role TEXT,is_active INTEGER,view_only INTEGER,saas_staff_id TEXT,last_login TEXT);
-        CREATE TABLE saas_companies_contact(id TEXT PRIMARY KEY,org_nr TEXT UNIQUE,company_name TEXT,website TEXT,contact_person TEXT,contact_email TEXT,contact_phone TEXT,
+        CREATE TABLE saas_companies_contact(id TEXT PRIMARY KEY,org_nr TEXT UNIQUE,company_name TEXT,website TEXT,logo_url TEXT,contact_person TEXT,contact_first_name TEXT,contact_last_name TEXT,contact_email TEXT,contact_phone TEXT,
             interest_score INTEGER,interest_tags TEXT,status TEXT,source TEXT,last_contacted_at TEXT,notes TEXT,created_at TEXT,updated_at TEXT)");
     $hash=password_hash('fixture-only-password',PASSWORD_DEFAULT);
     $stmt=$db->prepare('INSERT INTO saas_admins VALUES (?,?,?,?,?,?,NULL,NULL)');
     $stmt->execute(['limited','limited@example.invalid',$hash,'admin',1,1]);$stmt->execute(['full','full@example.invalid',$hash,'admin',1,0]);
     $id='11111111-1111-4111-8111-111111111111';
-    $db->prepare('INSERT INTO saas_companies_contact VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
+    $db->prepare('INSERT INTO saas_companies_contact (id,org_nr,company_name,website,contact_person,contact_email,contact_phone,interest_score,interest_tags,status,source,last_contacted_at,notes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
         $id,'123456789','Skrivebeskyttet firma','https://example.invalid','Kontaktperson','contact@example.invalid','12345678',
         45,'{"large":9223372036854775808}','Eldre status','Imported','invalid-legacy-date','Original','2026-01-01','2026-01-01']);
     $config="<?php function getDBConnection(){static \$db;if(is_file(__DIR__.'/outage'))throw new RuntimeException('Fixture outage');if(!\$db){\$db=new PDO('sqlite:".$root."/fixture.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);\$db->sqliteCreateFunction('NOW',fn()=>gmdate('Y-m-d H:i:s'));}return \$db;} function dbBool(\$v){return \$v?'1':'0';}";
@@ -40,6 +40,7 @@ try {
     };
     $get=static fn()=>$request('/saas_portal/api/prospects.php?id='.$id)[1]['item'];
     accessCheck($request('/saas_portal/api/prospects.php','GET',null,'')[0]===403,'Anonymous denied');
+    accessCheck($request('/saas_portal/api/contact_request.php','POST',[])[0]===422,'Public contact endpoint is available without a portal login');
     $first=$get();accessCheck($first['company_name']==='Skrivebeskyttet firma','Limited user can read prospects');
     $original=$db->query('SELECT * FROM saas_companies_contact')->fetch();
     $save=['action'=>'save','csrf_token'=>'csrf','id'=>$id,'version'=>$first['version'],'notes'=>'Endret notat','status'=>'ikke_interessert'];
@@ -60,7 +61,7 @@ try {
     unset($save['id']);accessCheck($request('/saas_portal/api/prospects.php','POST',$save)[0]===422,'No prospect creation');
     $checked=0;
     foreach (glob(__DIR__.'/../api/*.php') as $file) {
-        if (basename($file)==='prospects.php') continue;
+        if (in_array(basename($file),['prospects.php','contact_request.php'],true)) continue;
         $path='/saas_portal/api/'.basename($file);
         foreach (['GET','POST'] as $method) {
             $reply=$request($path,$method,['csrf_token'=>'csrf','action'=>'noop']);

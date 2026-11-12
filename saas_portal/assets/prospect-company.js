@@ -48,14 +48,18 @@
 
     function canConvert(detail) {
         return !!detail && detail.saved && !detail.dirty && !detail.saving &&
-            String(detail.status || '').trim().toLowerCase() === 'interessert';
+            String(detail.status || '').trim().toLowerCase() === 'interessert' &&
+            /^\d{9}$/.test(String(detail.item?.org_nr || '')) &&
+            String(detail.item?.company_name || '').trim() !== '';
     }
 
     function updateButton(detail) {
         elements.button.disabled = state.submitting || !canConvert(detail);
         elements.button.setAttribute('aria-disabled', elements.button.disabled ? 'true' : 'false');
         elements.button.title = elements.button.disabled
-            ? 'Krever lagret prospekt, status «interessert» og ingen ulagrede endringer.'
+            ? !/^\d{9}$/.test(String(detail?.item?.org_nr || ''))
+                ? 'Opprettelse krever et lagret organisasjonsnummer og bedriftsnavn.'
+                : 'Krever lagret prospekt, status «interessert» og ingen ulagrede endringer.'
             : 'Opprett bedrift fra lagret prospekt.';
     }
 

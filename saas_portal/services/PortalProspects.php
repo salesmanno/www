@@ -13,6 +13,10 @@ final class PortalProspects {
         'interest_score','interest_tags','status','source','last_contacted_at','notes'];
     public function __construct(private PDO $db) {}
 
+    public function count(): int {
+        return (int)$this->db->query('SELECT COUNT(*) FROM saas_companies_contact')->fetchColumn();
+    }
+
     private static function present(array $row): array {
         $row['version'] = hash('sha256', json_encode($row, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         return $row;
@@ -33,8 +37,10 @@ final class PortalProspects {
         $where = []; $params = [];
         if ($q !== '') {
             $pattern = '%'.strtr($q, ['='=>'==','%'=>'=%','_'=>'=_']).'%';
-            $where[] = "(company_name LIKE ? ESCAPE '=' OR org_nr LIKE ? ESCAPE '=' OR contact_person LIKE ? ESCAPE '=' OR contact_email LIKE ? ESCAPE '=')";
-            array_push($params, $pattern, $pattern, $pattern, $pattern);
+            // Search only established columns so the portal remains usable
+            // during the short period before the optional lead columns are installed.
+            $where[] = "(company_name LIKE ? ESCAPE '=' OR org_nr LIKE ? ESCAPE '=' OR contact_person LIKE ? ESCAPE '=' OR contact_email LIKE ? ESCAPE '=' OR contact_phone LIKE ? ESCAPE '=')";
+            array_push($params, $pattern, $pattern, $pattern, $pattern, $pattern);
         }
         if ($status !== '') { $where[] = 'status = ?'; $params[] = $status; }
         $clause = $where ? ' WHERE '.implode(' AND ', $where) : '';
@@ -142,6 +148,66 @@ final class PortalProspects {
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             if ($e instanceof PDOException && (($e->errorInfo[1] ?? 0)===1062 || str_contains($e->getMessage(),'UNIQUE constraint failed: saas_companies_contact.org_nr'))) {
+                throw new ProspectValidationException(['org_nr'=>'En interessent med dette organisasjonsnummeret finnes allerede.']);
+            }
+            throw $e;
+        }
+    }
+
+    /** Public website requests enter the existing SaaS prospect register only. */
+    public function createWebsiteLead(array $input): array {
+        $errors = [];
+        $readText = static function(string $key, int $max, bool $required, array &$errors) use ($input): ?string {
+            $value = $input[$key] ?? '';
+            if (!is_string($value)) {
+                $errors[$key] = 'Oppgi tekst.';
+                return null;
+            }
+            $value = trim($value);
+            if ($required && $value === '') $errors[$key] = 'Dette feltet må fylles ut.';
+            if (mb_strlen($value) > $max || str_contains($value, "\0") ||
+                preg_match('/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value)) {
+                $errors[$key] = 'Kontroller feltet.';
+            }
+            return $value === '' ? null : $value;
+        };
+
+        $firstName = $readText('first_name', 100, true, $errors);
+        $lastName = $readText('last_name', 100, true, $errors);
+        $email = $readText('contact_email', 254, true, $errors);
+        $phone = $readText('contact_phone', 50, true, $errors);
+        $logoUrl = $readText('logo_url', 2048, false, $errors);
+        $orgNumber = $readText('org_nr', 9, false, $errors);
+
+        if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors['contact_email'] = 'Oppgi en gyldig e-postadresse.';
+        }
+        if ($phone !== null && (!preg_match('/^[0-9+().\-\s]{5,50}$/D', $phone) || preg_match_all('/[0-9]/', $phone) < 5)) {
+            $errors['contact_phone'] = 'Oppgi et gyldig telefonnummer.';
+        }
+        if ($logoUrl !== null && (!filter_var($logoUrl, FILTER_VALIDATE_URL) ||
+            !in_array(strtolower((string)parse_url($logoUrl, PHP_URL_SCHEME)), ['http','https'], true))) {
+            $errors['logo_url'] = 'Logo-URL må begynne med http:// eller https://.';
+        }
+        if ($orgNumber !== null) {
+            $orgNumber = preg_replace('/\s+/', '', $orgNumber);
+            if (!preg_match('/^\d{9}$/D', $orgNumber)) $errors['org_nr'] = 'Organisasjonsnummer må være ni siffer.';
+        }
+        if ($errors) throw new ProspectValidationException($errors);
+
+        $hex = bin2hex(random_bytes(16));
+        $id = substr($hex,0,8).'-'.substr($hex,8,4).'-4'.substr($hex,13,3).'-'.dechex((hexdec($hex[16])&3)|8).substr($hex,17,3).'-'.substr($hex,20);
+        $contactPerson = trim($firstName.' '.$lastName);
+        $sql = 'INSERT INTO saas_companies_contact
+            (id,org_nr,company_name,contact_person,contact_first_name,contact_last_name,contact_email,contact_phone,logo_url,status,source)
+            VALUES (?,?,NULL,?,?,?,?,?,?,?,?)';
+        try {
+            $this->db->prepare($sql)->execute([
+                $id,$orgNumber,$contactPerson,$firstName,$lastName,$email,$phone,$logoUrl,'ny','nettside'
+            ]);
+            return $this->get($id);
+        } catch (PDOException $e) {
+            if (($e->errorInfo[1] ?? 0) === 1062 || str_contains($e->getMessage(), 'UNIQUE constraint failed: saas_companies_contact.org_nr')) {
                 throw new ProspectValidationException(['org_nr'=>'En interessent med dette organisasjonsnummeret finnes allerede.']);
             }
             throw $e;

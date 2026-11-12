@@ -7,7 +7,16 @@ if (!isset($_SESSION['saas_admin_id'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__.'/../services/PortalProspects.php';
 require_once __DIR__.'/../auth/require_active.php';
+$prospect_count = null;
+try {
+    if (isset($portalIdentityDb) && $portalIdentityDb instanceof PDO) {
+        $prospect_count = (new PortalProspects($portalIdentityDb))->count();
+    }
+} catch (Throwable $e) {
+    // Keep dashboard access available if the prospect table is not installed.
+}
 if (empty($_SESSION['portal_csrf'])) {
     $_SESSION['portal_csrf'] = bin2hex(random_bytes(32));
 }
@@ -287,7 +296,7 @@ session_write_close();
                 <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i> Opprett ny bedrift</button>
                 <button type="button" class="btn btn-outline-primary" id="grantModeButton">Tildel moduler</button>
                 <a href="/saas_portal/pages/email_templates.php" class="btn btn-outline-secondary"><i class="bi bi-envelope-paper me-1" aria-hidden="true"></i>E-postmaler</a>
-                <a href="/saas_portal/pages/prospects.php" class="btn btn-outline-secondary"><i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>Interessenter</a>
+                <a href="/saas_portal/pages/prospects.php" class="btn btn-outline-secondary" aria-label="Interessenter<?= $prospect_count ? ' ('.$prospect_count.' registreringer)' : '' ?>"><i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>Interessenter<?php if ($prospect_count !== null && $prospect_count > 0): ?> <span class="badge rounded-pill text-bg-danger ms-1" title="<?= $prospect_count ?> registreringer"><?= $prospect_count ?></span><?php endif; ?></a>
                 <button type="button" class="btn btn-outline-secondary" id="moduleTransitionPreviewButton">Kontroller eldre tilganger</button>
                 <button type="button" class="btn btn-primary-custom" id="grantConfirmButton" hidden disabled>Velg moduler (0)</button>
             </div>
