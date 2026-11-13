@@ -38,9 +38,23 @@ if [[ "$remote" != "$EXPECTED_REMOTE" ]]; then
 fi
 
 export GIT_TERMINAL_PROMPT=0 GH_PROMPT_DISABLED=1
+# Agent's managed GitHub proxy is not available in ordinary workflow processes.
+# Use one explicit credential for both Git and the GitHub Actions API.
+export GH_TOKEN="${GH_TOKEN:-${MY_PERSONAL_KEY:-}}"
+if [[ -z "$GH_TOKEN" ]]; then
+  echo "Publish stopped: set MY_PERSONAL_KEY in Replit Secrets to a valid GitHub token with repository write and workflow access. Never paste it in chat. Nothing was committed or uploaded." >&2
+  exit 1
+fi
+
+github_push() {
+  git -c credential.helper= \
+    -c 'credential.helper=!f() { if [ "$1" = get ]; then printf "%s\n" "username=x-access-token" "password=$GH_TOKEN"; fi; }; f' \
+    push "$@"
+}
+
 echo "Checking GitHub workflow access..."
 if ! workflow_state="$(gh api "repos/$REPOSITORY/actions/workflows/$WORKFLOW" --jq '.state')"; then
-  echo "Publish stopped: cannot access the GitHub workflow. Check the connected GitHub account's repository and Actions access. Nothing was committed or uploaded." >&2
+  echo "Publish stopped: GitHub rejected access to the workflow. Replace MY_PERSONAL_KEY in Replit Secrets with a valid token for salesmanno/www, including repository write and Actions access. Nothing was committed or uploaded." >&2
   exit 1
 fi
 if [[ "$workflow_state" != "active" ]]; then
@@ -48,10 +62,8 @@ if [[ "$workflow_state" != "active" ]]; then
   exit 1
 fi
 
-# Keep Replit's managed GitHub authentication. A custom credential helper
-# would override it with a possibly expired personal token.
 echo "Checking push access without changing GitHub..."
-if ! git push --dry-run origin main; then
+if ! github_push --dry-run origin main; then
   echo "Publish stopped: push preflight failed. Resolve the reported access or branch conflict first. Nothing was committed or uploaded." >&2
   exit 1
 fi
@@ -78,7 +90,7 @@ else
 fi
 
 echo "Pushing main to GitHub..."
-git push origin main
+github_push origin main
 
 echo "Starting the approved FTP publish to salesman.no..."
 if ! gh workflow run "$WORKFLOW" --repo "$REPOSITORY" --ref main \

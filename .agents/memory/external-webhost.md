@@ -45,8 +45,8 @@ Replit can rewrite GitHub transport URLs to `github.replit.internal` while the c
 
 **How to apply:** Validate the configured repository destination separately from Git's transport rewrite. Do not weaken repository checks or change the remote simply because its resolved transport uses the internal host.
 
-Use Replit's managed GitHub authentication for Git and `gh`, rather than overriding it with a personal-token credential helper.
+Agent-shell GitHub authentication does not verify authentication in an ordinary publishing workflow.
 
-**Why:** The custom helper supplied a rejected personal token while the managed Git push dry run and GitHub workflow read both succeeded.
+**Why:** Agent-shell Git push dry run and GitHub workflow reads succeeded, but the ordinary workflow subsequently failed because `gh` was not authenticated. The separately configured personal token had also been rejected.
 
-**How to apply:** Keep authentication preflight read-only, and distinguish a successful dispatch request from a completed FTP deployment. Do not run the live publishing workflow merely to test a script change.
+**How to apply:** Use explicit Secrets-backed authentication for ordinary workflow Git and API calls, and verify it in that execution context. Keep authentication preflight read-only. Distinguish a successful dispatch request from a completed FTP deployment; do not run live publishing merely to test a script change.
