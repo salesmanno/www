@@ -44,3 +44,9 @@ Replit can rewrite GitHub transport URLs to `github.replit.internal` while the c
 **Why:** Comparing the resolved transport URL to the public repository URL incorrectly blocked publishing to the correct repository.
 
 **How to apply:** Validate the configured repository destination separately from Git's transport rewrite. Do not weaken repository checks or change the remote simply because its resolved transport uses the internal host.
+
+Use Replit's managed GitHub authentication for Git and `gh`, rather than overriding it with a personal-token credential helper.
+
+**Why:** The custom helper supplied a rejected personal token while the managed Git push dry run and GitHub workflow read both succeeded.
+
+**How to apply:** Keep authentication preflight read-only, and distinguish a successful dispatch request from a completed FTP deployment. Do not run the live publishing workflow merely to test a script change.

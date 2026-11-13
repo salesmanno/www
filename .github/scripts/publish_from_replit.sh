@@ -2,9 +2,26 @@
 set -euo pipefail
 
 readonly EXPECTED_REMOTE="https://github.com/salesmanno/www.git"
-readonly DISPATCH_URL="https://api.github.com/repos/salesmanno/www/actions/workflows/Ftp_deployment.yaml/dispatches"
+readonly REPOSITORY="salesmanno/www"
+readonly WORKFLOW="Ftp_deployment.yaml"
 
-: "${MY_PERSONAL_KEY:?MY_PERSONAL_KEY is not configured in Replit Secrets}"
+check_only=false
+case "${1:-}" in
+  "") ;;
+  --check) check_only=true ;;
+  *) echo "Usage: bash .github/scripts/publish_from_replit.sh [--check]" >&2; exit 2 ;;
+esac
+if [[ "$#" -gt 1 ]]; then
+  echo "Usage: bash .github/scripts/publish_from_replit.sh [--check]" >&2
+  exit 2
+fi
+
+for executable in git gh; do
+  if ! command -v "$executable" >/dev/null; then
+    echo "Publish stopped: required command '$executable' is unavailable." >&2
+    exit 1
+  fi
+done
 
 branch="$(git branch --show-current)"
 if [[ "$branch" != "main" ]]; then
@@ -18,6 +35,29 @@ remote="$(git config --get remote.origin.url)"
 if [[ "$remote" != "$EXPECTED_REMOTE" ]]; then
   echo "Publish stopped: origin is not the expected www repository. No files were pushed." >&2
   exit 1
+fi
+
+export GIT_TERMINAL_PROMPT=0 GH_PROMPT_DISABLED=1
+echo "Checking GitHub workflow access..."
+if ! workflow_state="$(gh api "repos/$REPOSITORY/actions/workflows/$WORKFLOW" --jq '.state')"; then
+  echo "Publish stopped: cannot access the GitHub workflow. Check the connected GitHub account's repository and Actions access. Nothing was committed or uploaded." >&2
+  exit 1
+fi
+if [[ "$workflow_state" != "active" ]]; then
+  echo "Publish stopped: the GitHub FTP workflow is not active. Nothing was committed or uploaded." >&2
+  exit 1
+fi
+
+# Keep Replit's managed GitHub authentication. A custom credential helper
+# would override it with a possibly expired personal token.
+echo "Checking push access without changing GitHub..."
+if ! git push --dry-run origin main; then
+  echo "Publish stopped: push preflight failed. Resolve the reported access or branch conflict first. Nothing was committed or uploaded." >&2
+  exit 1
+fi
+if [[ "$check_only" == true ]]; then
+  echo "Checks passed. No commit, push, workflow dispatch or FTP upload was performed."
+  exit 0
 fi
 
 git add --all
@@ -37,21 +77,13 @@ else
   echo "No uncommitted changes; publishing the latest main commit."
 fi
 
-export GIT_TERMINAL_PROMPT=0
 echo "Pushing main to GitHub..."
-git -c credential.helper= \
-    -c 'credential.helper=!f() { if [ "$1" = get ]; then printf "%s\n" "username=x-access-token" "password=$MY_PERSONAL_KEY"; fi; }; f' \
-    push origin main
+git push origin main
 
 echo "Starting the approved FTP publish to salesman.no..."
-if ! curl --silent --show-error --fail \
-    --request POST "$DISPATCH_URL" \
-    --header "Accept: application/vnd.github+json" \
-    --header "Authorization: Bearer $MY_PERSONAL_KEY" \
-    --header "X-GitHub-Api-Version: 2022-11-28" \
-    --header "Content-Type: application/json" \
-    --data '{"ref":"main","inputs":{"publish":"true","inspect_target":"false"}}'; then
-  echo "GitHub received the code push, but did not start the FTP publish. Check the token's repository Actions permissions, then run the publish action from GitHub." >&2
+if ! gh workflow run "$WORKFLOW" --repo "$REPOSITORY" --ref main \
+    -f publish=true -f inspect_target=false; then
+  echo "GitHub received the code push, but did not start the FTP publish. Check Actions permissions for the connected GitHub account, then run the publish action from GitHub." >&2
   exit 1
 fi
 
