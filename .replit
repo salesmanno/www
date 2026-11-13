@@ -16,6 +16,10 @@ author = "agent"
 task = "workflow.run"
 args = "PHP Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Publish to salesman.no"
+
 
 
 [[workflows.workflow]]
@@ -34,12 +38,12 @@ outputType = "webview"
 name = "Publish to salesman.no"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash .github/scripts/publish_from_replit.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 5000
