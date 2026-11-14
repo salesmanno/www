@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="saas-apache-routing-") as temp:
         port = reservation.getsockname()[1]
     loads = "\n".join(
         f'LoadModule {name}_module "{modules}/mod_{name}.so"'
-        for name in ["mpm_event", "unixd", "authz_core", "dir", "autoindex", "rewrite"]
+        for name in ["mpm_event", "unixd", "authz_core", "dir", "autoindex", "rewrite", "headers"]
     )
     config = base / "httpd.conf"
     config.write_text(f"""
@@ -100,7 +100,7 @@ ErrorLog "{base}/errors.log"
 
         assert request("/assets/missing.png")[0] == 500
         print("PASS original missing-asset rewrite reproduces HTTP 500.")
-        for name in [".htaccess", "public/.htaccess", "config/.htaccess", "docs/.htaccess"]:
+        for name in [".htaccess", "public/.htaccess", "config/.htaccess", "docs/.htaccess", "saas_portal/.htaccess"]:
             shutil.copyfile(project / name, web / name)
         for path, expected in [
             ("/", 200), ("/saas_portal/", 200),
@@ -115,6 +115,16 @@ ErrorLog "{base}/errors.log"
         code, location = request("/saas-portal/")
         assert code == 302 and location.endswith("/saas_portal/login.php")
         print("PASS Apache alias, directories, company pages, assets, 404s and private-file protection.")
+        for path in ["/saas_portal/", "/saas_portal/login.php", "/saas_portal/missing.php"]:
+            try:
+                response = opener.open(f"http://127.0.0.1:{port}{path}", timeout=5)
+            except urllib.error.HTTPError as error:
+                response = error
+            with response:
+                assert response.headers.get("X-Robots-Tag") == "noindex, nofollow, nosnippet", path
+        with opener.open(f"http://127.0.0.1:{port}/", timeout=5) as response:
+            assert response.headers.get("X-Robots-Tag") is None
+        print("PASS portal search exclusion covers success and error responses without excluding the homepage.")
     finally:
         process.terminate()
         process.wait(timeout=10)

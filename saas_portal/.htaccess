@@ -1,0 +1,5 @@
+# Keep all portal responses (including redirects and non-HTML files) out of search.
+# Crawlers must be able to read this header; do not block the portal in robots.txt.
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow, nosnippet"
+</IfModule>
