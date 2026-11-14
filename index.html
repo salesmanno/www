@@ -405,6 +405,91 @@
             font-size: .83rem;
             text-align: center;
         }
+        .pricing-section { background: #eef3f0; }
+        .package-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: stretch;
+            gap: 17px;
+        }
+        .package-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 300px;
+            padding: 27px;
+            border: 1px solid rgba(17, 38, 59, .1);
+            border-radius: var(--radius);
+            background: rgba(255,255,255,.82);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        .package-card:hover {
+            transform: translateY(-4px);
+            border-color: #c8d5f5;
+            box-shadow: 0 17px 35px rgba(17, 38, 59, .08);
+        }
+        .package-card.featured {
+            border-color: #b8c9ff;
+            background: white;
+            box-shadow: 0 12px 32px rgba(17, 38, 59, .07);
+        }
+        .package-label {
+            margin-bottom: 14px;
+            color: var(--blue-dark);
+            font-size: .74rem;
+            font-weight: 760;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+        }
+        .package-card h3 { margin: 0 0 6px; font-size: 1.2rem; letter-spacing: -.035em; }
+        .package-price { margin: 15px 0 12px; font-size: clamp(2rem, 3vw, 2.55rem); font-weight: 740; letter-spacing: -.065em; line-height: 1; }
+        .package-price span { color: var(--muted); font-size: .88rem; font-weight: 550; letter-spacing: 0; }
+        .package-copy { flex: 1; margin-bottom: 23px; color: var(--ink-soft); font-size: .9rem; }
+        .package-card .button { width: 100%; min-height: 46px; padding: 10px 16px; font-size: .9rem; }
+        .package-card .button-secondary { background: #f7f8f5; }
+        .pricing-terms {
+            max-width: 900px;
+            margin: 25px auto 0;
+            padding: 17px 20px;
+            border: 1px solid rgba(17, 38, 59, .09);
+            border-radius: 15px;
+            color: var(--ink-soft);
+            background: rgba(255,255,255,.58);
+            font-size: .85rem;
+        }
+        .pricing-terms p { margin: 0; }
+        .pricing-terms p + p { margin-top: 8px; }
+        .why-section { background: var(--paper); }
+        .why-grid {
+            display: grid;
+            grid-template-columns: 1.05fr .95fr;
+            gap: clamp(35px, 7vw, 86px);
+            align-items: start;
+        }
+        .why-copy h2 { max-width: 560px; }
+        .why-copy > p:last-child { max-width: 530px; margin: 0; color: var(--ink-soft); }
+        .why-points { display: grid; gap: 12px; }
+        .why-point {
+            display: grid;
+            grid-template-columns: 38px 1fr;
+            gap: 13px;
+            padding: 17px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: white;
+        }
+        .why-point-mark {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: 11px;
+            color: var(--blue-dark);
+            background: #edf2ff;
+            font-size: .82rem;
+            font-weight: 800;
+        }
+        .why-point h3 { margin: 0 0 3px; font-size: .95rem; }
+        .why-point p { margin: 0; color: var(--muted); font-size: .84rem; }
         .future-note {
             display: flex;
             align-items: flex-start;
@@ -541,15 +626,17 @@
         @media (max-width: 900px) {
             .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr); gap: 30px; }
             .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .package-card:last-child { grid-column: 1 / -1; }
             .how-grid { grid-template-columns: 1fr 1.1fr; gap: 35px; }
         }
         @media (max-width: 680px) {
             .container { width: min(100% - 36px, 520px); }
-            .header-inner { min-height: 76px; }
+            .header-inner { min-height: 76px; flex-direction: column; gap: 0; padding: 4px 0 12px; }
             .brand-logo { width: 138px; height: 70px; }
-            .nav { gap: 14px; }
-            .nav a:not(.nav-cta) { display: none; }
-            .nav .nav-cta { padding: 9px 14px; font-size: .85rem; }
+            .nav { width: 100%; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+            .nav a { font-size: .78rem; }
+            .nav .nav-cta { padding: 8px 11px; font-size: .78rem; }
             .hero { padding: 57px 0 52px; }
             .hero-grid { grid-template-columns: 1fr; gap: 38px; }
             h1 { max-width: 540px; font-size: clamp(2.8rem, 13vw, 4rem); }
@@ -566,6 +653,11 @@
             .module-grid { grid-template-columns: 1fr; gap: 13px; }
             .module-card { min-height: 0; padding: 22px; }
             .module-description { margin-bottom: 20px; }
+            .package-grid { grid-template-columns: 1fr; gap: 12px; }
+            .package-card:last-child { grid-column: auto; }
+            .package-card { min-height: 0; padding: 22px; }
+            .why-grid { grid-template-columns: 1fr; gap: 27px; }
+            .pricing-terms { padding: 15px; }
             .future-note { padding: 16px; }
             .how-grid { grid-template-columns: 1fr; gap: 29px; }
             .contact-panel { grid-template-columns: 1fr; gap: 26px; border-radius: 23px; }
@@ -576,6 +668,8 @@
         }
         @media (max-width: 390px) {
             .container { width: calc(100% - 28px); }
+            .nav { justify-content: flex-start; column-gap: 13px; row-gap: 7px; }
+            .nav .nav-cta { margin-left: auto; }
             .hero-actions { align-items: stretch; flex-direction: column; }
             .hero-actions .button { width: 100%; }
             .product-card { padding: 18px; }
@@ -600,6 +694,8 @@
             </a>
             <nav class="nav" aria-label="Hovedmeny">
                 <a href="#moduler">Moduler</a>
+                <a href="#priser">Priser</a>
+                <a href="#hvorfor-oss">Hvorfor velge oss</a>
                 <a href="#slik-fungerer-det">Slik fungerer det</a>
                 <a class="nav-cta" href="#kontakt">Snakk med oss <span aria-hidden="true">↗</span></a>
             </nav>
@@ -660,7 +756,7 @@
         <div class="proof-strip" aria-label="Plattformens fordeler">
             <div class="container proof-inner">
                 <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Velg modulene dere trenger</span>
-                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Oppstart og månedspris vises separat</span>
+                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Samlet månedspris med tydelige pakker</span>
                 <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Bygg ut i eget tempo</span>
             </div>
         </div>
@@ -668,9 +764,9 @@
         <section class="section" id="moduler">
             <div class="container">
                 <div class="section-heading">
-                    <p class="eyebrow">Dagens tilbud</p>
+                    <p class="eyebrow">Moduler</p>
                     <h2>Velg verktøyene som passer dere.</h2>
-                    <p>Start med én modul eller kombiner flere. Prisene under er et veiledende overslag i norske kroner.</p>
+                    <p>Samle arbeidsflyten i én plattform. Se hvilke moduler som er tilgjengelige i dag, og hva som fortsatt er under utvikling.</p>
                 </div>
 
                 <div class="module-grid">
@@ -681,10 +777,6 @@
                         </div>
                         <h3>Events</h3>
                         <p class="module-description">Opprett og publiser arrangementer, sett priser, ta imot reservasjoner og sjekk inn deltakere.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>kr 5 000</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>kr 350</strong></div>
-                        </div>
                     </article>
 
                     <article class="module-card">
@@ -694,10 +786,6 @@
                         </div>
                         <h3>Rental</h3>
                         <p class="module-description">Administrer utleieobjekter, priser, forespørsler og kalender. Få oversikt over kommende leie og kontaktinformasjon.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>kr 7 500</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>kr 300</strong></div>
-                        </div>
                     </article>
 
                     <article class="module-card">
@@ -707,10 +795,6 @@
                         </div>
                         <h3>Memberships</h3>
                         <p class="module-description">Opprett medlemskapsplaner og hold orden på medlemmer, varighet, pris og medlemsstatus.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>kr 3 500</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>kr 300</strong></div>
-                        </div>
                     </article>
 
                     <article class="module-card">
@@ -720,10 +804,6 @@
                         </div>
                         <h3>Economy</h3>
                         <p class="module-description">Sett opp betalingsmetoder som Vipps og Stripe, og samle inntekts- og utgiftsoversikt fra utvalgte moduler. Fakturering er under utvikling.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>kr 1 500</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>kr 100</strong></div>
-                        </div>
                     </article>
 
                     <article class="module-card">
@@ -733,10 +813,6 @@
                         </div>
                         <h3>Email</h3>
                         <p class="module-description">Få en egen e-postadresse på salesman.no og send varsler knyttet til reservasjoner, kjøp og medlemskap.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>kr 10 000</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>kr 400</strong></div>
-                        </div>
                     </article>
 
                     <article class="module-card">
@@ -746,17 +822,73 @@
                         </div>
                         <h3>News</h3>
                         <p class="module-description">Administrer nyheter på hjemmesiden, bestem rekkefølgen og vis aktuelt innhold for besøkende.</p>
-                        <div class="module-price">
-                            <div class="price-part"><span>Etablering</span><strong>Gratis</strong></div>
-                            <div class="price-part monthly"><span>Per måned</span><strong>Gratis</strong></div>
-                        </div>
                     </article>
                 </div>
 
-                <p class="pricing-note">Etablering og månedspris beregnes per valgt modul. Endelig tilbud avhenger av oppsettet dere trenger.</p>
                 <div class="future-note">
                     <span class="future-mark" aria-hidden="true">↗</span>
-                    <p><strong>Flere muligheter kommer.</strong> Sales, Services og andre moduler er under vurdering og er ikke del av dagens tilbud.</p>
+                    <p><strong>På vei og under vurdering.</strong> Economy er under videreutvikling. Sales, Services og andre moduler er under vurdering og er ikke tilgjengelige i dag.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section pricing-section" id="priser">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="eyebrow">En tydelig månedspris</p>
+                    <h2>Velg pakken som passer omfanget deres.</h2>
+                    <p>Start med noen få moduler, eller samle alle dagens tilgjengelige moduler i én pakke.</p>
+                </div>
+                <div class="package-grid">
+                    <article class="package-card">
+                        <p class="package-label">Kompakt</p>
+                        <h3>3 moduler</h3>
+                        <p class="package-price">400 kr <span>/ mnd</span></p>
+                        <p class="package-copy">Velg tre av modulene som er tilgjengelige i dag. Et godt utgangspunkt for å samle de viktigste oppgavene.</p>
+                        <a class="button button-secondary" href="#kontakt">Spør om 3 moduler <span class="arrow" aria-hidden="true">→</span></a>
+                    </article>
+                    <article class="package-card featured">
+                        <p class="package-label">Mer samlet</p>
+                        <h3>4 moduler</h3>
+                        <p class="package-price">500 kr <span>/ mnd</span></p>
+                        <p class="package-copy">Kombiner fire tilgjengelige moduler og få flere deler av driften inn i samme arbeidsflate.</p>
+                        <a class="button" href="#kontakt">Spør om 4 moduler <span class="arrow" aria-hidden="true">→</span></a>
+                    </article>
+                    <article class="package-card">
+                        <p class="package-label">Alt tilgjengelig</p>
+                        <h3>Full moduldekning</h3>
+                        <p class="package-price">549 kr <span>/ mnd</span></p>
+                        <p class="package-copy">Tilgang til alle modulene som er tilgjengelige i dagens løsning. Economy er fortsatt under utvikling.</p>
+                        <a class="button button-secondary" href="#kontakt">Spør om full dekning <span class="arrow" aria-hidden="true">→</span></a>
+                    </article>
+                </div>
+                <div class="pricing-terms">
+                    <p>Flere konkurrerende løsninger tar transaksjonsgebyrer i tillegg til abonnementsprisen. Sammenlign totalkostnaden, ikke bare månedsprisen.</p>
+                    <p>Betalingsleverandører som Vipps og Stripe kan ha egne gebyrer. Eventuelle gebyrer fastsettes av leverandøren og kommer i tillegg til Salesman-abonnementet.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section why-section" id="hvorfor-oss">
+            <div class="container why-grid">
+                <div class="why-copy">
+                    <p class="eyebrow">Hvorfor velge oss</p>
+                    <h2>Driften henger bedre sammen når verktøyene gjør det.</h2>
+                    <p>Events, Rental og Memberships løser ulike oppgaver, men trenger ofte de samme oversiktene, kontaktflatene og rutinene. Salesman samler modulene på ett sted, så organisasjonen kan ta utgangspunkt i hvordan den faktisk jobber.</p>
+                </div>
+                <div class="why-points">
+                    <article class="why-point">
+                        <span class="why-point-mark" aria-hidden="true">01</span>
+                        <div><h3>Moduler som passer behovet</h3><p>Velg en pakke ut fra hvor mange deler av driften dere vil samle.</p></div>
+                    </article>
+                    <article class="why-point">
+                        <span class="why-point-mark" aria-hidden="true">02</span>
+                        <div><h3>Én felles oversikt</h3><p>Hold arrangementer, utleie og medlemsadministrasjon samlet i samme plattform.</p></div>
+                    </article>
+                    <article class="why-point">
+                        <span class="why-point-mark" aria-hidden="true">03</span>
+                        <div><h3>Utvikles videre</h3><p>Velg blant dagens tilgjengelige moduler, med flere muligheter under utvikling og vurdering.</p></div>
+                    </article>
                 </div>
             </div>
         </section>
@@ -775,7 +907,7 @@
                     </article>
                     <article class="step">
                         <span class="step-number">02</span>
-                        <div><h3>Velg relevante moduler</h3><p>Få et tydelig tilbud med etablering og månedspris for valgene deres.</p></div>
+                        <div><h3>Velg en pakke</h3><p>Finn ut om tre moduler, fire moduler eller full dekning passer best.</p></div>
                     </article>
                     <article class="step">
                         <span class="step-number">03</span>
@@ -791,7 +923,7 @@
                     <div>
                         <p class="eyebrow">Neste steg</p>
                         <h2>La oss finne ut hva som passer for dere.</h2>
-                        <p>Send oss kontaktinformasjonen, så følger vi opp med en uforpliktende prat om behov, moduler og oppstart.</p>
+                        <p>Send oss kontaktinformasjonen, så følger vi opp om behovene deres og hvilken pakke som passer.</p>
                         <p class="contact-form-note">Opplysningene brukes til å følge opp henvendelsen.</p>
                     </div>
                     <form id="publicContactForm" class="contact-form" action="/saas_portal/api/contact_request.php" method="post" novalidate>
