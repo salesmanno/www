@@ -3,8 +3,8 @@ name: Offentlige prispakker
 description: Brukerens føringer for pakkepriser og presentasjon på landingssiden.
 ---
 
-Behold landingssidens design, men fjern enkeltmodulpriser og etableringspriser fra den offentlige moduloversikten. Vis 3 moduler til 400 kr/mnd, 4 moduler til 500 kr/mnd og full moduldekning til 549 kr/mnd. Ha «Hvorfor velge oss» og fremhev at flere konkurrenter tar transaksjonsgebyrer.
+Behold landingssidens design, men ikke vis priser i det hele tatt på den offentlige nettsiden. «Hvorfor velge oss» skal vektlegge Salesman som norsk startup, muligheten for brukere til å forme produktet, og et sterkt fortrinn ved tidlig adopsjon.
 
-**Why:** Brukeren ba om denne offentlige prismodellen og ønsket å beholde designet.
+**Why:** Brukeren ønsket først synlige pakkepriser, men ba senere eksplisitt om å fjerne priser helt og endre produktposisjoneringen.
 
-**How to apply:** Dette gjelder markedsføringen på landingssiden. Ikke endre eksisterende bedriftsavtaler eller abonnementsdata som følge av en slik presentasjonsendring. Ikke utled et løfte om null egne transaksjonsgebyrer uten at det bekreftes.
+**How to apply:** Dette gjelder markedsføringen på landingssiden. Ikke endre eksisterende bedriftsavtaler eller abonnementsdata som følge av en slik presentasjonsendring.

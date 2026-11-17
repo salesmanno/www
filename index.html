@@ -387,77 +387,6 @@
             font-size: .91rem;
             line-height: 1.65;
         }
-        .module-price {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            padding-top: 16px;
-            border-top: 1px solid var(--line);
-        }
-        .price-part { display: grid; gap: 2px; }
-        .price-part span { color: var(--muted); font-size: .72rem; }
-        .price-part strong { font-size: .91rem; font-weight: 730; }
-        .price-part.monthly { text-align: right; }
-        .pricing-note {
-            max-width: 820px;
-            margin: 25px auto 0;
-            color: var(--muted);
-            font-size: .83rem;
-            text-align: center;
-        }
-        .pricing-section { background: #eef3f0; }
-        .package-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            align-items: stretch;
-            gap: 17px;
-        }
-        .package-card {
-            display: flex;
-            flex-direction: column;
-            min-height: 300px;
-            padding: 27px;
-            border: 1px solid rgba(17, 38, 59, .1);
-            border-radius: var(--radius);
-            background: rgba(255,255,255,.82);
-            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-        }
-        .package-card:hover {
-            transform: translateY(-4px);
-            border-color: #c8d5f5;
-            box-shadow: 0 17px 35px rgba(17, 38, 59, .08);
-        }
-        .package-card.featured {
-            border-color: #b8c9ff;
-            background: white;
-            box-shadow: 0 12px 32px rgba(17, 38, 59, .07);
-        }
-        .package-label {
-            margin-bottom: 14px;
-            color: var(--blue-dark);
-            font-size: .74rem;
-            font-weight: 760;
-            letter-spacing: .09em;
-            text-transform: uppercase;
-        }
-        .package-card h3 { margin: 0 0 6px; font-size: 1.2rem; letter-spacing: -.035em; }
-        .package-price { margin: 15px 0 12px; font-size: clamp(2rem, 3vw, 2.55rem); font-weight: 740; letter-spacing: -.065em; line-height: 1; }
-        .package-price span { color: var(--muted); font-size: .88rem; font-weight: 550; letter-spacing: 0; }
-        .package-copy { flex: 1; margin-bottom: 23px; color: var(--ink-soft); font-size: .9rem; }
-        .package-card .button { width: 100%; min-height: 46px; padding: 10px 16px; font-size: .9rem; }
-        .package-card .button-secondary { background: #f7f8f5; }
-        .pricing-terms {
-            max-width: 900px;
-            margin: 25px auto 0;
-            padding: 17px 20px;
-            border: 1px solid rgba(17, 38, 59, .09);
-            border-radius: 15px;
-            color: var(--ink-soft);
-            background: rgba(255,255,255,.58);
-            font-size: .85rem;
-        }
-        .pricing-terms p { margin: 0; }
-        .pricing-terms p + p { margin-top: 8px; }
         .why-section { background: var(--paper); }
         .why-grid {
             display: grid;
@@ -626,8 +555,6 @@
         @media (max-width: 900px) {
             .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr); gap: 30px; }
             .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .package-card:last-child { grid-column: 1 / -1; }
             .how-grid { grid-template-columns: 1fr 1.1fr; gap: 35px; }
         }
         @media (max-width: 680px) {
@@ -653,11 +580,7 @@
             .module-grid { grid-template-columns: 1fr; gap: 13px; }
             .module-card { min-height: 0; padding: 22px; }
             .module-description { margin-bottom: 20px; }
-            .package-grid { grid-template-columns: 1fr; gap: 12px; }
-            .package-card:last-child { grid-column: auto; }
-            .package-card { min-height: 0; padding: 22px; }
             .why-grid { grid-template-columns: 1fr; gap: 27px; }
-            .pricing-terms { padding: 15px; }
             .future-note { padding: 16px; }
             .how-grid { grid-template-columns: 1fr; gap: 29px; }
             .contact-panel { grid-template-columns: 1fr; gap: 26px; border-radius: 23px; }
@@ -694,7 +617,6 @@
             </a>
             <nav class="nav" aria-label="Hovedmeny">
                 <a href="#moduler">Moduler</a>
-                <a href="#priser">Priser</a>
                 <a href="#hvorfor-oss">Hvorfor velge oss</a>
                 <a href="#slik-fungerer-det">Slik fungerer det</a>
                 <a class="nav-cta" href="#kontakt">Snakk med oss <span aria-hidden="true">↗</span></a>
@@ -756,7 +678,7 @@
         <div class="proof-strip" aria-label="Plattformens fordeler">
             <div class="container proof-inner">
                 <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Velg modulene dere trenger</span>
-                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Samlet månedspris med tydelige pakker</span>
+                <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Formet for deres arbeidsflyt</span>
                 <span class="proof-item"><span class="proof-check" aria-hidden="true">✓</span> Bygg ut i eget tempo</span>
             </div>
         </div>
@@ -832,62 +754,25 @@
             </div>
         </section>
 
-        <section class="section pricing-section" id="priser">
-            <div class="container">
-                <div class="section-heading">
-                    <p class="eyebrow">En tydelig månedspris</p>
-                    <h2>Velg pakken som passer omfanget deres.</h2>
-                    <p>Start med noen få moduler, eller samle alle dagens tilgjengelige moduler i én pakke.</p>
-                </div>
-                <div class="package-grid">
-                    <article class="package-card">
-                        <p class="package-label">Kompakt</p>
-                        <h3>3 moduler</h3>
-                        <p class="package-price">400 kr <span>/ mnd</span></p>
-                        <p class="package-copy">Velg tre av modulene som er tilgjengelige i dag. Et godt utgangspunkt for å samle de viktigste oppgavene.</p>
-                        <a class="button button-secondary" href="#kontakt">Spør om 3 moduler <span class="arrow" aria-hidden="true">→</span></a>
-                    </article>
-                    <article class="package-card featured">
-                        <p class="package-label">Mer samlet</p>
-                        <h3>4 moduler</h3>
-                        <p class="package-price">500 kr <span>/ mnd</span></p>
-                        <p class="package-copy">Kombiner fire tilgjengelige moduler og få flere deler av driften inn i samme arbeidsflate.</p>
-                        <a class="button" href="#kontakt">Spør om 4 moduler <span class="arrow" aria-hidden="true">→</span></a>
-                    </article>
-                    <article class="package-card">
-                        <p class="package-label">Alt tilgjengelig</p>
-                        <h3>Full moduldekning</h3>
-                        <p class="package-price">549 kr <span>/ mnd</span></p>
-                        <p class="package-copy">Tilgang til alle modulene som er tilgjengelige i dagens løsning. Economy er fortsatt under utvikling.</p>
-                        <a class="button button-secondary" href="#kontakt">Spør om full dekning <span class="arrow" aria-hidden="true">→</span></a>
-                    </article>
-                </div>
-                <div class="pricing-terms">
-                    <p>Flere konkurrerende løsninger tar transaksjonsgebyrer i tillegg til abonnementsprisen. Sammenlign totalkostnaden, ikke bare månedsprisen.</p>
-                    <p>Betalingsleverandører som Vipps og Stripe kan ha egne gebyrer. Eventuelle gebyrer fastsettes av leverandøren og kommer i tillegg til Salesman-abonnementet.</p>
-                </div>
-            </div>
-        </section>
-
         <section class="section why-section" id="hvorfor-oss">
             <div class="container why-grid">
                 <div class="why-copy">
-                    <p class="eyebrow">Hvorfor velge oss</p>
-                    <h2>Driften henger bedre sammen når verktøyene gjør det.</h2>
-                    <p>Events, Rental og Memberships løser ulike oppgaver, men trenger ofte de samme oversiktene, kontaktflatene og rutinene. Salesman samler modulene på ett sted, så organisasjonen kan ta utgangspunkt i hvordan den faktisk jobber.</p>
+                    <p class="eyebrow">En norsk startup, bygget sammen med brukerne</p>
+                    <h2>Vær med og form verktøyene dere selv trenger.</h2>
+                    <p>Salesman er en norsk startup som utvikler en samlet plattform for organisasjoner og virksomheter. Som tidlig bruker kan dere dele behovene deres direkte og være med på å påvirke hvordan løsningen utvikles videre.</p>
                 </div>
                 <div class="why-points">
                     <article class="why-point">
                         <span class="why-point-mark" aria-hidden="true">01</span>
-                        <div><h3>Moduler som passer behovet</h3><p>Velg en pakke ut fra hvor mange deler av driften dere vil samle.</p></div>
+                        <div><h3>Norsk utgangspunkt</h3><p>Produktet bygges av en norsk startup, med dialog og produktutvikling tett på brukerne.</p></div>
                     </article>
                     <article class="why-point">
                         <span class="why-point-mark" aria-hidden="true">02</span>
-                        <div><h3>Én felles oversikt</h3><p>Hold arrangementer, utleie og medlemsadministrasjon samlet i samme plattform.</p></div>
+                        <div><h3>Mulighet til å påvirke</h3><p>Del arbeidsflyten og utfordringene deres mens produktet fortsatt formes.</p></div>
                     </article>
                     <article class="why-point">
                         <span class="why-point-mark" aria-hidden="true">03</span>
-                        <div><h3>Utvikles videre</h3><p>Velg blant dagens tilgjengelige moduler, med flere muligheter under utvikling og vurdering.</p></div>
+                        <div><h3>Et fortrinn ved å komme tidlig</h3><p>Dere kan bidra til at nye løsninger tar utgangspunkt i reelle behov — og få erfaring med plattformen mens den utvikles.</p></div>
                     </article>
                 </div>
             </div>
@@ -907,7 +792,7 @@
                     </article>
                     <article class="step">
                         <span class="step-number">02</span>
-                        <div><h3>Velg en pakke</h3><p>Finn ut om tre moduler, fire moduler eller full dekning passer best.</p></div>
+                        <div><h3>Finn riktig oppsett</h3><p>Vi går gjennom modulene og arbeidsflyten som passer for dere.</p></div>
                     </article>
                     <article class="step">
                         <span class="step-number">03</span>
@@ -923,7 +808,7 @@
                     <div>
                         <p class="eyebrow">Neste steg</p>
                         <h2>La oss finne ut hva som passer for dere.</h2>
-                        <p>Send oss kontaktinformasjonen, så følger vi opp om behovene deres og hvilken pakke som passer.</p>
+                        <p>Send oss kontaktinformasjonen, så følger vi opp om behovene deres og hvordan løsningen kan formes rundt dem.</p>
                         <p class="contact-form-note">Opplysningene brukes til å følge opp henvendelsen.</p>
                     </div>
                     <form id="publicContactForm" class="contact-form" action="/saas_portal/api/contact_request.php" method="post" novalidate>
