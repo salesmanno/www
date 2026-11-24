@@ -10,6 +10,7 @@ final class SitemapRepository
     private array $tables = [];
     private array $columns = [];
     public array $warnings = [];
+    public array $counts = [];
 
     public function __construct(private PDO $db)
     {
@@ -105,12 +106,15 @@ final class SitemapRepository
             'is_available', 'is_for_sale', 'for_sale', 'noindex', 'is_noindex', 'is_private',
             'requires_login', 'maintenance_mode', 'deleted_at', 'robots', 'seo_robots',
             'allow_indexing', 'is_indexable', 'updated_at', 'created_at'];
-        foreach (['tenant_companies', 'tenant_website_general', 'tenant_website_config'] as $required) {
-            if (!isset($this->tables[$required])) throw new RuntimeException('Sitemap website publication metadata is unavailable.');
-        }
-        $companies = $this->rows('tenant_companies', ['id', 'subdomain', 'is_active'], array_merge($visibility, ['subdomain_active']));
+        if (!isset($this->tables['tenant_companies'])) throw new RuntimeException('Sitemap company source is unavailable.');
+        // Company homepages are discovered from subdomain, not module setup.
+        // Optional visibility flags still apply when installed; HTTP verification
+        // remains mandatory before any candidate is published.
+        $companies = $this->rows('tenant_companies', ['id', 'subdomain'], array_merge($visibility, ['subdomain_active']));
+        $this->counts = ['companies_read' => count($companies), 'companies_hidden' => 0,
+            'subdomains_invalid' => 0, 'home_candidates' => 0, 'offer_companies' => 0];
         $general = [];
-        foreach ($this->rows('tenant_website_general', ['company_id', 'is_active'], $visibility) as $row) {
+        foreach ($this->rows('tenant_website_general', ['company_id'], $visibility) as $row) {
             $general[$row['company_id']][] = $row;
         }
         $configs = [];
@@ -121,16 +125,25 @@ final class SitemapRepository
         $urls = [['loc' => 'https://salesman.no/', 'lastmod' => null]];
         foreach ($companies as $company) {
             $id = (string)$company['id'];
-            $subdomain = strtolower((string)$company['subdomain']);
-            if (!self::publicRow($company) || (array_key_exists('subdomain_active', $company) && !self::on($company['subdomain_active']))) continue;
-            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $subdomain)) continue;
-            if (in_array($subdomain, ['www', 'admin', 'api', 'mail', 'ftp', 'localhost', 'saas-portal'], true)) continue;
-            $settings = $general[$id] ?? [];
-            // Ambiguous or unpublished website settings fail closed.
-            if (count($settings) !== 1 || !self::publicRow($settings[0]) || empty($configs[$id])) continue;
+            $subdomain = strtolower(trim((string)$company['subdomain']));
+            if (!self::publicRow($company) || (array_key_exists('subdomain_active', $company) && !self::on($company['subdomain_active']))) {
+                $this->counts['companies_hidden']++;
+                continue;
+            }
+            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $subdomain)
+                || in_array($subdomain, ['www', 'admin', 'api', 'mail', 'ftp', 'localhost', 'saas-portal'], true)) {
+                $this->counts['subdomains_invalid']++;
+                continue;
+            }
             $base = "https://{$subdomain}.salesman.no/";
+            $urls[] = ['loc' => $base, 'lastmod' => self::dates($company)];
+            $this->counts['home_candidates']++;
+            $settings = $general[$id] ?? [];
+            // Offer discovery keeps its own publication checks; optional module
+            // metadata must not prevent discovering a company's public homepage.
+            if (count($settings) !== 1 || !self::publicRow($settings[0]) || empty($configs[$id])) continue;
             $eligible[$id] = ['base' => $base, 'company' => $company, 'general' => $settings[0]];
-            $urls[] = ['loc' => $base, 'lastmod' => self::dates($company, $settings[0], ...array_values($configs[$id]))];
+            $this->counts['offer_companies']++;
         }
 
         $catalog = [];

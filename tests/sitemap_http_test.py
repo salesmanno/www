@@ -33,6 +33,7 @@ function publicSitemapCache(): SitemapCache {
         SitemapDiagnostics::warning('Sitemap: optional source rental_objects is absent; excluded.');
         SitemapDiagnostics::warning('Sitemap: secret DO_NOT_EXPOSE');
         SitemapDiagnostics::counts(['candidates'=>4, 'included'=>3, 'excluded'=>1, 'password'=>'DO_NOT_EXPOSE']);
+        SitemapDiagnostics::discovery(['companies_read'=>2, 'home_candidates'=>1, 'password'=>'DO_NOT_EXPOSE']);
         return [
             ['loc'=>'https://salesman.no/','lastmod'=>null],
             ['loc'=>'https://bergsoy.salesman.no/','lastmod'=>'2025-10-15'],
@@ -98,6 +99,7 @@ function publicSitemapCache(): SitemapCache {
         assert diagnostic_headers["X-Robots-Tag"] == "noindex"
         assert b'Sitemap verification: {"candidates":4,"included":3,"excluded":1}' in diagnostic_body
         assert b'optional source rental_objects is absent' in diagnostic_body
+        assert b'Sitemap: discovery={"companies_read":2,"home_candidates":1}' in diagnostic_body
         assert b'DO_NOT_EXPOSE' not in diagnostic_body
         assert get("/sitemap.xml?part=99&company=private")[2] == body
         assert get("/sitemap-1.xml")[0] == 404  # No chunks for a single urlset.

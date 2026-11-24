@@ -17,11 +17,20 @@
 
 Ingen nye tabeller eller migreringer. Generatoren leser bare:
 
-- `tenant_companies`: aktivt firma, gyldig subdomene; `subdomain_active` må være
-  aktiv dersom denne kolonnen finnes.
-- `tenant_website_general`: én aktiv innstillingsrad uten vedlikeholdsmodus
+- `tenant_companies.subdomain` er grunnlaget for firmasidene. Bare `id` og
+  `subdomain` kreves; eksisterende inaktiv-/privat-flagg respekteres, inkludert
+  `subdomain_active` dersom kolonnen finnes. Mellomrom trimmes og navnet
+  normaliseres til små bokstaver. Ingen nettsteds- eller modulrad kreves for å
+  sende firmaets forside til den offentlige HTTP-kontrollen.
+- Følgende ekstra krav gjelder tilbud, ikke oppdagelse av firmaforsider:
+  `tenant_website_general`: én aktiv innstillingsrad uten vedlikeholdsmodus
   eller noindex. `tenant_website_config`: minst én aktivert, offentlig og
   publisert modul.
+
+Diagnostikkens `Sitemap: discovery=` viser antall leste bedrifter,
+skjulte/inaktive bedrifter, ugyldige/reserverte subdomener, forsidekandidater
+og bedrifter med tilstrekkelig oppsett for tilbud. Dette er tellinger før
+HTTP-kontrollen, ikke en bekreftelse på at sidene ble publisert i kartet.
 - `output_products`: bare synlige og offentlige oppføringer for publiserte
   moduler. Inaktive firmamoduler og systemmoduler utelates når disse
   tilgangstabellene finnes.

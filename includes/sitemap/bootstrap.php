@@ -17,6 +17,7 @@ function publicSitemapCache(): SitemapCache
             $candidates = $repository->candidates();
         } finally {
             foreach (array_unique($repository->warnings) as $warning) SitemapDiagnostics::warning($warning);
+            SitemapDiagnostics::discovery($repository->counts);
         }
         SitemapDiagnostics::counts(['candidates' => count($candidates)]);
         SitemapDiagnostics::stage('verification');

@@ -98,6 +98,10 @@ $urls = array_column($candidates, 'loc');
 $expected = [
     'https://salesman.no/',
     'https://bergsoy.salesman.no/',
+    'https://maintenance.salesman.no/',
+    'https://noindex.salesman.no/',
+    'https://draft.salesman.no/',
+    'https://settings-off.salesman.no/',
     'https://bergsoy.salesman.no/lqlk5?type=event',
     'https://bergsoy.salesman.no/ongoing?type=event',
     'https://bergsoy.salesman.no/5a9fa2?type=membership',
@@ -105,28 +109,37 @@ $expected = [
     'https://bergsoy.salesman.no/service-code?type=service',
 ];
 check($urls === $expected, 'Incorrect publication filtering: ' . json_encode($urls));
-check($candidates[0]['lastmod'] === null && $candidates[1]['lastmod'] === '2025-11-01', 'Incorrect homepage lastmod.');
-check($candidates[2]['lastmod'] === '2025-10-15' && $candidates[5]['lastmod'] === null, 'Missing dates must not invent today.');
+check($repository->counts === ['companies_read'=>9, 'companies_hidden'=>2, 'subdomains_invalid'=>2, 'home_candidates'=>5, 'offer_companies'=>1], 'Incorrect discovery counts.');
+check($candidates[0]['lastmod'] === null && $candidates[1]['lastmod'] === '2025-10-01', 'Incorrect homepage lastmod.');
+check($candidates[6]['lastmod'] === '2025-10-15' && $candidates[9]['lastmod'] === null, 'Missing dates must not invent today.');
 $db->exec("UPDATE tenant_company_modules SET is_active=0 WHERE module_id='events'");
-check(count($repository->candidates('2026-11-24')) === 5, 'Disabled firm module leaked.');
+check(count($repository->candidates('2026-11-24')) === 9, 'Disabled firm module leaked.');
 $db->exec("UPDATE tenant_company_modules SET is_active=1 WHERE module_id='events'");
 $db->exec("UPDATE system_modules SET is_active=0 WHERE id='membership'");
-check(count($repository->candidates('2026-11-24')) === 6, 'Disabled system module leaked.');
+check(count($repository->candidates('2026-11-24')) === 10, 'Disabled system module leaked.');
 $db->exec("UPDATE system_modules SET is_active=1 WHERE id='membership'");
 $db->exec("UPDATE tenant_website_config SET is_published=0 WHERE module_id='rental' AND company_id='good'");
-check(count($repository->candidates('2026-11-24')) === 6, 'Unpublished module leaked.');
+check(count($repository->candidates('2026-11-24')) === 10, 'Unpublished module leaked.');
 $db->exec("UPDATE tenant_website_config SET is_published=1 WHERE module_id='rental' AND company_id='good'");
 $db->exec('ALTER TABLE rental_object RENAME TO rental_objects');
-check(count((new SitemapRepository($db))->candidates('2026-11-24')) === 7, 'Plural rental table compatibility failed.');
+check(count((new SitemapRepository($db))->candidates('2026-11-24')) === 11, 'Plural rental table compatibility failed.');
 $db->exec('DROP TABLE reservation_services');
 $missing = new SitemapRepository($db);
-check(count($missing->candidates('2026-11-24')) === 6 && count($missing->warnings) > 0, 'Optional absent source not reported/excluded.');
+check(count($missing->candidates('2026-11-24')) === 10 && count($missing->warnings) > 0, 'Optional absent source not reported/excluded.');
 $db->exec('ALTER TABLE membership_plans RENAME COLUMN share_code TO old_code');
 $missingCode = new SitemapRepository($db);
-check(count($missingCode->candidates('2026-11-24')) === 5, 'Missing share code must not fall back to IDs.');
+check(count($missingCode->candidates('2026-11-24')) === 9, 'Missing share code must not fall back to IDs.');
 check(str_contains(implode(' ', $missingCode->warnings), 'share_code'), 'Missing code must be diagnosed.');
 $db->exec('DROP TABLE tenant_website_config');
-fails(fn() => (new SitemapRepository($db))->candidates(), RuntimeException::class);
+check(count((new SitemapRepository($db))->candidates()) === 6, 'Absent module config must not block homepage discovery.');
+$minimal = new PDO('sqlite::memory:');
+$minimal->exec('CREATE TABLE tenant_companies (id TEXT, subdomain TEXT)');
+foreach ([' Bergsoy ', '', 'www', 'evil.example.com', 'another'] as $index => $host) {
+    add($minimal, 'tenant_companies', ['id' => (string)$index, 'subdomain' => $host]);
+}
+check(array_column((new SitemapRepository($minimal))->candidates(), 'loc') === [
+    'https://salesman.no/', 'https://bergsoy.salesman.no/', 'https://another.salesman.no/',
+], 'Home discovery must work using company subdomains without website tables or flags.');
 echo "PASS read-only schema-aware candidate filtering, dates, table variants and missing modules.\n";
 
 foreach ([

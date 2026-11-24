@@ -31,6 +31,15 @@ final class SitemapDiagnostics
         self::record('Sitemap verification: ' . json_encode($safe));
     }
 
+    public static function discovery(array $counts): void
+    {
+        $safe = [];
+        foreach (['companies_read', 'companies_hidden', 'subdomains_invalid', 'home_candidates', 'offer_companies'] as $key) {
+            if (isset($counts[$key]) && is_int($counts[$key])) $safe[$key] = max(0, $counts[$key]);
+        }
+        self::record('Sitemap: discovery=' . json_encode($safe));
+    }
+
     private static function record(string $line): void
     {
         error_log($line);
