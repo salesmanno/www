@@ -52,6 +52,7 @@ med offentlig HTTPS-GET uten innlogging eller cookies:
 
 - Krever HTTP 200 og HTML; ingen videresendinger.
 - Respekterer robots.txt, HTTP- og HTML-noindex, canonical og passordskjemaer.
+  Et tomt `/`-path og `/` behandles som samme kanoniske firmaside-URL.
 - Tilbud utelates dersom firmaets offentlige hovedside ikke består kontrollen.
 - Tillater bare salesman.no og ett gyldig firmasubdomene; DNS-adressen bindes
   til en offentlig IP. Private adresser, andre domener, HTTP, proxy og

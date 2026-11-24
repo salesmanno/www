@@ -8,6 +8,24 @@ final class SitemapVerifier
     private Closure $fetch;
     public array $counts = ['candidates' => 0, 'included' => 0, 'excluded' => 0];
 
+    private static function sameCanonicalPage(string $left, string $right): bool
+    {
+        $a = parse_url($left);
+        $b = parse_url($right);
+        if (!$a || !$b) return false;
+        foreach (['scheme', 'host'] as $field) {
+            if (strtolower($a[$field] ?? '') !== strtolower($b[$field] ?? '')) return false;
+        }
+        foreach (['user', 'pass', 'port', 'fragment'] as $field) {
+            if (isset($a[$field]) || isset($b[$field])) return false;
+        }
+        $pathA = $a['path'] ?? '/';
+        $pathB = $b['path'] ?? '/';
+        if ($pathA === '') $pathA = '/';
+        if ($pathB === '') $pathB = '/';
+        return $pathA === $pathB && ($a['query'] ?? null) === ($b['query'] ?? null);
+    }
+
     public function __construct(?callable $fetch = null)
     {
         $client = new SitemapHttpClient();
@@ -90,7 +108,8 @@ final class SitemapVerifier
                 if (str_starts_with($canonical, '/') && !str_starts_with($canonical, '//')) {
                     $canonical = 'https://' . parse_url($url, PHP_URL_HOST) . $canonical;
                 }
-                if ($canonical !== $url) return false;
+                // Empty path and "/" are the same canonical root URL.
+                if (!self::sameCanonicalPage($canonical, $url)) return false;
             }
             return trim($response['body'] ?? '') !== '';
         } finally {

@@ -147,9 +147,14 @@ foreach (['127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.169.254', '0.0.0.0',
 check(SitemapHttpClient::publicIp('8.8.8.8'), 'Public IP rejected.');
 check(SitemapHttpClient::publicIp('2001:4860:4860::8888'), 'Global unicast IPv6 rejected.');
 $url = 'https://bergsoy.salesman.no/lqlk5?type=event';
+$rootUrl = 'https://bergsoy.salesman.no/';
 $html = '<html><head><title>Public offer</title><link rel="canonical" href="' . $url . '"></head><body>Public content</body></html>';
 $response = ['status' => 200, 'headers' => ['content-type' => ['text/html; charset=UTF-8']], 'body' => $html];
 check(SitemapVerifier::indexable($url, $response), 'Public page excluded.');
+$rootWithoutSlash = '<html><head><link rel="canonical" href="https://bergsoy.salesman.no"></head><body>Firm homepage</body></html>';
+check(SitemapVerifier::indexable($rootUrl, array_replace($response, ['body' => $rootWithoutSlash])), 'Equivalent root canonical without slash was rejected.');
+check(!SitemapVerifier::indexable($url, array_replace($response, ['body' => $rootWithoutSlash])), 'Offer with homepage canonical was accepted.');
+check(SitemapVerifier::indexable($rootUrl, array_replace($response, ['body' => '<html><body>Homepage without canonical</body></html>'])), 'Homepage without an explicit canonical was rejected.');
 foreach ([301, 302, 401, 403, 404, 500, 0] as $status) {
     check(!SitemapVerifier::indexable($url, array_replace($response, ['status' => $status])), 'Non-200 page included.');
 }
@@ -162,6 +167,7 @@ foreach ([
     ['body' => '<html><head><meta name="googlebot" content="none"></head><body>private</body></html>'],
     ['body' => '<html><head><meta http-equiv="refresh" content="0;url=/login"></head><body></body></html>'],
     ['body' => '<html><head><link rel="canonical" href="https://salesman.no/"></head><body>duplicate</body></html>'],
+    ['body' => '<html><head><link rel="canonical" href="https://bergsoy.salesman.no:443/"></head><body>different port</body></html>'],
     ['body' => '<html><body><input type="password"></body></html>'],
     ['body' => ''],
 ] as $change) check(!SitemapVerifier::indexable($url, array_replace($response, $change)), 'Private or noncanonical response included.');
@@ -177,6 +183,11 @@ $fetch = static function (array $urls, float $deadline) use (&$calls, $response)
     foreach ($urls as $item) {
         if (str_ends_with($item, '/robots.txt')) yield $item => ['status' => 404, 'headers' => [], 'body' => ''];
         elseif (str_contains($item, 'blocked')) yield $item => array_replace($response, ['status' => 403]);
+        elseif (preg_match('~^https://([a-z0-9-]+\.salesman\.no)/$~D', $item, $match)) {
+            yield $item => array_replace($response, [
+                'body' => '<html><head><link rel="canonical" href="https://' . $match[1] . '"></head><body>Public firm homepage</body></html>',
+            ]);
+        }
         else yield $item => array_replace($response, ['body' => '<html><head><title>Public</title></head><body>Public</body></html>']);
     }
 };
@@ -186,6 +197,7 @@ $verifyInput = array_merge($candidates, [
     ['loc' => 'https://blocked.salesman.no/offer?type=event', 'lastmod' => null],
 ]);
 check(count($verifier->verify($verifyInput)) === count($candidates), 'Blocked host or offer leaked.');
+check(in_array('https://bergsoy.salesman.no/', array_column($verifier->verify($verifyInput), 'loc'), true), 'Firm canonical without slash dropped the verified firm and offers.');
 check($calls === 2 && $verifier->counts['excluded'] === 2, 'HTTP checks not batched or metrics wrong.');
 $noHome = new SitemapVerifier(static function (array $urls, float $deadline): Generator {
     foreach ($urls as $item) yield $item => ['status' => 404, 'headers' => [], 'body' => ''];
