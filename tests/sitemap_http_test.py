@@ -25,10 +25,14 @@ require_once %s;
 function publicSitemapCache(): SitemapCache {
     if (file_exists(__DIR__ . '/fail.flag')) {
         return new SitemapCache(%s, static function(float $deadline): array {
+            SitemapDiagnostics::stage('database');
             throw new RuntimeException('synthetic internal error: DO_NOT_EXPOSE');
         });
     }
     return new SitemapCache(%s, static function(float $deadline): array {
+        SitemapDiagnostics::warning('Sitemap: optional source rental_objects is absent; excluded.');
+        SitemapDiagnostics::warning('Sitemap: secret DO_NOT_EXPOSE');
+        SitemapDiagnostics::counts(['candidates'=>4, 'included'=>3, 'excluded'=>1, 'password'=>'DO_NOT_EXPOSE']);
         return [
             ['loc'=>'https://salesman.no/','lastmod'=>null],
             ['loc'=>'https://bergsoy.salesman.no/','lastmod'=>'2025-10-15'],
@@ -86,6 +90,15 @@ function publicSitemapCache(): SitemapCache {
         assert len(xml.findall(ns + "url")) == 3
         assert xml.findall(ns + "url")[2].find(ns + "loc").text.endswith("lqlk5?type=event")
         assert get("/sitemap.php")[2] == body
+        assert b'<!--' in body and b'Sitemap verification:' in body
+        assert b'DO_NOT_EXPOSE' not in body
+        status, diagnostic_headers, diagnostic_body = get("/sitemap.xml?diagnostics=1")
+        assert status == 200 and diagnostic_headers["Content-Type"] == "text/plain; charset=UTF-8"
+        assert diagnostic_headers["Cache-Control"] == "no-store"
+        assert diagnostic_headers["X-Robots-Tag"] == "noindex"
+        assert b'Sitemap verification: {"candidates":4,"included":3,"excluded":1}' in diagnostic_body
+        assert b'optional source rental_objects is absent' in diagnostic_body
+        assert b'DO_NOT_EXPOSE' not in diagnostic_body
         assert get("/sitemap.xml?part=99&company=private")[2] == body
         assert get("/sitemap-1.xml")[0] == 404  # No chunks for a single urlset.
         assert get("/sitemap-50000.xml")[0] == 404
@@ -98,7 +111,11 @@ function publicSitemapCache(): SitemapCache {
         assert headers["Cache-Control"] == "no-store"
         assert b"DO_NOT_EXPOSE" not in body and b"RuntimeException" not in body
         assert b"salesman-sitemap-" not in body
+        assert b"Sitemap: stage=database" in body
         ET.fromstring(body)
+        status, headers, body = get("/sitemap.xml?diagnostics=1")
+        assert status == 503 and b"Sitemap: stage=database" in body
+        assert b"DO_NOT_EXPOSE" not in body and b"RuntimeException" not in body
         assert manifest_path.read_text() == original
         print("PASS real PHP endpoint: public 200 XML, no login/cookie, route validation, safe 404/503, and cache preservation.")
     finally:

@@ -9,13 +9,21 @@ function publicSitemapCache(): SitemapCache
 {
     return new SitemapCache(SitemapCache::directory(), static function (float $deadline): array {
         // Load the existing connection lazily: warm-cache requests need no DB.
+        SitemapDiagnostics::stage('database');
         require_once dirname(__DIR__, 2) . '/config/database.php';
         $repository = new SitemapRepository(getDBConnection());
-        $candidates = $repository->candidates();
-        foreach (array_unique($repository->warnings) as $warning) error_log($warning);
+        SitemapDiagnostics::stage('candidates');
+        try {
+            $candidates = $repository->candidates();
+        } finally {
+            foreach (array_unique($repository->warnings) as $warning) SitemapDiagnostics::warning($warning);
+        }
+        SitemapDiagnostics::counts(['candidates' => count($candidates)]);
+        SitemapDiagnostics::stage('verification');
         $verifier = new SitemapVerifier();
         $entries = $verifier->verify($candidates, $deadline);
-        error_log('Sitemap verification: ' . json_encode($verifier->counts));
+        SitemapDiagnostics::counts($verifier->counts);
+        SitemapDiagnostics::stage('complete');
         return $entries;
     });
 }

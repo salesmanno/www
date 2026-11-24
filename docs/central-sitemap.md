@@ -120,6 +120,24 @@ https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitem
 
 ## Lokale tester (ingen produksjonsdatabase eller eksterne HTTP-kall)
 
+### Diagnostikk uten tilgang til PHP-loggen
+
+Åpne `https://salesman.no/sitemap.xml?diagnostics=1` for ren tekst med
+genereringstidspunkt, URL-antall, `Sitemap:`-meldinger og
+`Sitemap verification:`-tellinger. De samme meldingene ligger som
+XML-kommentarer i vanlig `/sitemap.xml` (vis kilde hvis nettleseren skjuler dem).
+Kommentarene utelates dersom de ville overskride XML-størrelsesgrensen;
+tekstvisningen er fortsatt tilgjengelig.
+
+Diagnostikken lagres sammen med genereringen og vises også fra varm cache.
+Tekstvisningen starter ikke en ekstra regenerering og krever ingen innlogging.
+Den viser bare forhåndsdefinerte stadier, aggregerte tellinger og manglende
+skjemafelt/kilder, aldri rå unntak, SQL, kundedata eller påloggingsopplysninger.
+Ved feil beholdes HTTP 503; stadiet som ble nådd vises uten intern feilmelding.
+Dette er offentlig diagnostikk, ikke en offentlig visning av hele PHP-loggen.
+Ingen databaseendringer kreves. Last opp `sitemap.php`, `bootstrap.php`,
+`SitemapCache.php` og den nye `SitemapDiagnostics.php` fra `includes/sitemap/`.
+
 ```sh
 php tests/sitemap_test.php
 python3 tests/sitemap_http_test.py

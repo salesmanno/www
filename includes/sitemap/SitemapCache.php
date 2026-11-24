@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/SitemapHttpClient.php';
 require_once __DIR__ . '/SitemapXml.php';
+require_once __DIR__ . '/SitemapDiagnostics.php';
 
 /** Private, atomic snapshots. Failed refreshes never replace the last good snapshot. */
 final class SitemapCache
@@ -29,6 +30,7 @@ final class SitemapCache
             __DIR__ . '/SitemapVerifier.php',
             __DIR__ . '/SitemapHttpClient.php',
             __DIR__ . '/SitemapXml.php',
+            __DIR__ . '/SitemapDiagnostics.php',
             __DIR__ . '/bootstrap.php',
         ] as $file) {
             $digest = @hash_file('sha256', $file);
@@ -68,6 +70,7 @@ final class SitemapCache
 
     private function refreshLocked(float $deadline): array
     {
+        SitemapDiagnostics::reset();
         $generation = bin2hex(random_bytes(12));
         $path = $this->directory . '/' . $generation;
         if (!mkdir($path, 0700)) throw new RuntimeException('Cannot create sitemap generation.');
@@ -87,6 +90,7 @@ final class SitemapCache
             $main = $count === 1 ? (string)file_get_contents($path . '/sitemap-1.xml') : SitemapXml::index($count);
             $write($path . '/sitemap.xml', $main);
             $manifest = ['generation' => $generation, 'parts' => $count, 'url_count' => $urlCount, 'built_at' => time()];
+            $manifest['diagnostics'] = SitemapDiagnostics::lines();
             $temporary = $this->directory . '/manifest-' . $generation . '.tmp';
             $write($temporary, json_encode($manifest, JSON_THROW_ON_ERROR));
             if (!rename($temporary, $this->directory . '/manifest.json')) throw new RuntimeException('Cannot publish the sitemap snapshot.');
@@ -122,7 +126,8 @@ final class SitemapCache
     {
         $manifest = $this->manifest();
         if (!$manifest) throw new RuntimeException('Sitemap snapshot metadata is unavailable.');
-        return ['built_at' => $manifest['built_at'], 'url_count' => $manifest['url_count'], 'parts' => $manifest['parts']];
+        return ['built_at' => $manifest['built_at'], 'url_count' => $manifest['url_count'], 'parts' => $manifest['parts'],
+            'diagnostics' => $manifest['diagnostics'] ?? []];
     }
 
     public function document(?int $part = null, float $deadline = 0): string
