@@ -196,8 +196,9 @@ $verifyInput = array_merge($candidates, [
     ['loc' => 'https://blocked.salesman.no/', 'lastmod' => null],
     ['loc' => 'https://blocked.salesman.no/offer?type=event', 'lastmod' => null],
 ]);
-check(count($verifier->verify($verifyInput)) === count($candidates), 'Blocked host or offer leaked.');
-check(in_array('https://bergsoy.salesman.no/', array_column($verifier->verify($verifyInput), 'loc'), true), 'Firm canonical without slash dropped the verified firm and offers.');
+$verifiedInput = $verifier->verify($verifyInput);
+check(count($verifiedInput) === count($candidates), 'Blocked host or offer leaked.');
+check(in_array('https://bergsoy.salesman.no/', array_column($verifiedInput, 'loc'), true), 'Firm canonical without slash dropped the verified firm and offers.');
 check($calls === 2 && $verifier->counts['excluded'] === 2, 'HTTP checks not batched or metrics wrong.');
 $noHome = new SitemapVerifier(static function (array $urls, float $deadline): Generator {
     foreach ($urls as $item) yield $item => ['status' => 404, 'headers' => [], 'body' => ''];
