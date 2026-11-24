@@ -16,8 +16,13 @@ try {
     } elseif (!in_array($path, ['/sitemap.xml', '/sitemap.php'], true)) {
         throw new OutOfBoundsException('Unknown sitemap route.');
     }
-    $document = publicSitemapCache()->document($part, microtime(true) + 20);
+    $cache = publicSitemapCache();
+    $document = $cache->document($part, microtime(true) + 20);
     // Buffer the complete document before sending; never emit truncated XML.
+    $metadata = $cache->metadata();
+    header('X-Sitemap-Generated: ' . gmdate('D, d M Y H:i:s', $metadata['built_at']) . ' GMT');
+    header('X-Sitemap-URL-Count: ' . $metadata['url_count']);
+    header('X-Sitemap-Parts: ' . $metadata['parts']);
     http_response_code(200);
     echo $document;
 } catch (OutOfBoundsException $e) {

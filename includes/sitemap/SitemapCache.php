@@ -17,8 +17,26 @@ final class SitemapCache
 
     public static function directory(): string
     {
-        // No database writes or new persistent schema. Not inside the webroot.
-        return sys_get_temp_dir() . '/salesman-sitemap-' . substr(hash('sha256', dirname(__DIR__, 2)), 0, 20);
+        // Invalidate old snapshots when generation/visibility logic is deployed.
+        // A TTL alone can otherwise preserve a stale XML response across FTP
+        // uploads because the webhost's temporary directory survives deploys.
+        $root = dirname(__DIR__, 2);
+        $version = hash_init('sha256');
+        hash_update($version, $root);
+        foreach ([
+            __FILE__,
+            __DIR__ . '/SitemapRepository.php',
+            __DIR__ . '/SitemapVerifier.php',
+            __DIR__ . '/SitemapHttpClient.php',
+            __DIR__ . '/SitemapXml.php',
+            __DIR__ . '/bootstrap.php',
+        ] as $file) {
+            $digest = @hash_file('sha256', $file);
+            if ($digest === false) throw new RuntimeException('Cannot fingerprint sitemap generator.');
+            hash_update($version, $digest);
+        }
+        // Private and outside the webroot; no new database schema or writes.
+        return sys_get_temp_dir() . '/salesman-sitemap-' . substr(hash_final($version), 0, 24);
     }
 
     private function prepare(): void
@@ -40,7 +58,9 @@ final class SitemapCache
         if (!is_file($file)) return null;
         $manifest = json_decode((string)file_get_contents($file), true);
         if (!is_array($manifest) || !preg_match('/^[a-f0-9]{24}$/D', $manifest['generation'] ?? '')
-            || !is_int($manifest['parts'] ?? null) || $manifest['parts'] < 1 || !is_int($manifest['built_at'] ?? null)) {
+            || !is_int($manifest['parts'] ?? null) || $manifest['parts'] < 1
+            || !is_int($manifest['url_count'] ?? null) || $manifest['url_count'] < 1
+            || !is_int($manifest['built_at'] ?? null)) {
             return null;
         }
         return $manifest;
@@ -57,14 +77,16 @@ final class SitemapCache
         };
         try {
             $count = 0;
+            $urlCount = 0;
             foreach (SitemapXml::parts(($this->build)($deadline)) as $document) {
                 $count++;
                 if ($count > SitemapXml::MAX_URLS) throw new LengthException('Sitemap index capacity exceeded.');
+                $urlCount += substr_count($document, '<url>');
                 $write($path . "/sitemap-{$count}.xml", $document);
             }
             $main = $count === 1 ? (string)file_get_contents($path . '/sitemap-1.xml') : SitemapXml::index($count);
             $write($path . '/sitemap.xml', $main);
-            $manifest = ['generation' => $generation, 'parts' => $count, 'built_at' => time()];
+            $manifest = ['generation' => $generation, 'parts' => $count, 'url_count' => $urlCount, 'built_at' => time()];
             $temporary = $this->directory . '/manifest-' . $generation . '.tmp';
             $write($temporary, json_encode($manifest, JSON_THROW_ON_ERROR));
             if (!rename($temporary, $this->directory . '/manifest.json')) throw new RuntimeException('Cannot publish the sitemap snapshot.');
@@ -94,6 +116,13 @@ final class SitemapCache
         } finally {
             fclose($lock);
         }
+    }
+
+    public function metadata(): array
+    {
+        $manifest = $this->manifest();
+        if (!$manifest) throw new RuntimeException('Sitemap snapshot metadata is unavailable.');
+        return ['built_at' => $manifest['built_at'], 'url_count' => $manifest['url_count'], 'parts' => $manifest['parts']];
     }
 
     public function document(?int $part = null, float $deadline = 0): string

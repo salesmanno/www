@@ -75,6 +75,9 @@ function publicSitemapCache(): SitemapCache {
         status, headers, body = get("/sitemap.xml")
         assert status == 200
         assert headers["Content-Type"] == "application/xml; charset=UTF-8"
+        assert headers.get("X-Sitemap-URL-Count") == "3"
+        assert headers.get("X-Sitemap-Parts") == "1"
+        assert headers.get("X-Sitemap-Generated")
         assert headers.get("Location") is None and headers.get("Set-Cookie") is None
         assert headers.get("X-Robots-Tag") is None
         ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"

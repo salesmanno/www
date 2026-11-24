@@ -246,6 +246,7 @@ $cache = new SitemapCache($directory, static function (float $deadline) use (&$b
 try {
     $first = $cache->document();
     check($builds === 1 && $cache->document() === $first && $builds === 1, 'Warm cache must not rebuild.');
+    check($cache->metadata()['url_count'] === 2 && $cache->metadata()['parts'] === 1, 'Incorrect sitemap cache metadata.');
     check((fileperms($directory) & 0077) === 0, 'Cache directory not private.');
     fails(fn() => $cache->document(1), OutOfBoundsException::class);
     $before = file_get_contents($directory . '/manifest.json');
@@ -261,6 +262,9 @@ try {
     fails(fn() => $cache->document(), RuntimeException::class);
     fclose($lock);
     check($cache->document() === $first && $builds === 2, 'Stale cache did not refresh after releasing lock.');
+    $newVersionDirectory = SitemapCache::directory();
+    check(str_starts_with($newVersionDirectory, sys_get_temp_dir() . '/salesman-sitemap-')
+        && preg_match('/^[a-f0-9]{24}$/D', substr($newVersionDirectory, -24)) === 1, 'Sitemap cache path not private versioned temp storage.');
 } finally {
     foreach (glob($directory . '/*') ?: [] as $item) {
         if (is_dir($item)) {
