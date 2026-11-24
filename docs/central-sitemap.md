@@ -72,6 +72,10 @@ Replits enkle PHP-utviklingsserver leser ikke Apache-reglene; bruk
 
 Ferdige XML-filer mellomlagres privat i PHPs midlertidige område, med fem
 minutters levetid, filrettigheter 0600 og katalogrettigheter 0700.
+Cache-nøkkelen inkluderer generatorens kildekode, slik at endret generator
+ikke gjenbruker forrige versjons XML. Responsheaderne `X-Sitemap-Generated`,
+`X-Sitemap-URL-Count` og `X-Sitemap-Parts` viser når snapshotet ble laget og
+hvor mye det inneholder, uten å vise interne filer eller databaseopplysninger.
 Første forespørsel kan generere kartet. En kald/utløpt forespørsel har 20
 sekunders arbeidsbudsjett. Ved stor datamengde bør webhotellets cron oppdatere
 kartet hvert fjerde minutt, som **samme bruker og med samme PHP-konfigurasjon**
