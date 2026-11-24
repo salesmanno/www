@@ -10,5 +10,6 @@
 - [Sentralt malverksted](email-template-workflow.md) — ett sted for bearbeiding og delegering, med kopiering og flytting begge veier mellom firmaer.
 - [Interessenter](prospect-conversion-policy.md) — bare notater/interesse redigeres; view_only har kun interessenttilgang; firmaopprettelse krever lagret interesse.
 - [Portal actor boundaries](portal-actor-boundaries.md) — SaaS IDs are not tenant-admin IDs; required creator fields must not cause automatic account creation.
-- [Offentlige prispakker](public-pricing-policy.md) — behold landingsdesignet; vis pakkene, ikke enkeltmodulenes priser eller etablering.
+- [Offentlig posisjonering](public-pricing-policy.md) — behold landingsdesignet uten priser; fremhev norsk startup, påvirkningsmulighet og tidlig adopsjon.
 - [Portal i søkemotorer](portal-search-policy.md) — SaaS-portalen skal ikke vises i Google; den offentlige landingssiden skal fortsatt kunne indekseres.
+- [Samlet nettstedskart](public-sitemap-policy.md) — ett cross-site-kart for hovedside, firmasubdomener og tilbud; ikke ett kart per firma.

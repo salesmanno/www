@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# SaaS portal pages use noindex response headers. Do not prevent crawlers
+# from reading those headers by disallowing the portal here.
+Sitemap: https://salesman.no/sitemap.xml

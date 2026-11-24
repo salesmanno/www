@@ -33,6 +33,8 @@ with tempfile.TemporaryDirectory(prefix="saas-apache-routing-") as temp:
         "index.php": "root",
         "saas_portal/index.php": "portal",
         "saas_portal/login.php": "login",
+        "sitemap.php": "synthetic sitemap endpoint",
+        "robots.txt": (project / "robots.txt").read_text(),
         "public/bergsoy/index.php": "company",
         "public/assets/exists.txt": "asset",
         "config/database.php": "synthetic configuration",
@@ -114,7 +116,23 @@ ErrorLog "{base}/errors.log"
             assert actual == expected, f"{path}: expected {expected}, got {actual}"
         code, location = request("/saas-portal/")
         assert code == 302 and location.endswith("/saas_portal/login.php")
+        for route in ["/sitemap.xml", "/sitemap-1.xml", "/sitemap-50000.xml"]:
+            assert request(route)[0] == 200, f"Sitemap routing failed: {route}"
+        assert request("/sitemap-0.xml")[0] == 404
+        assert request("/sitemap-999999.xml")[0] == 404
+        assert request("/robots.txt")[0] == 200
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/sitemap.xml?query=preserved",
+            headers={"Host": "www.salesman.no"},
+        )
+        try:
+            opener.open(req, timeout=5)
+            raise AssertionError("www did not redirect")
+        except urllib.error.HTTPError as error:
+            assert error.code == 301
+            assert error.headers["Location"] == "https://salesman.no/sitemap.xml?query=preserved"
         print("PASS Apache alias, directories, company pages, assets, 404s and private-file protection.")
+        print("PASS consolidated sitemap routes, robots.txt and canonical www redirect.")
         for path in ["/saas_portal/", "/saas_portal/login.php", "/saas_portal/missing.php"]:
             try:
                 response = opener.open(f"http://127.0.0.1:{port}{path}", timeout=5)

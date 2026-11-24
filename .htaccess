@@ -6,6 +6,11 @@ DirectoryIndex index.php index.html
     RewriteEngine On
     RewriteRule ^saas-portal/?$ /saas_portal/login.php [R=302,L]
     RewriteRule ^(?:\.git|\.agents|\.local|\.cache|\.config)(?:/|$) - [F,L]
+    # One canonical marketing host. Preserve the path and query string.
+    RewriteCond %{HTTP_HOST} ^www\.salesman\.no(?::[0-9]+)?$ [NC]
+    RewriteRule ^ https://salesman.no%{REQUEST_URI} [R=301,L,NE]
+    # Public XML endpoints; never route these through portal authentication.
+    RewriteRule ^sitemap(?:-[1-9][0-9]{0,4})?\.xml$ sitemap.php [END]
 </IfModule>
 
 # Source configuration and project metadata are never public downloads.
