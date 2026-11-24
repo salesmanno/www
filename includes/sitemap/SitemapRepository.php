@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 /**
- * Read-only discovery from the installed schema. Missing visibility metadata
- * excludes content; it must never publish an optional module by default.
+ * Read-only discovery from subdomains and share codes. Every candidate must
+ * subsequently pass public HTTP/robots/canonical verification.
  */
 final class SitemapRepository
 {
@@ -71,7 +71,7 @@ final class SitemapRepository
 
     private static function publicRow(array $row): bool
     {
-        foreach (['is_active', 'is_public', 'is_visible', 'is_enabled', 'is_published', 'is_available', 'is_for_sale', 'for_sale', 'allow_indexing', 'is_indexable'] as $key) {
+        foreach (['is_public', 'is_visible', 'is_published', 'allow_indexing', 'is_indexable'] as $key) {
             if (array_key_exists($key, $row) && !self::on($row[$key])) return false;
         }
         foreach (['noindex', 'is_noindex', 'is_private', 'requires_login', 'maintenance_mode'] as $key) {
@@ -101,35 +101,24 @@ final class SitemapRepository
     /** @return array<array{loc:string,lastmod:?string}> */
     public function candidates(?string $today = null): array
     {
-        $today ??= (new DateTimeImmutable('now', new DateTimeZone('Europe/Oslo')))->format('Y-m-d');
-        $visibility = ['is_active', 'is_public', 'is_visible', 'is_enabled', 'is_published',
-            'is_available', 'is_for_sale', 'for_sale', 'noindex', 'is_noindex', 'is_private',
+        // Keep the optional argument for existing CLI/test callers. Event end
+        // dates no longer determine whether the public information page exists.
+        $visibility = ['is_public', 'is_visible', 'is_published',
+            'noindex', 'is_noindex', 'is_private',
             'requires_login', 'maintenance_mode', 'deleted_at', 'robots', 'seo_robots',
             'allow_indexing', 'is_indexable', 'updated_at', 'created_at'];
         if (!isset($this->tables['tenant_companies'])) throw new RuntimeException('Sitemap company source is unavailable.');
         // Company homepages are discovered from subdomain, not module setup.
-        // Optional visibility flags still apply when installed; HTTP verification
-        // remains mandatory before any candidate is published.
-        $companies = $this->rows('tenant_companies', ['id', 'subdomain'], array_merge($visibility, ['subdomain_active']));
+        // Administrative activity/module flags do not describe indexability.
+        // The company's public response determines whether it can be listed.
+        $companies = $this->rows('tenant_companies', ['id', 'subdomain'], ['updated_at', 'created_at']);
         $this->counts = ['companies_read' => count($companies), 'companies_hidden' => 0,
             'subdomains_invalid' => 0, 'home_candidates' => 0, 'offer_companies' => 0];
-        $general = [];
-        foreach ($this->rows('tenant_website_general', ['company_id'], $visibility) as $row) {
-            $general[$row['company_id']][] = $row;
-        }
-        $configs = [];
-        foreach ($this->rows('tenant_website_config', ['company_id', 'module_id', 'is_enabled', 'is_public', 'is_published'], $visibility) as $row) {
-            if (self::publicRow($row)) $configs[$row['company_id']][$row['module_id']] = $row;
-        }
         $eligible = [];
         $urls = [['loc' => 'https://salesman.no/', 'lastmod' => null]];
         foreach ($companies as $company) {
             $id = (string)$company['id'];
             $subdomain = strtolower(trim((string)$company['subdomain']));
-            if (!self::publicRow($company) || (array_key_exists('subdomain_active', $company) && !self::on($company['subdomain_active']))) {
-                $this->counts['companies_hidden']++;
-                continue;
-            }
             if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $subdomain)
                 || in_array($subdomain, ['www', 'admin', 'api', 'mail', 'ftp', 'localhost', 'saas-portal'], true)) {
                 $this->counts['subdomains_invalid']++;
@@ -138,66 +127,61 @@ final class SitemapRepository
             $base = "https://{$subdomain}.salesman.no/";
             $urls[] = ['loc' => $base, 'lastmod' => self::dates($company)];
             $this->counts['home_candidates']++;
-            $settings = $general[$id] ?? [];
-            // Offer discovery keeps its own publication checks; optional module
-            // metadata must not prevent discovering a company's public homepage.
-            if (count($settings) !== 1 || !self::publicRow($settings[0]) || empty($configs[$id])) continue;
-            $eligible[$id] = ['base' => $base, 'company' => $company, 'general' => $settings[0]];
+            $eligible[$id] = ['base' => $base];
             $this->counts['offer_companies']++;
         }
 
-        $catalog = [];
-        foreach ($this->rows('output_products', ['company_id', 'module_id', 'product_type', 'product_id', 'is_public', 'is_visible'], $visibility) as $row) {
-            if (!self::publicRow($row) || !isset($configs[$row['company_id']][$row['module_id']])) continue;
-            $catalog[$row['company_id']][$row['product_type']][$row['product_id']] = $row;
-        }
-        $moduleAccess = null;
-        if (isset($this->tables['tenant_company_modules'])) {
-            $moduleAccess = [];
-            foreach ($this->rows('tenant_company_modules', ['company_id', 'module_id', 'is_active'], $visibility) as $row) {
-                if (self::publicRow($row)) $moduleAccess[$row['company_id']][$row['module_id']] = true;
-            }
-        }
-        $moduleStates = null;
-        if (isset($this->tables['system_modules'])) {
-            $moduleStates = [];
-            foreach ($this->rows('system_modules', ['id', 'is_active'], $visibility) as $row) {
-                if (self::publicRow($row)) $moduleStates[$row['id']] = true;
-            }
-        }
         $sources = [
-            ['events_eventdata', 'event', ['start_date']],
-            ['membership_plans', 'membership', []],
-            [isset($this->tables['rental_object']) ? 'rental_object' : 'rental_objects', 'rental', ['is_available']],
-            ['reservation_services', 'service', []],
+            ['events_eventdata', 'event'],
+            ['membership_plans', 'membership'],
+            [isset($this->tables['rental_object']) ? 'rental_object' : 'rental_objects', 'rental'],
+            ['reservation_services', 'service'],
+            ['tenant_announcements', 'announcement'],
         ];
-        foreach ($sources as [$table, $type, $required]) {
-            $rows = $this->rows($table, array_merge(['id', 'company_id', 'share_code', 'is_active'], $required),
-                array_merge($visibility, ['start_date', 'end_date', 'is_member_exclusive']));
+        foreach ($sources as [$table, $type]) {
+            $rows = $this->rows($table, ['company_id', 'share_code'],
+                array_merge($visibility, ['is_member_exclusive', 'target_audience', 'publish_at', 'expire_at']));
+            $sourceCounts = ['read' => count($rows), 'excluded' => 0, 'candidates' => 0];
             foreach ($rows as $row) {
                 $company = $eligible[$row['company_id']] ?? null;
-                $product = $catalog[$row['company_id']][$type][$row['id']] ?? null;
-                if (!$company || !$product || !self::publicRow($row) || self::on($row['is_member_exclusive'] ?? false)) continue;
-                if ($moduleAccess !== null && !isset($moduleAccess[$row['company_id']][$product['module_id']])) continue;
-                if ($moduleStates !== null && !isset($moduleStates[$product['module_id']])) continue;
+                if (!$company || !self::publicRow($row) || self::on($row['is_member_exclusive'] ?? false)) {
+                    $sourceCounts['excluded']++;
+                    continue;
+                }
                 $code = (string)($row['share_code'] ?? '');
-                if (!preg_match('/^[a-zA-Z0-9_-]{1,128}$/D', $code)) continue;
-                if ($type === 'event') {
-                    $end = !empty($row['end_date']) ? $row['end_date'] : $row['start_date'];
-                    if (!is_string($end)) continue;
-                    $end = substr($end, 0, 10);
-                    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $end);
-                    if (!$date || $date->format('Y-m-d') !== $end || $end < $today) continue;
+                if (!preg_match('/^[a-zA-Z0-9_-]{1,128}$/D', $code)
+                    || ($type === 'announcement' && !self::publicAnnouncement($row))) {
+                    $sourceCounts['excluded']++;
+                    continue;
                 }
                 $urls[] = [
                     'loc' => $company['base'] . $code . '?type=' . $type,
-                    'lastmod' => self::dates($row, $product),
+                    'lastmod' => self::dates($row),
                 ];
+                $sourceCounts['candidates']++;
             }
+            $this->counts['sources'][$type] = $sourceCounts;
         }
         // One URL must never be listed twice, including aliases in firm data.
         $unique = [];
         foreach ($urls as $url) $unique[$url['loc']] = $url;
         return array_values($unique);
+    }
+
+    private static function publicAnnouncement(array $row): bool
+    {
+        if (isset($row['target_audience']) && !in_array(strtolower((string)$row['target_audience']), ['all', 'public'], true)) return false;
+        $zone = new DateTimeZone('Europe/Oslo');
+        $now = new DateTimeImmutable('now', $zone);
+        foreach (['publish_at', 'expire_at'] as $field) {
+            if (empty($row[$field])) continue;
+            try {
+                $date = new DateTimeImmutable((string)$row[$field], $zone);
+            } catch (Exception $e) {
+                return false;
+            }
+            if (($field === 'publish_at' && $date > $now) || ($field === 'expire_at' && $date <= $now)) return false;
+        }
+        return true;
     }
 }

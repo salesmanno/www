@@ -98,40 +98,51 @@ $urls = array_column($candidates, 'loc');
 $expected = [
     'https://salesman.no/',
     'https://bergsoy.salesman.no/',
+    'https://inactive.salesman.no/',
+    'https://suboff.salesman.no/',
     'https://maintenance.salesman.no/',
     'https://noindex.salesman.no/',
     'https://draft.salesman.no/',
     'https://settings-off.salesman.no/',
     'https://bergsoy.salesman.no/lqlk5?type=event',
     'https://bergsoy.salesman.no/ongoing?type=event',
+    'https://bergsoy.salesman.no/expired?type=event',
+    'https://bergsoy.salesman.no/inactive?type=event',
+    'https://bergsoy.salesman.no/private?type=event',
+    'https://bergsoy.salesman.no/hidden?type=event',
+    'https://bergsoy.salesman.no/bad-date?type=event',
+    'https://inactive.salesman.no/other-firm?type=event',
     'https://bergsoy.salesman.no/5a9fa2?type=membership',
+    'https://bergsoy.salesman.no/not-for-sale?type=membership',
     'https://bergsoy.salesman.no/rental-code?type=rental',
+    'https://bergsoy.salesman.no/unavailable?type=rental',
     'https://bergsoy.salesman.no/service-code?type=service',
+    'https://bergsoy.salesman.no/service-off?type=service',
 ];
 check($urls === $expected, 'Incorrect publication filtering: ' . json_encode($urls));
-check($repository->counts === ['companies_read'=>9, 'companies_hidden'=>2, 'subdomains_invalid'=>2, 'home_candidates'=>5, 'offer_companies'=>1], 'Incorrect discovery counts.');
+check($repository->counts['companies_read'] === 9 && $repository->counts['home_candidates'] === 7 && $repository->counts['offer_companies'] === 7, 'Incorrect discovery counts.');
 check($candidates[0]['lastmod'] === null && $candidates[1]['lastmod'] === '2025-10-01', 'Incorrect homepage lastmod.');
-check($candidates[6]['lastmod'] === '2025-10-15' && $candidates[9]['lastmod'] === null, 'Missing dates must not invent today.');
+check($candidates[8]['lastmod'] === '2025-10-15', 'Incorrect offer lastmod.');
 $db->exec("UPDATE tenant_company_modules SET is_active=0 WHERE module_id='events'");
-check(count($repository->candidates('2026-11-24')) === 9, 'Disabled firm module leaked.');
+check($repository->candidates('2026-11-24') === $candidates, 'Administrative module access must not suppress HTTP discovery.');
 $db->exec("UPDATE tenant_company_modules SET is_active=1 WHERE module_id='events'");
 $db->exec("UPDATE system_modules SET is_active=0 WHERE id='membership'");
-check(count($repository->candidates('2026-11-24')) === 10, 'Disabled system module leaked.');
+check($repository->candidates('2026-11-24') === $candidates, 'System module access must not suppress HTTP discovery.');
 $db->exec("UPDATE system_modules SET is_active=1 WHERE id='membership'");
 $db->exec("UPDATE tenant_website_config SET is_published=0 WHERE module_id='rental' AND company_id='good'");
-check(count($repository->candidates('2026-11-24')) === 10, 'Unpublished module leaked.');
+check($repository->candidates('2026-11-24') === $candidates, 'Website module setup must not suppress HTTP discovery.');
 $db->exec("UPDATE tenant_website_config SET is_published=1 WHERE module_id='rental' AND company_id='good'");
 $db->exec('ALTER TABLE rental_object RENAME TO rental_objects');
-check(count((new SitemapRepository($db))->candidates('2026-11-24')) === 11, 'Plural rental table compatibility failed.');
+check((new SitemapRepository($db))->candidates('2026-11-24') === $candidates, 'Plural rental table compatibility failed.');
 $db->exec('DROP TABLE reservation_services');
 $missing = new SitemapRepository($db);
-check(count($missing->candidates('2026-11-24')) === 10 && count($missing->warnings) > 0, 'Optional absent source not reported/excluded.');
+check(count($missing->candidates('2026-11-24')) === count($candidates) - 2 && count($missing->warnings) > 0, 'Optional absent source not reported/excluded.');
 $db->exec('ALTER TABLE membership_plans RENAME COLUMN share_code TO old_code');
 $missingCode = new SitemapRepository($db);
-check(count($missingCode->candidates('2026-11-24')) === 9, 'Missing share code must not fall back to IDs.');
+check(count($missingCode->candidates('2026-11-24')) === count($candidates) - 4, 'Missing share code must not fall back to IDs.');
 check(str_contains(implode(' ', $missingCode->warnings), 'share_code'), 'Missing code must be diagnosed.');
 $db->exec('DROP TABLE tenant_website_config');
-check(count((new SitemapRepository($db))->candidates()) === 6, 'Absent module config must not block homepage discovery.');
+check(count((new SitemapRepository($db))->candidates()) === count($candidates) - 4, 'Absent module config must not block discovery.');
 $minimal = new PDO('sqlite::memory:');
 $minimal->exec('CREATE TABLE tenant_companies (id TEXT, subdomain TEXT)');
 foreach ([' Bergsoy ', '', 'www', 'evil.example.com', 'another'] as $index => $host) {
@@ -140,10 +151,34 @@ foreach ([' Bergsoy ', '', 'www', 'evil.example.com', 'another'] as $index => $h
 check(array_column((new SitemapRepository($minimal))->candidates(), 'loc') === [
     'https://salesman.no/', 'https://bergsoy.salesman.no/', 'https://another.salesman.no/',
 ], 'Home discovery must work using company subdomains without website tables or flags.');
+$minimal->exec('CREATE TABLE tenant_announcements (company_id TEXT, share_code TEXT, is_published INT, target_audience TEXT, publish_at TEXT, expire_at TEXT, updated_at TEXT)');
+foreach ([
+    ['news', 1, 'all', '2020-01-01', null],
+    ['draft', 0, 'all', null, null],
+    ['members', 1, 'members', null, null],
+    ['future', 1, 'all', '2999-01-01', null],
+    ['expired', 1, 'all', null, '2020-01-01'],
+    ['bad-date', 1, 'all', 'not-a-date', null],
+    ['../unsafe', 1, 'all', null, null],
+] as [$code, $published, $audience, $publish, $expire]) {
+    add($minimal, 'tenant_announcements', ['company_id'=>'0', 'share_code'=>$code,
+        'is_published'=>$published, 'target_audience'=>$audience, 'publish_at'=>$publish,
+        'expire_at'=>$expire, 'updated_at'=>'2025-01-01']);
+}
+$news = new SitemapRepository($minimal);
+$newsUrls = array_column($news->candidates(), 'loc');
+check(count($newsUrls) === 4 && end($newsUrls) === 'https://bergsoy.salesman.no/news?type=announcement', 'Announcement privacy/scheduling or minimal schema discovery failed.');
+check($news->counts['sources']['announcement'] === ['read'=>7, 'excluded'=>6, 'candidates'=>1], 'Announcement diagnostic counts incorrect.');
+$minimal->exec('CREATE TABLE Events_eventdata (company_id TEXT, share_code TEXT, is_public INT, noindex INT)');
+foreach ([['visible',1,0], ['private',0,0], ['noindex',1,1]] as [$code,$public,$noindex]) {
+    add($minimal,'Events_eventdata',['company_id'=>'0','share_code'=>$code,'is_public'=>$public,'noindex'=>$noindex]);
+}
+check(in_array('https://bergsoy.salesman.no/visible?type=event', array_column((new SitemapRepository($minimal))->candidates(), 'loc'), true), 'Share codes must work without catalog, module, active or date columns.');
+check(count((new SitemapRepository($minimal))->candidates()) === 5, 'Explicit offer privacy flags must still apply.');
 echo "PASS read-only schema-aware candidate filtering, dates, table variants and missing modules.\n";
 
 foreach ([
-    'https://salesman.no/', 'https://bergsoy.salesman.no/', 'https://bergsoy.salesman.no/lqlk5?type=event',
+    'https://salesman.no/', 'https://bergsoy.salesman.no/', 'https://bergsoy.salesman.no/lqlk5?type=event', 'https://bergsoy.salesman.no/news?type=announcement',
 ] as $url) check(SitemapHttpClient::validUrl($url), 'Valid URL rejected.');
 foreach ([
     'http://salesman.no/', 'https://www.salesman.no/', 'https://salesman.no.evil.test/',
@@ -213,6 +248,7 @@ $verifiedInput = $verifier->verify($verifyInput);
 check(count($verifiedInput) === count($candidates), 'Blocked host or offer leaked.');
 check(in_array('https://bergsoy.salesman.no/', array_column($verifiedInput, 'loc'), true), 'Firm canonical without slash dropped the verified firm and offers.');
 check($calls === 2 && $verifier->counts['excluded'] === 2, 'HTTP checks not batched or metrics wrong.');
+check($verifier->counts['http_failed'] === 2 && $verifier->counts['robots_blocked'] === 0, 'Missing HTTP exclusion diagnostics.');
 $noHome = new SitemapVerifier(static function (array $urls, float $deadline): Generator {
     foreach ($urls as $item) yield $item => ['status' => 404, 'headers' => [], 'body' => ''];
 });

@@ -18,31 +18,42 @@
 Ingen nye tabeller eller migreringer. Generatoren leser bare:
 
 - `tenant_companies.subdomain` er grunnlaget for firmasidene. Bare `id` og
-  `subdomain` kreves; eksisterende inaktiv-/privat-flagg respekteres, inkludert
-  `subdomain_active` dersom kolonnen finnes. Mellomrom trimmes og navnet
-  normaliseres til små bokstaver. Ingen nettsteds- eller modulrad kreves for å
-  sende firmaets forside til den offentlige HTTP-kontrollen.
-- Følgende ekstra krav gjelder tilbud, ikke oppdagelse av firmaforsider:
-  `tenant_website_general`: én aktiv innstillingsrad uten vedlikeholdsmodus
-  eller noindex. `tenant_website_config`: minst én aktivert, offentlig og
-  publisert modul.
-
-Diagnostikkens `Sitemap: discovery=` viser antall leste bedrifter,
-skjulte/inaktive bedrifter, ugyldige/reserverte subdomener, forsidekandidater
-og bedrifter med tilstrekkelig oppsett for tilbud. Dette er tellinger før
-HTTP-kontrollen, ikke en bekreftelse på at sidene ble publisert i kartet.
-- `output_products`: bare synlige og offentlige oppføringer for publiserte
-  moduler. Inaktive firmamoduler og systemmoduler utelates når disse
-  tilgangstabellene finnes.
-- `events_eventdata.share_code`: aktivt arrangement som ikke er utløpt
-  (sluttdato, ellers startdato), med `?type=event`.
-- `membership_plans.share_code`: aktivt, offentlig medlemskap til salgs,
-  med `?type=membership`. Eksisterende `is_for_sale`/`for_sale` respekteres.
-- `rental_object.share_code`, eller `rental_objects.share_code`: aktivt og
-  tilgjengelig objekt, med `?type=rental`.
-- `reservation_services.share_code`: aktiv timebestilling, med `?type=service`.
+  `subdomain` kreves. Mellomrom trimmes og navnet normaliseres til små bokstaver.
+  Firmaets administrative aktiv-/modulflagg begrenser ikke oppdagelsen:
+  nettstedets offentlige HTTPS-svar, robots og canonical avgjør inkludering.
+- `events_eventdata.share_code`, med `?type=event`. Også eldre arrangementers
+  informasjonssider undersøkes; utløpt påmelding betyr ikke fjernet nettside.
+- `membership_plans.share_code`, med `?type=membership`.
+- `rental_object.share_code`, eller `rental_objects.share_code`:
+  eksisterende delingskode, med `?type=rental`. Tilgjengelighet for bestilling
+  avgjør ikke om informasjonssiden kan indekseres.
+- `reservation_services.share_code`, med `?type=service`.
   `service` er typen dette prosjektet bruker i tilbudskatalogen. Firmaprosjektets
   delingsruter må bruke samme type; generatoren oppretter ikke disse rutene.
+- `tenant_announcements.share_code`, med `?type=announcement`. Eksplisitt
+  upubliserte/ikke-offentlige nyheter, avgrenset målgruppe, fremtidig
+  publisering og utløpte nyheter utelates.
+
+Delingskilder krever bare `company_id` og `share_code`; eksisterende personvern-,
+publiserings- og noindex-felt respekteres. Ingen oppføring i `output_products`,
+`tenant_website_general`, `tenant_website_config`, `tenant_company_modules`
+eller `system_modules` kreves for oppdagelsen. Alle kandidater må gjennom
+HTTP-kontrollen nedenfor. Manglende skjemafelt for administrativt moduloppsett
+skal aldri skjule eksisterende offentlige sider.
+
+Diagnostikkens `Sitemap: discovery=` viser antall bedrifter og forsidekandidater.
+`companies_hidden` beholdes som bakoverkompatibelt felt og er nå 0.
+`offer_companies` er firmaer med gyldig subdomene, ikke firmaer som har bestått
+HTTP-kontrollen. `Sitemap: source=` viser leste rader, utelatelser og kandidater
+for hver delingskilde. Verifiseringens `robots_blocked`, `http_failed`,
+`not_indexable` og `home_failed` forklarer utelatelser etter oppdagelsen.
+
+**Nyhetsrute:** Kundesiden på Bergsøy ble observert å bruke `?news=<id>` for
+modalvisning. Det beviser ikke støtte for `/<share_code>?type=announcement`.
+Generatoren støtter denne delingskodetypen, men inkluderer den bare når
+kundesiden faktisk svarer med en egen offentlig, kanonisk informasjonsside.
+En modal eller URL til forsiden er ikke nok. Ikke hev at nyheter er indekserbare
+før en virkelig delingskode er kontrollert.
 
 Tabellnavn oppdages uten hensyn til bokstavstørrelse, men spørringene bruker
 faktisk installert navn. Tilbud uten `share_code` eller nødvendige

@@ -25,7 +25,7 @@ final class SitemapDiagnostics
     public static function counts(array $counts): void
     {
         $safe = [];
-        foreach (['candidates', 'included', 'excluded'] as $key) {
+        foreach (['candidates', 'included', 'excluded', 'robots_blocked', 'http_failed', 'not_indexable', 'home_failed'] as $key) {
             if (isset($counts[$key]) && is_int($counts[$key])) $safe[$key] = max(0, $counts[$key]);
         }
         self::record('Sitemap verification: ' . json_encode($safe));
@@ -38,6 +38,15 @@ final class SitemapDiagnostics
             if (isset($counts[$key]) && is_int($counts[$key])) $safe[$key] = max(0, $counts[$key]);
         }
         self::record('Sitemap: discovery=' . json_encode($safe));
+        foreach (['event', 'membership', 'rental', 'service', 'announcement'] as $type) {
+            if (!isset($counts['sources'][$type])) continue;
+            $source = [];
+            foreach (['read', 'excluded', 'candidates'] as $key) {
+                $value = $counts['sources'][$type][$key] ?? 0;
+                if (is_int($value)) $source[$key] = max(0, $value);
+            }
+            self::record('Sitemap: source=' . $type . ' ' . json_encode($source));
+        }
     }
 
     private static function record(string $line): void

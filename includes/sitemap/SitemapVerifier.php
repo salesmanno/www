@@ -134,24 +134,34 @@ final class SitemapVerifier
             $robots[parse_url($url, PHP_URL_HOST)] = $response;
         }
         $toCheck = [];
+        $rejected = ['robots_blocked' => 0, 'http_failed' => 0, 'not_indexable' => 0, 'home_failed' => 0];
         foreach ($byUrl as $url => $candidate) {
             $response = $robots[parse_url($url, PHP_URL_HOST)] ?? ['status' => 0];
             if (($response['status'] ?? 0) === 404
                 || (($response['status'] ?? 0) === 200 && self::robotsAllows($response['body'] ?? '', $url))) {
                 $toCheck[] = $url;
+            } else {
+                $rejected['robots_blocked']++;
             }
         }
         $verified = [];
         foreach (($this->fetch)($toCheck, $deadline) as $url => $response) {
-            if (self::indexable($url, $response)) $verified[$url] = $byUrl[$url];
+            if (self::indexable($url, $response)) {
+                $verified[$url] = $byUrl[$url];
+            } else {
+                $rejected[($response['status'] ?? 0) === 200 ? 'not_indexable' : 'http_failed']++;
+            }
         }
         // An offer cannot be public in this sitemap if its firm's homepage failed.
         foreach ($verified as $url => $row) {
             $home = 'https://' . parse_url($url, PHP_URL_HOST) . '/';
-            if (!isset($verified[$home])) unset($verified[$url]);
+            if (!isset($verified[$home])) {
+                unset($verified[$url]);
+                $rejected['home_failed']++;
+            }
         }
         if (!isset($verified['https://salesman.no/'])) throw new RuntimeException('The canonical homepage did not pass public indexability verification.');
-        $this->counts = ['candidates' => count($candidates), 'included' => count($verified), 'excluded' => count($candidates) - count($verified)];
+        $this->counts = ['candidates' => count($candidates), 'included' => count($verified), 'excluded' => count($candidates) - count($verified)] + $rejected;
         return array_values($verified);
     }
 }

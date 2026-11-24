@@ -32,12 +32,13 @@ function publicSitemapCache(): SitemapCache {
     return new SitemapCache(%s, static function(float $deadline): array {
         SitemapDiagnostics::warning('Sitemap: optional source rental_objects is absent; excluded.');
         SitemapDiagnostics::warning('Sitemap: secret DO_NOT_EXPOSE');
-        SitemapDiagnostics::counts(['candidates'=>4, 'included'=>3, 'excluded'=>1, 'password'=>'DO_NOT_EXPOSE']);
+        SitemapDiagnostics::counts(['candidates'=>5, 'included'=>4, 'excluded'=>1, 'password'=>'DO_NOT_EXPOSE']);
         SitemapDiagnostics::discovery(['companies_read'=>2, 'home_candidates'=>1, 'password'=>'DO_NOT_EXPOSE']);
         return [
             ['loc'=>'https://salesman.no/','lastmod'=>null],
             ['loc'=>'https://bergsoy.salesman.no/','lastmod'=>'2025-10-15'],
             ['loc'=>'https://bergsoy.salesman.no/lqlk5?type=event','lastmod'=>null],
+            ['loc'=>'https://bergsoy.salesman.no/news-code?type=announcement','lastmod'=>null],
         ];
     });
 }
@@ -80,7 +81,7 @@ function publicSitemapCache(): SitemapCache {
         status, headers, body = get("/sitemap.xml")
         assert status == 200
         assert headers["Content-Type"] == "application/xml; charset=UTF-8"
-        assert headers.get("X-Sitemap-URL-Count") == "3"
+        assert headers.get("X-Sitemap-URL-Count") == "4"
         assert headers.get("X-Sitemap-Parts") == "1"
         assert headers.get("X-Sitemap-Generated")
         assert headers.get("Location") is None and headers.get("Set-Cookie") is None
@@ -88,8 +89,9 @@ function publicSitemapCache(): SitemapCache {
         ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
         xml = ET.fromstring(body)
         assert xml.tag == ns + "urlset"
-        assert len(xml.findall(ns + "url")) == 3
+        assert len(xml.findall(ns + "url")) == 4
         assert xml.findall(ns + "url")[2].find(ns + "loc").text.endswith("lqlk5?type=event")
+        assert xml.findall(ns + "url")[3].find(ns + "loc").text.endswith("news-code?type=announcement")
         assert get("/sitemap.php")[2] == body
         assert b'<!--' in body and b'Sitemap verification:' in body
         assert b'DO_NOT_EXPOSE' not in body
@@ -97,7 +99,7 @@ function publicSitemapCache(): SitemapCache {
         assert status == 200 and diagnostic_headers["Content-Type"] == "text/plain; charset=UTF-8"
         assert diagnostic_headers["Cache-Control"] == "no-store"
         assert diagnostic_headers["X-Robots-Tag"] == "noindex"
-        assert b'Sitemap verification: {"candidates":4,"included":3,"excluded":1}' in diagnostic_body
+        assert b'Sitemap verification: {"candidates":5,"included":4,"excluded":1}' in diagnostic_body
         assert b'optional source rental_objects is absent' in diagnostic_body
         assert b'Sitemap: discovery={"companies_read":2,"home_candidates":1}' in diagnostic_body
         assert b'DO_NOT_EXPOSE' not in diagnostic_body
