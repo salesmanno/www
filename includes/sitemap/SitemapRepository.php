@@ -135,7 +135,7 @@ final class SitemapRepository
             ['events_eventdata', 'event'],
             ['membership_plans', 'membership'],
             [isset($this->tables['rental_object']) ? 'rental_object' : 'rental_objects', 'rental'],
-            ['reservation_services', 'service'],
+            ['reservation_services', 'reservation'],
             ['tenant_announcements', 'announcement'],
         ];
         foreach ($sources as [$table, $type]) {

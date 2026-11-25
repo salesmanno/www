@@ -27,9 +27,9 @@ Ingen nye tabeller eller migreringer. Generatoren leser bare:
 - `rental_object.share_code`, eller `rental_objects.share_code`:
   eksisterende delingskode, med `?type=rental`. Tilgjengelighet for bestilling
   avgjør ikke om informasjonssiden kan indekseres.
-- `reservation_services.share_code`, med `?type=service`.
-  `service` er typen dette prosjektet bruker i tilbudskatalogen. Firmaprosjektets
-  delingsruter må bruke samme type; generatoren oppretter ikke disse rutene.
+- `reservation_services.share_code`, med `?type=reservation`.
+  Kundesidens faktiske delingsrute bruker `reservation`, ikke katalogtypen
+  `service`. Generatoren oppretter ikke disse rutene.
 - `tenant_announcements.share_code`, med `?type=announcement`. Eksplisitt
   upubliserte/ikke-offentlige nyheter, avgrenset målgruppe, fremtidig
   publisering og utløpte nyheter utelates.
@@ -139,6 +139,11 @@ Offisiell veiledning:
 https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap#cross-submit
 
 ## Lokale tester (ingen produksjonsdatabase eller eksterne HTTP-kall)
+
+`tests/fixtures/sitemap_customer_reference.xml` er kundesidens oppgitte
+14 URL-er som regresjonsgrunnlag. Testen bygger et isolert minimumsskjema og
+krever de samme adressene pluss hovedsiden. Firmadataene hardkodes ikke i
+produksjonsgeneratoren. Denne testen verifiserer formatet, ikke live DB-innhold.
 
 ### Diagnostikk uten tilgang til PHP-loggen
 

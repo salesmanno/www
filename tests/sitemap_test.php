@@ -116,8 +116,8 @@ $expected = [
     'https://bergsoy.salesman.no/not-for-sale?type=membership',
     'https://bergsoy.salesman.no/rental-code?type=rental',
     'https://bergsoy.salesman.no/unavailable?type=rental',
-    'https://bergsoy.salesman.no/service-code?type=service',
-    'https://bergsoy.salesman.no/service-off?type=service',
+    'https://bergsoy.salesman.no/service-code?type=reservation',
+    'https://bergsoy.salesman.no/service-off?type=reservation',
 ];
 check($urls === $expected, 'Incorrect publication filtering: ' . json_encode($urls));
 check($repository->counts['companies_read'] === 9 && $repository->counts['home_candidates'] === 7 && $repository->counts['offer_companies'] === 7, 'Incorrect discovery counts.');
@@ -177,6 +177,37 @@ check(in_array('https://bergsoy.salesman.no/visible?type=event', array_column((n
 check(count((new SitemapRepository($minimal))->candidates()) === 5, 'Explicit offer privacy flags must still apply.');
 echo "PASS read-only schema-aware candidate filtering, dates, table variants and missing modules.\n";
 
+// Contract supplied by the customer-site project, not inferred from catalog types.
+$reference = simplexml_load_file(__DIR__ . '/fixtures/sitemap_customer_reference.xml');
+$referenceUrls = [];
+$contract = new PDO('sqlite::memory:');
+$contract->exec('CREATE TABLE tenant_companies (id TEXT, subdomain TEXT)');
+$sourceTables = ['event'=>'events_eventdata', 'membership'=>'membership_plans',
+    'rental'=>'rental_object', 'reservation'=>'reservation_services'];
+foreach ($sourceTables as $table) $contract->exec("CREATE TABLE {$table} (company_id TEXT, share_code TEXT)");
+$hosts = [];
+foreach ($reference->url as $entry) {
+    $loc = (string)$entry->loc;
+    $referenceUrls[] = $loc;
+    check(SitemapHttpClient::validUrl($loc), 'Customer-site URL rejected: ' . $loc);
+    $parts = parse_url($loc);
+    $subdomain = explode('.', $parts['host'])[0];
+    if (!isset($hosts[$subdomain])) {
+        add($contract, 'tenant_companies', ['id'=>$subdomain, 'subdomain'=>$subdomain]);
+        $hosts[$subdomain] = true;
+    }
+    if (isset($parts['query'])) {
+        parse_str($parts['query'], $query);
+        add($contract, $sourceTables[$query['type']], ['company_id'=>$subdomain, 'share_code'=>substr($parts['path'], 1)]);
+    }
+}
+$contractUrls = array_column((new SitemapRepository($contract))->candidates(), 'loc');
+$referenceUrls[] = 'https://salesman.no/';
+sort($contractUrls);
+sort($referenceUrls);
+check(count($referenceUrls) === 15 && $contractUrls === $referenceUrls, 'Generator differs from the customer-site URL contract.');
+echo "PASS all 14 customer-site reference URLs plus Salesman homepage from minimal DB schema.\n";
+
 foreach ([
     'https://salesman.no/', 'https://bergsoy.salesman.no/', 'https://bergsoy.salesman.no/lqlk5?type=event', 'https://bergsoy.salesman.no/news?type=announcement',
 ] as $url) check(SitemapHttpClient::validUrl($url), 'Valid URL rejected.');
@@ -185,6 +216,7 @@ foreach ([
     'https://evil.test/', 'https://127.0.0.1/', 'https://bergsoy.salesman.no:443/',
     'https://user:pass@bergsoy.salesman.no/', 'https://bergsoy.salesman.no/../admin',
     'https://bergsoy.salesman.no/a?type=event&secret=x', 'https://bergsoy.salesman.no/a?type=admin',
+    'https://justnails.salesman.no/f72206?type=service',
     'https://bergsoy.salesman.no/a#private', 'https://bergsoy.salesman.no/a%2fb',
 ] as $url) check(!SitemapHttpClient::validUrl($url), 'Unsafe URL accepted: ' . $url);
 foreach (['127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.169.254', '0.0.0.0',

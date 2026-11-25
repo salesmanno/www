@@ -38,7 +38,7 @@ final class SitemapDiagnostics
             if (isset($counts[$key]) && is_int($counts[$key])) $safe[$key] = max(0, $counts[$key]);
         }
         self::record('Sitemap: discovery=' . json_encode($safe));
-        foreach (['event', 'membership', 'rental', 'service', 'announcement'] as $type) {
+        foreach (['event', 'membership', 'rental', 'reservation', 'announcement'] as $type) {
             if (!isset($counts['sources'][$type])) continue;
             $source = [];
             foreach (['read', 'excluded', 'candidates'] as $key) {

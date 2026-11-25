@@ -13,7 +13,7 @@ final class SitemapHttpClient
         $host = $parts['host'] ?? '';
         if ($host !== 'salesman.no' && !preg_match('/^(?!www\.)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.salesman\.no$/D', $host)) return false;
         return preg_match('~^/(?:robots\.txt|[a-zA-Z0-9_-]{1,128})?$~D', $parts['path'] ?? '/') === 1
-            && (!isset($parts['query']) || preg_match('/^type=(event|membership|rental|service|announcement)$/D', $parts['query']) === 1);
+            && (!isset($parts['query']) || preg_match('/^type=(event|membership|rental|reservation|announcement)$/D', $parts['query']) === 1);
     }
 
     public static function publicIp(string $address): bool

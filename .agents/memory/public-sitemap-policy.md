@@ -14,3 +14,9 @@ Finn tilbydere med utgangspunkt i `tenant_companies.subdomain`. Brukeren presise
 **Why:** Brukeren ba uttrykkelig om dette da produksjonskartet bare fikk én kandidat. Nettsteds- og moduloppsett må ikke hindre oppdagelse av eksisterende offentlige forsider.
 
 **How to apply:** Ikke bruk administrative aktiv-/modulflagg eller obligatoriske katalogkoblinger som bevis for at en offentlig nettside mangler. Oppdag delingskoder direkte; respekter eksplisitt privat/upublisert innhold og kontroller offentlig HTTP-tilgjengelighet og indekserbarhet før URL-er tas inn i kartet.
+
+Kundesidens delingsruter er autoritative for URL-typen: timebestilling bruker `type=reservation`, ikke katalogtypen `service`.
+
+**Why:** Brukeren delte et nettstedskart fra kundesideprosjektet som viste den faktiske kontrakten; intern produktkatalog hadde ført til feil offentlig URL-type.
+
+**How to apply:** Ikke utled offentlige ruter fra interne modul-/produktnavn. Kontroller mot kundesidens delingslenker når nye typer legges til.
